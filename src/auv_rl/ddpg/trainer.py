@@ -108,7 +108,7 @@ def _evaluate(
     episode_id = 0
     for scenario_key in scenario_keys:
         for seed in seeds:
-            observation, _ = env.reset(
+            observation, reset_info = env.reset(
                 seed=seed,
                 options={"scenario_key": scenario_key},
             )
@@ -120,7 +120,14 @@ def _evaluate(
             while not terminated and not truncated:
                 action = agent.act(observation, evaluate=True)
                 observation, _, terminated, truncated, info = env.step(action)
-            rows.append({**_rows_from_info(info), "scenario_key": scenario_key, "eval_seed": seed})
+            rows.append(
+                {
+                    **_rows_from_info(info),
+                    "scenario_key": scenario_key,
+                    "eval_seed": seed,
+                    "reset_sensor_points_total": reset_info.get("sensor_points_total"),
+                }
+            )
     return rows
 
 

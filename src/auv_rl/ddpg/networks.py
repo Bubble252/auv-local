@@ -81,21 +81,39 @@ class NoisyLinear(nn.Module):
         return torch.nn.functional.linear(input_tensor, weight, bias)
 
 
-def _make_mlp(
-    input_dim: int,
-    hidden_sizes: Sequence[int],
-    output_dim: int,
-    *,
-    use_noisy: bool,
-) -> nn.Sequential:
-    layers: list[nn.Module] = []
-    previous = input_dim
-    for width in hidden_sizes:
-        layers.append(NoisyLinear(previous, width, use_noisy=use_noisy))
-        layers.append(nn.ReLU())
-        previous = width
-    layers.append(NoisyLinear(previous, output_dim, use_noisy=use_noisy))
-    return nn.Sequential(*layers)
+class _NoisyMLP(nn.Module):
+    """MLP that forwards the noise mode to every :class:`NoisyLinear` layer.
+
+    ``nn.Sequential`` cannot pass the ``sample_noise`` keyword to its children,
+    which silently made evaluation sample noisy weights.
+    """
+
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_sizes: Sequence[int],
+        output_dim: int,
+        *,
+        use_noisy: bool,
+    ) -> None:
+        super().__init__()
+        layers: list[nn.Module] = []
+        previous = input_dim
+        for width in hidden_sizes:
+            layers.append(NoisyLinear(previous, width, use_noisy=use_noisy))
+            layers.append(nn.ReLU())
+            previous = width
+        layers.append(NoisyLinear(previous, output_dim, use_noisy=use_noisy))
+        self.layers = nn.ModuleList(layers)
+
+    def forward(self, inputs: torch.Tensor, *, sample_noise: bool = True) -> torch.Tensor:
+        outputs = inputs
+        for layer in self.layers:
+            if isinstance(layer, NoisyLinear):
+                outputs = layer(outputs, sample_noise=sample_noise)
+            else:
+                outputs = layer(outputs)
+        return outputs
 
 
 class _SequenceHead(nn.Module):
@@ -123,7 +141,7 @@ class _SequenceHead(nn.Module):
         else:
             self.gru = None
             head_input = input_dim
-        self.head = _make_mlp(head_input, hidden_sizes, output_dim, use_noisy=use_noisy)
+        self.head = _NoisyMLP(head_input, hidden_sizes, output_dim, use_noisy=use_noisy)
         self.gru_hidden_size = gru_hidden_size
 
     def forward(
@@ -139,7 +157,7 @@ class _SequenceHead(nn.Module):
         if unbatched_time:
             inputs = inputs.unsqueeze(1)
         if self.gru is None:
-            outputs = self.head(inputs)
+            outputs = self.head(inputs, sample_noise=sample_noise)
             next_hidden = None
         else:
             if hidden is None:
@@ -151,7 +169,7 @@ class _SequenceHead(nn.Module):
                     dtype=inputs.dtype,
                 )
             outputs, next_hidden = self.gru(inputs, hidden)
-            outputs = self.head(outputs)
+            outputs = self.head(outputs, sample_noise=sample_noise)
         if unbatched_time:
             outputs = outputs.squeeze(1)
         return outputs, next_hidden

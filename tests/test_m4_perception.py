@@ -506,6 +506,44 @@ def test_oceansim_source_runs_scene_reset_and_tick_callbacks() -> None:
     assert len(ticks) == 4
 
 
+def test_planar_env_reports_s2_points_at_reset() -> None:
+    cases = default_planar_scenarios()[:2]
+
+    class ScenarioAwareSource:
+        def __init__(self) -> None:
+            self.has_obstacle = False
+
+        def reset(self, *, scenario: ScenarioConfig) -> None:
+            self.has_obstacle = bool(scenario.world.obstacle_map.obstacles)
+
+        def capture(self, state: State) -> PointCloudFrame:
+            points = (
+                np.array([[11.2, 0.0, 0.0]], dtype=np.float64)
+                if self.has_obstacle
+                else np.empty((0, 3), dtype=np.float64)
+            )
+            return PointCloudFrame(stamp_s=state.t_s, points_body_m=points)
+
+        def close(self) -> None:
+            return None
+
+    backend = PointCloudSonarBackend(ScenarioAwareSource(), config=PointCloudSonarConfig())
+    env = PlanarAvoidanceEnv(
+        PlanarEnvConfig(active_scenario_keys=("s1", "s2")),
+        scenarios=cases,
+        perception=backend,
+    )
+
+    _, s1_info = env.reset(seed=0, options={"scenario_key": "s1"})
+    assert s1_info["sensor_points_total"] == 0.0
+    assert s1_info["sensor_scan_valid"] == 1.0
+
+    _, s2_info = env.reset(seed=0, options={"scenario_key": "s2"})
+    assert s2_info["sensor_points_total"] == 1.0
+    assert s2_info["sensor_points_used"] == 1.0
+    assert s2_info["sensor_scan_valid"] == 1.0
+
+
 def test_pointcloud_backend_prewarms_scenarios_in_order() -> None:
     events: list[tuple[str, str]] = []
 

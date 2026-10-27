@@ -48,6 +48,7 @@ EPISODE_FIELDS: tuple[str, ...] = (
     "sensor_empty_rays",
     "sensor_frame_age_s",
     "sensor_scan_returned_false",
+    "reset_sensor_points_total",
     "reward_total",
     "reward_distance",
     "reward_obstacle",
@@ -110,7 +111,10 @@ def evaluate_policy(
     rows: list[dict[str, Any]] = []
     for scenario_key in scenario_keys:
         for seed in seeds:
-            observation, _ = env.reset(seed=seed, options={"scenario_key": scenario_key})
+            observation, reset_info = env.reset(
+                seed=seed,
+                options={"scenario_key": scenario_key},
+            )
             terminated = False
             truncated = False
             info: dict[str, Any] = {}
@@ -122,6 +126,7 @@ def evaluate_policy(
                     **{field: info.get(field) for field in EPISODE_FIELDS},
                     "scenario_key": scenario_key,
                     "eval_seed": seed,
+                    "reset_sensor_points_total": reset_info.get("sensor_points_total"),
                 }
             )
     return rows

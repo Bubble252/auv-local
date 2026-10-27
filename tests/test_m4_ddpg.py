@@ -8,7 +8,7 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from auv_rl.ddpg.agent import DDPGAgent, DDPGConfig  # noqa: E402
-from auv_rl.ddpg.networks import NoisyLinear  # noqa: E402
+from auv_rl.ddpg.networks import NoisyLinear, PolicyActor  # noqa: E402
 from auv_rl.ddpg.replay import PrioritizedSequenceReplayBuffer, SumTree  # noqa: E402
 from auv_rl.ddpg.trainer import train_ddpg  # noqa: E402
 from auv_rl.envs.planar_avoidance import PlanarAvoidanceEnv, PlanarEnvConfig  # noqa: E402
@@ -120,6 +120,113 @@ def test_sumtree_update_and_sequence_replay_stays_within_episode() -> None:
     for row in range(batch.episode_ids.shape[0]):
         valid = batch.episode_ids[row][batch.valid_masks[row] > 0.5]
         assert np.all(valid == valid[0])
+
+
+def test_actor_eval_is_deterministic_after_rng_is_consumed() -> None:
+    config = DDPGConfig(
+        observation_dim=5,
+        hidden_sizes=(8, 8),
+        gru_hidden_size=4,
+        history_length=4,
+        use_noisy=True,
+        use_gru=True,
+        use_pper=False,
+        device="cpu",
+    )
+    agent = DDPGAgent(config, seed=17)
+    observation = np.linspace(0.0, 1.0, 5, dtype=np.float32)
+    agent.begin_episode(0)
+    first = agent.act(observation, evaluate=True)
+    torch.randn(4096)
+    agent.begin_episode(0)
+    second = agent.act(observation, evaluate=True)
+    assert np.allclose(first, second, atol=1e-7, rtol=0.0)
+
+
+def test_eval_forward_ignores_noisy_rho_and_training_uses_it() -> None:
+    actor = PolicyActor(
+        5,
+        (-0.5, -0.2),
+        (0.5, 0.2),
+        hidden_sizes=(8, 8),
+        use_gru=False,
+        use_noisy=True,
+    )
+    inputs = torch.linspace(-1.0, 1.0, 5).reshape(1, 5)
+    mean_action, _ = actor(inputs, sample_noise=False)
+    with torch.no_grad():
+        for module in actor.modules():
+            if isinstance(module, NoisyLinear):
+                module.weight_rho.fill_(50.0)
+                module.bias_rho.fill_(50.0)
+    mean_action_after, _ = actor(inputs, sample_noise=False)
+    noisy_action, _ = actor(inputs, sample_noise=True)
+    assert torch.allclose(mean_action, mean_action_after, atol=1e-7, rtol=0.0)
+    assert not torch.allclose(mean_action, noisy_action, atol=1e-6, rtol=0.0)
+
+
+def test_noisy_forward_samples_different_weights_each_call() -> None:
+    actor = PolicyActor(
+        4,
+        (-0.5, -0.2),
+        (0.5, 0.2),
+        hidden_sizes=(16, 8),
+        use_gru=False,
+        use_noisy=True,
+    )
+    inputs = torch.linspace(-1.0, 1.0, 4).reshape(1, 4)
+    first, _ = actor(inputs, sample_noise=True)
+    second, _ = actor(inputs, sample_noise=True)
+    assert not torch.allclose(first, second, atol=1e-8, rtol=0.0)
+
+
+def test_checkpoint_reload_is_deterministic_after_rng_drift(tmp_path) -> None:
+    config = DDPGConfig(
+        observation_dim=5,
+        hidden_sizes=(8, 8),
+        gru_hidden_size=4,
+        history_length=4,
+        use_noisy=True,
+        use_gru=True,
+        use_pper=True,
+        device="cpu",
+    )
+    agent = DDPGAgent(config, seed=23)
+    observation = np.linspace(0.0, 1.0, 5, dtype=np.float32)
+    agent.begin_episode(0)
+    torch.randn(1024)
+    expected = agent.act(observation, evaluate=True)
+    checkpoint = tmp_path / "model.pt"
+    agent.save(checkpoint)
+    restored = DDPGAgent.load(checkpoint)
+    torch.randn(2048)
+    restored.begin_episode(0)
+    actual = restored.act(observation, evaluate=True)
+    assert np.allclose(actual, expected, atol=1e-6, rtol=0.0)
+
+
+def test_target_networks_ignore_noise_and_are_repeatable() -> None:
+    config = DDPGConfig(
+        observation_dim=4,
+        hidden_sizes=(8, 8),
+        gru_hidden_size=4,
+        history_length=3,
+        use_noisy=True,
+        use_gru=True,
+        use_pper=False,
+        device="cpu",
+    )
+    agent = DDPGAgent(config, seed=29)
+    observations = torch.randn(2, 3, 4)
+    with torch.no_grad():
+        first_actions, _ = agent.target_actor(observations, sample_noise=False)
+        torch.randn(512)
+        second_actions, _ = agent.target_actor(observations, sample_noise=False)
+        first_q, _ = agent.target_critic(observations, first_actions, sample_noise=False)
+        torch.randn(512)
+        second_q, _ = agent.target_critic(observations, second_actions, sample_noise=False)
+    assert torch.allclose(first_actions, second_actions, atol=1e-7, rtol=0.0)
+    assert torch.allclose(first_q, second_q, atol=1e-7, rtol=0.0)
 
 
 def test_checkpoint_restore_matches_deterministic_action(tmp_path) -> None:
