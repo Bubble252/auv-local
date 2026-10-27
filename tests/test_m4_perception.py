@@ -573,7 +573,7 @@ def test_pointcloud_backend_prewarms_scenarios_in_order() -> None:
     ]
 
 
-def test_pointcloud_backend_does_not_rebuild_same_scene() -> None:
+def test_pointcloud_backend_rebuilds_scene_on_every_reset() -> None:
     resets: list[str] = []
 
     class FakeSource:
@@ -591,11 +591,72 @@ def test_pointcloud_backend_does_not_rebuild_same_scene() -> None:
 
     cases = default_planar_scenarios()[:2]
     backend = PointCloudSonarBackend(FakeSource())
-    backend.reset(scenario=cases[0].scenario)
-    backend.reset(scenario=cases[0].scenario)
-    backend.reset(scenario=cases[1].scenario)
-    backend.reset(scenario=cases[1].scenario)
-    assert resets == [cases[0].scenario.name, cases[1].scenario.name]
+    for _ in range(2):
+        backend.reset(scenario=cases[0].scenario)
+        backend.reset(scenario=cases[1].scenario)
+    assert resets == [
+        cases[0].scenario.name,
+        cases[1].scenario.name,
+        cases[0].scenario.name,
+        cases[1].scenario.name,
+    ]
+
+
+def test_pointcloud_backend_retries_empty_obstacle_echo_on_reset() -> None:
+    obstacle_case = next(case for case in default_planar_scenarios() if case.key == "s2")
+    captures = 0
+
+    class FlakySource:
+        def reset(self, *, scenario: ScenarioConfig) -> None:
+            return None
+
+        def capture(self, state: State) -> PointCloudFrame:
+            nonlocal captures
+            captures += 1
+            points = (
+                np.empty((0, 3), dtype=np.float64)
+                if captures == 1
+                else np.array([[11.2, 0.0, 0.0]], dtype=np.float64)
+            )
+            return PointCloudFrame(stamp_s=state.t_s, points_body_m=points)
+
+        def close(self) -> None:
+            return None
+
+    backend = PointCloudSonarBackend(
+        FlakySource(),
+        require_obstacle_echo_on_reset=True,
+        reset_echo_attempts=2,
+    )
+    backend.reset(scenario=obstacle_case.scenario)
+    assert backend.last_reset_echo_attempts == 2
+    assert captures == 2
+
+
+def test_pointcloud_backend_raises_when_obstacle_echo_never_arrives() -> None:
+    obstacle_case = next(case for case in default_planar_scenarios() if case.key == "s2")
+
+    class BlindSource:
+        def reset(self, *, scenario: ScenarioConfig) -> None:
+            return None
+
+        def capture(self, state: State) -> PointCloudFrame:
+            return PointCloudFrame(
+                stamp_s=state.t_s,
+                points_body_m=np.empty((0, 3), dtype=np.float64),
+            )
+
+        def close(self) -> None:
+            return None
+
+    backend = PointCloudSonarBackend(
+        BlindSource(),
+        require_obstacle_echo_on_reset=True,
+        reset_echo_attempts=3,
+    )
+    with pytest.raises(PerceptionUnavailableError, match="no obstacle echo"):
+        backend.reset(scenario=obstacle_case.scenario)
+    assert backend.last_reset_echo_attempts == 3
 
 
 def test_p1_oceansim_config_matches_frozen_values() -> None:

@@ -345,7 +345,12 @@ def main() -> int:
         scan_attempts=int(oceansim.get("scan_attempts", 60)),
         sensor_origin_body_m=(0.8, 0.0, 0.0),
     )
-    backend = PointCloudSonarBackend(source, config=sonar_config)
+    backend = PointCloudSonarBackend(
+        source,
+        config=sonar_config,
+        require_obstacle_echo_on_reset=True,
+        reset_echo_attempts=3,
+    )
     env = PlanarAvoidanceEnv(env_config, perception=backend)
     backend.prewarm(scenarios=tuple(case.scenario for case in cases))
     print(

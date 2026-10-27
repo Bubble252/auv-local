@@ -367,25 +367,54 @@ class PointCloudSonarBackend:
         source: PointCloudSource,
         *,
         config: PointCloudSonarConfig | None = None,
+        require_obstacle_echo_on_reset: bool = False,
+        reset_echo_attempts: int = 2,
     ) -> None:
         self.source = source
         self.config = PointCloudSonarConfig() if config is None else config
         if not isinstance(self.config, PointCloudSonarConfig):
             raise TypeError("config must be a PointCloudSonarConfig")
+        if reset_echo_attempts < 1:
+            raise ValueError("reset_echo_attempts must be positive")
         self.adapter = PointCloudSonarAdapter(self.config)
         self.observation_source = self.config.observation_source
         self.perception_mode = self.config.perception_mode
         self.config_hash = self.config.config_hash
+        self.require_obstacle_echo_on_reset = bool(require_obstacle_echo_on_reset)
+        self.reset_echo_attempts = int(reset_echo_attempts)
         self._expect_obstacles = False
-        self._active_scenario_name: str | None = None
+        self.last_reset_echo_attempts = 0
 
     def reset(self, *, scenario: ScenarioConfig) -> None:
         if not isinstance(scenario, ScenarioConfig):
             raise TypeError("scenario must be a ScenarioConfig")
-        if self._active_scenario_name != scenario.name:
-            self.source.reset(scenario=scenario)
-            self._active_scenario_name = scenario.name
+        # Always rebuild: OceanSim's Replicator point-cloud output can stay
+        # empty after an episode ends far from the target.  Skipping the
+        # rebuild on an unchanged scenario made later S2 resets blind.
+        self.source.reset(scenario=scenario)
         self._expect_obstacles = bool(scenario.world.obstacle_map.obstacles)
+        self.last_reset_echo_attempts = 0
+        if not (self.require_obstacle_echo_on_reset and self._expect_obstacles):
+            return
+        last_points = 0
+        for attempt in range(self.reset_echo_attempts):
+            self.last_reset_echo_attempts = attempt + 1
+            frame = self.source.capture(scenario.start)
+            observation = self.adapter.scan_from_points(
+                frame.points_body_m,
+                stamp_s=frame.stamp_s,
+                state=scenario.start,
+                health=frame.health,
+            )
+            last_points = int(observation.health.get("points_used", 0.0))
+            if last_points > 0:
+                return
+            if attempt + 1 < self.reset_echo_attempts:
+                self.source.reset(scenario=scenario)
+        raise PerceptionUnavailableError(
+            "no obstacle echo at reset despite obstacles in scenario "
+            f"({last_points} points used, {self.reset_echo_attempts} attempts)"
+        )
 
     def prewarm(self, *, scenarios: tuple[ScenarioConfig, ...]) -> None:
         """Populate backend scene state without consuming training steps.
