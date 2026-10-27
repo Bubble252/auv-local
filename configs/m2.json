@@ -1,0 +1,22 @@
+{
+  "rollout": {
+    "horizon_s": 2.0,
+    "step_s": 0.2,
+    "replan_period_s": 0.5,
+    "max_path_length_m": 5.0,
+    "model_id": "line_detour_v1",
+    "stop_on_collision": true,
+    "clip_actions": true,
+    "inherit_depth_from_route": true
+  },
+  "seeds": [0, 1, 2],
+  "nominal_speed_mps": 1.0,
+  "max_duration_s": 60.0,
+  "pvs_sample_time_s": 0.02,
+  "oracle_ray_count": 72,
+  "oracle_min_range_m": 0.05,
+  "oracle_max_range_m": 8.0,
+  "oracle_validity_s": 0.5,
+  "horizontal_lookahead_m": 1.5,
+  "vertical_lookahead_m": 1.0
+}
