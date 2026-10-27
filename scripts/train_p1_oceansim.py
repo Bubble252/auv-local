@@ -33,12 +33,20 @@ class _Tee:
 
     def write(self, data: str) -> int:
         for stream in self._streams:
-            stream.write(data)
+            try:
+                stream.write(data)
+            except (BrokenPipeError, ValueError):
+                # A detached training process must survive its terminal or
+                # SSH stdout pipe going away. The file stream is still valid.
+                continue
         return len(data)
 
     def flush(self) -> None:
         for stream in self._streams:
-            stream.flush()
+            try:
+                stream.flush()
+            except (BrokenPipeError, ValueError):
+                continue
 
 
 def _parse_args() -> argparse.Namespace:

@@ -202,7 +202,8 @@ def train_ddpg(
             )
             print(
                 f"episode={episode_id} timestep={timestep} scenario={scenario_key} "
-                f"success={info.get('success')} reason={info.get('failure_reason')}"
+                f"success={info.get('success')} reason={info.get('failure_reason')}",
+                flush=True,
             )
             episode_id += 1
 
@@ -264,8 +265,8 @@ def train_ddpg(
         encoding="utf-8",
     )
     successes = sum(bool(row["success"]) for row in eval_rows)
-    print(f"trained model: {model_path}")
-    print(f"evaluation success: {successes}/{len(eval_rows)}")
+    print(f"trained model: {model_path}", flush=True)
+    print(f"evaluation success: {successes}/{len(eval_rows)}", flush=True)
     return 0
 
 
