@@ -7,14 +7,26 @@ name = "auv-local"
 version = "0.1.0"
 description = "Modular local planning and reactive navigation contracts for underwater vehicles."
 requires-python = ">=3.10"
-dependencies = ["numpy>=2.0", "auv-planner>=0.1.0"]
+dependencies = ["numpy>=1.26,<3", "auv-planner>=0.1.0"]
 
 [project.optional-dependencies]
 dev = [
+    "matplotlib>=3.9",
     "mypy>=1.10,<2",
     "pyright>=1.1.400",
     "pytest>=8",
     "ruff>=0.11",
+]
+viz = [
+    "plotly>=6.0",
+]
+rl = [
+    "gymnasium==0.29.1",
+]
+training = [
+    "gymnasium==0.29.1",
+    "stable-baselines3==2.8.0",
+    "torch==2.7.0",
 ]
 
 [tool.uv.sources]
