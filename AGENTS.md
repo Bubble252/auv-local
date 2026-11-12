@@ -3,6 +3,16 @@
 本文件适用于 `settled_局部规划器_反应式/`。更上层规则见
 `/home/bubble/水下机器人/AGENTS.md` 和 `/home/bubble/.codex/AGENTS.md`。
 
+## 0. 独立仓库边界
+
+- 本目录现在对应独立 Git 仓库 `/home/bubble/水下机器人-local`，分支 `main`。
+- Python 包是 `auv_local` / `auv_rl` / `auv_lowlevel` / `auv_isaaclab`。
+- 只允许依赖已安装的 `auv-core`；不得导入 `auv_planner`，也不得引用
+  `../settled_全局规划器/src`。
+- 安装顺序：先安装 `settled_共享基础` 的 `auv-core`，再安装本仓库。
+- 外部 PVS/MSS 资产用 `PVS_SOURCE_DIR` / `MSS_SOURCE_DIR` 指定；`artifacts/`
+  只作为本地测试 fixture，不进入 Git。
+
 ## 1. 项目定位
 
 - PC 臂：合成传感器 + Batch Torch REMUS100，不依赖 IsaacLab/IsaacSim 才能跑主实验。
