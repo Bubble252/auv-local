@@ -1,0 +1,24 @@
+{
+  "frozen_before_measurement": true,
+  "schema_version": "auv_goal151_t2_terminal_gate_profiles.v1",
+  "source_config": "configs/lowlevel/goal86/pc_goal86_t2_sac_default_20261110.json",
+  "source_sha256": "029f8afff2388a74bce935b68efc2dca5faf83c7f01f38e303967b3ae2d7563e",
+  "variants": {
+    "near10_2": {
+      "learner_terminal_gate_mode": "none",
+      "path": "configs/lowlevel/goal151/near10_2.json",
+      "residual_terminal_gate_enabled": true,
+      "residual_terminal_gate_enter_m": 10.0,
+      "residual_terminal_gate_full_m": 2.0,
+      "sha256": "27419c6c5f3b389dda4db5e9b78a92ef5feb93b01e7e7db8119870e02b03e69f"
+    },
+    "shell10_3": {
+      "learner_terminal_gate_mode": "shell",
+      "path": "configs/lowlevel/goal151/shell10_3.json",
+      "residual_terminal_gate_enabled": true,
+      "residual_terminal_gate_enter_m": 10.0,
+      "residual_terminal_gate_full_m": 3.0,
+      "sha256": "d7f3fda04010bfefc09fa42bb2c8a105ec013151b0ebd593e9be1387d3e12a74"
+    }
+  }
+}

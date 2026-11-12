@@ -1,0 +1,64 @@
+{
+  "control_change": "C0/C1 use ALOS path tracking instead of random direct commands",
+  "environment_config": "configs/lowlevel/goal136/curriculum/C0.json",
+  "environment_config_sha256": "fb85e27dc1f2cf4e932c8f7c074a56b436b91be10ac56a38d4e5f1493cebc20a",
+  "goal": "Goal143",
+  "notes": [
+    "1M pilot only validates control repair and C0 Gate; it is not a formal curriculum gain.",
+    "C0 Gate must pass twice before promotion: default>=0.90, strict>=0.70, plane_miss<=0.10, timeout<=0.10, safety=0.",
+    "C-hard comparison reuses Goal136 C-hard configs under the same PPO/SAC budget."
+  ],
+  "pilots": [
+    {
+      "arm": "C-full-alos",
+      "curriculum_control": "alos_c0_c1",
+      "curriculum_direct_commands_enabled": false,
+      "dev_seed_count": 40,
+      "dev_seed_start": 20,
+      "environment_config": "configs/lowlevel/goal136/curriculum/C0.json",
+      "environment_config_sha256": "fb85e27dc1f2cf4e932c8f7c074a56b436b91be10ac56a38d4e5f1493cebc20a",
+      "force_current_encoder_alpha_zero": false,
+      "heldout_closed": true,
+      "heldout_seed_count": 50,
+      "heldout_seed_start": 100,
+      "ppo_config": "configs/lowlevel/goal143/C-full-alos_ppo_pilot.json",
+      "ppo_config_sha256": "7bd9b5821d71bf8a9c0378c698e88915a94ad8d580b95a382167b59877a6bacd",
+      "ppo_transitions": 1000000,
+      "sac_config": "configs/lowlevel/goal143/C-full-alos_sac_pilot.json",
+      "sac_config_sha256": "67cdef3a192277ceefc037025e8a94da5657eb9c8301dccc966beafde6169791",
+      "sac_transitions": 1000192,
+      "train_seed": 86201
+    },
+    {
+      "arm": "C-no-current-alos",
+      "curriculum_control": "alos_c0_c1",
+      "curriculum_direct_commands_enabled": false,
+      "dev_seed_count": 40,
+      "dev_seed_start": 20,
+      "environment_config": "configs/lowlevel/goal136/curriculum/C0.json",
+      "environment_config_sha256": "fb85e27dc1f2cf4e932c8f7c074a56b436b91be10ac56a38d4e5f1493cebc20a",
+      "force_current_encoder_alpha_zero": true,
+      "heldout_closed": true,
+      "heldout_seed_count": 50,
+      "heldout_seed_start": 100,
+      "ppo_config": "configs/lowlevel/goal143/C-no-current-alos_ppo_pilot.json",
+      "ppo_config_sha256": "19d2aad6cb74eb980e814a8640eb7aa9b479ce6592526dc7906fa9f07a9fc5b4",
+      "ppo_transitions": 1000000,
+      "sac_config": "configs/lowlevel/goal143/C-no-current-alos_sac_pilot.json",
+      "sac_config_sha256": "11590c35305d0dd22d860fb6054d946a80aafbbcad38784bf7b6a6f19876dad5",
+      "sac_transitions": 1000192,
+      "train_seed": 86201
+    }
+  ],
+  "schema": "auv_pc_goal143_curriculum_alos_manifest.v1",
+  "source_goal": "Goal136",
+  "unchanged": [
+    "C0-C6 depth/path/noise/current/stage mix",
+    "reward",
+    "terminal",
+    "success",
+    "goal radius",
+    "PPO/SAC algorithm family",
+    "training/dev/held-out seed sets"
+  ]
+}

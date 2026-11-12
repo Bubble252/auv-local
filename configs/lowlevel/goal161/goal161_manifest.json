@@ -1,0 +1,28 @@
+{
+  "schema": "auv_goal161_cap_manifest.v1",
+  "date": "2026-11-12",
+  "cap": 0.25,
+  "command_scale_cap": {
+    "heading_rad": 0.0875,
+    "pitch_rad": 0.0425,
+    "speed_mps": 0.15
+  },
+  "train_seeds": [
+    86201,
+    86202,
+    86203
+  ],
+  "train_configs": [
+    "configs/lowlevel/goal161/train_b_command_cap025_seed86201.json",
+    "configs/lowlevel/goal161/train_b_command_cap025_seed86202.json",
+    "configs/lowlevel/goal161/train_b_command_cap025_seed86203.json",
+    "configs/lowlevel/goal161/train_c_command_terminal_cap025_seed86201.json",
+    "configs/lowlevel/goal161/train_c_command_terminal_cap025_seed86202.json",
+    "configs/lowlevel/goal161/train_c_command_terminal_cap025_seed86203.json"
+  ],
+  "eval_policy": "configs/lowlevel/goal161/eval_command_cap025.json",
+  "eval_environments": {
+    "B_command_cap025": "configs/lowlevel/goal161/env_h3_b_command_cap025_eval.json",
+    "C_command_terminal_cap025": "configs/lowlevel/goal161/env_h3_c_command_terminal_cap025_eval.json"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": "auv_ppo_final_gates.v1",
+  "s1_min_successes": 2,
+  "s2_min_successes": 1,
+  "max_yaw_saturation": 0.5,
+  "max_both_saturation": 0.1,
+  "curriculum": {
+    "c1_min_successes": 22,
+    "c2_min_successes": 21,
+    "c3_min_successes": 19,
+    "c3_gate_min_successes": 2
+  },
+  "oceansim": {
+    "latency_median_max_ms": 20.0,
+    "latency_p95_max_ms": 20.0,
+    "s1_min_successes": 2,
+    "s2_min_successes": 1
+  }
+}

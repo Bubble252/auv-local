@@ -1,0 +1,596 @@
+{
+  "base_environment_config": "configs/lowlevel/goal134/pc_goal134_nominal_strict_20261111.json",
+  "base_ppo_config": "configs/lowlevel/goal136/pc_goal136_ppo_b15_base_20261111.json",
+  "base_sac_config": "configs/lowlevel/goal135/pc_goal135_authority_sac_base_20261111.json",
+  "notes": [
+    "C0-C3 use plant z bounds 200 m; C4/C5/C6 extend to 260/410/510 m.",
+    "C6 is SIM_ONLY_OOD and must not be used for real deployment claims.",
+    "1M pilot only validates wiring; formal C-full vs C-hard needs matched 5M budget."
+  ],
+  "pilots": [
+    {
+      "arm": "C-full",
+      "dev_seed_count": 40,
+      "dev_seed_start": 20,
+      "environment_config": "configs/lowlevel/goal136/curriculum/C0.json",
+      "environment_stage": "C0",
+      "heldout_closed": true,
+      "heldout_seed_count": 50,
+      "heldout_seed_start": 100,
+      "ppo_config": "configs/lowlevel/goal136/C-full_ppo_pilot.json",
+      "ppo_config_sha256": "9e3694b90ddc05eb2858b86158e07d559b0919f16b992d39ff4b76ce8eedec55",
+      "ppo_transitions": 1000000,
+      "sac_config": "configs/lowlevel/goal136/C-full_sac_pilot.json",
+      "sac_config_sha256": "1e54b313bba76c112f5a221e817d1c8baf91f1964d10bc1e49be0beb98a21a54",
+      "sac_transitions": 1000192,
+      "train_seed": 86201
+    },
+    {
+      "arm": "C-hard",
+      "dev_seed_count": 40,
+      "dev_seed_start": 20,
+      "environment_config": "configs/lowlevel/goal136/curriculum/C6.json",
+      "environment_stage": "C6",
+      "heldout_closed": true,
+      "heldout_seed_count": 50,
+      "heldout_seed_start": 100,
+      "ppo_config": "configs/lowlevel/goal136/C-hard_ppo_pilot.json",
+      "ppo_config_sha256": "e8f1fcd339e8f46e0d86e79ad8b48ecc45f21136219b8c2357d446fd3a023384",
+      "ppo_transitions": 1000000,
+      "sac_config": "configs/lowlevel/goal136/C-hard_sac_pilot.json",
+      "sac_config_sha256": "b299e2f5dd2b313f738891a2ccfa90df78952485188ef0868437b249644bcf95",
+      "sac_transitions": 1000192,
+      "train_seed": 86201
+    },
+    {
+      "arm": "C-no-current",
+      "dev_seed_count": 40,
+      "dev_seed_start": 20,
+      "environment_config": "configs/lowlevel/goal136/curriculum/C0.json",
+      "environment_stage": "C0",
+      "heldout_closed": true,
+      "heldout_seed_count": 50,
+      "heldout_seed_start": 100,
+      "ppo_config": "configs/lowlevel/goal136/C-no-current_ppo_pilot.json",
+      "ppo_config_sha256": "cf64373644f1573f65ba4e79dd9346da1baf380caa81c8091b8340cb312cfc90",
+      "ppo_transitions": 1000000,
+      "sac_config": "configs/lowlevel/goal136/C-no-current_sac_pilot.json",
+      "sac_config_sha256": "97faed2a7abbf0dab095ee9dda8f8edb6ed266d12d827257e5ecc257394408f6",
+      "sac_transitions": 1000192,
+      "train_seed": 86201
+    }
+  ],
+  "schema": "auv_pc_goal136_curriculum_config_manifest.v1",
+  "stages": [
+    {
+      "config": "configs/lowlevel/goal136/curriculum/C0.json",
+      "depth_range_m": [
+        9.5,
+        10.5
+      ],
+      "goal_radius_m": 1.25,
+      "max_episode_steps": 2500,
+      "plant_bounds_m": [
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          0.0,
+          200.0
+        ]
+      ],
+      "reward": {
+        "approach_enter_m": 5.0,
+        "approach_full_m": 2.0,
+        "goal_bonus": 300.0,
+        "hold_bonus": true,
+        "mode": "pc_command_track_v2",
+        "out_of_bounds_penalty": 0,
+        "pc_ppo_scale": 0.01,
+        "terminal_progress_weight": 8.0,
+        "timeout_penalty": -100.0,
+        "w_3d": 0,
+        "w_action": 0,
+        "w_approach_pitch": 0.5,
+        "w_approach_vertical": 1.0,
+        "w_path_3d": 0.15,
+        "w_path_energy": 0,
+        "w_path_speed_smooth": 0,
+        "w_prog": 0,
+        "w_sat": 0,
+        "w_u": 0,
+        "w_yaw": 0
+      },
+      "sha256": "fb85e27dc1f2cf4e932c8f7c074a56b436b91be10ac56a38d4e5f1493cebc20a",
+      "stage": "C0",
+      "stage_mix": [
+        {
+          "stage": "C0",
+          "weight": 0.9
+        },
+        {
+          "stage": "C1",
+          "weight": 0.1
+        }
+      ],
+      "termination": {
+        "goal_plane_miss_distance_weight": 10.0,
+        "goal_plane_miss_penalty": -100.0,
+        "max_depth_m": 200.0,
+        "min_depth_m": 0.0,
+        "p_term_deg_s": 90,
+        "pc_goal_plane_miss_termination_enabled": true,
+        "phi_term_deg": 45,
+        "position_source": "eta",
+        "safety_terminal_penalty": -50,
+        "t_p_term_s": 0.5,
+        "t_phi_term_s": 1
+      }
+    },
+    {
+      "config": "configs/lowlevel/goal136/curriculum/C1.json",
+      "depth_range_m": [
+        10.0,
+        30.0
+      ],
+      "goal_radius_m": 1.25,
+      "max_episode_steps": 2500,
+      "plant_bounds_m": [
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          0.0,
+          200.0
+        ]
+      ],
+      "reward": {
+        "approach_enter_m": 5.0,
+        "approach_full_m": 2.0,
+        "goal_bonus": 300.0,
+        "hold_bonus": true,
+        "mode": "pc_command_track_v2",
+        "out_of_bounds_penalty": 0,
+        "pc_ppo_scale": 0.01,
+        "terminal_progress_weight": 8.0,
+        "timeout_penalty": -100.0,
+        "w_3d": 0,
+        "w_action": 0,
+        "w_approach_pitch": 0.5,
+        "w_approach_vertical": 1.0,
+        "w_path_3d": 0.15,
+        "w_path_energy": 0,
+        "w_path_speed_smooth": 0,
+        "w_prog": 0,
+        "w_sat": 0,
+        "w_u": 0,
+        "w_yaw": 0
+      },
+      "sha256": "f50cab87f7a12e1c1ac55f8cec76aba091b2cc9082b3479bf58b94725ab65011",
+      "stage": "C1",
+      "stage_mix": [
+        {
+          "stage": "C1",
+          "weight": 0.7
+        },
+        {
+          "stage": "C0",
+          "weight": 0.2
+        },
+        {
+          "stage": "C2",
+          "weight": 0.1
+        }
+      ],
+      "termination": {
+        "goal_plane_miss_distance_weight": 10.0,
+        "goal_plane_miss_penalty": -100.0,
+        "max_depth_m": 200.0,
+        "min_depth_m": 0.0,
+        "p_term_deg_s": 90,
+        "pc_goal_plane_miss_termination_enabled": true,
+        "phi_term_deg": 45,
+        "position_source": "eta",
+        "safety_terminal_penalty": -50,
+        "t_p_term_s": 0.5,
+        "t_phi_term_s": 1
+      }
+    },
+    {
+      "config": "configs/lowlevel/goal136/curriculum/C2.json",
+      "depth_range_m": [
+        30.0,
+        80.0
+      ],
+      "goal_radius_m": 1.25,
+      "max_episode_steps": 2500,
+      "plant_bounds_m": [
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          0.0,
+          200.0
+        ]
+      ],
+      "reward": {
+        "approach_enter_m": 5.0,
+        "approach_full_m": 2.0,
+        "goal_bonus": 300.0,
+        "hold_bonus": false,
+        "mode": "pc_command_track_v2",
+        "out_of_bounds_penalty": 0,
+        "pc_ppo_scale": 0.01,
+        "terminal_progress_weight": 8.0,
+        "timeout_penalty": -100.0,
+        "w_3d": 0,
+        "w_action": 0,
+        "w_approach_pitch": 0.5,
+        "w_approach_vertical": 1.0,
+        "w_path_3d": 0.15,
+        "w_path_energy": 0,
+        "w_path_speed_smooth": 0,
+        "w_prog": 0,
+        "w_sat": 0,
+        "w_u": 0,
+        "w_yaw": 0
+      },
+      "sha256": "5080dcbda6b70734fbc57c5ca893b0fbe5f85d89b6a926635d3248059686dd49",
+      "stage": "C2",
+      "stage_mix": [
+        {
+          "stage": "C2",
+          "weight": 0.7
+        },
+        {
+          "stage": "C1",
+          "weight": 0.15
+        },
+        {
+          "stage": "C0",
+          "weight": 0.1
+        },
+        {
+          "stage": "C3",
+          "weight": 0.05
+        }
+      ],
+      "termination": {
+        "goal_plane_miss_distance_weight": 10.0,
+        "goal_plane_miss_penalty": -100.0,
+        "max_depth_m": 200.0,
+        "min_depth_m": 0.0,
+        "p_term_deg_s": 90,
+        "pc_goal_plane_miss_termination_enabled": true,
+        "phi_term_deg": 45,
+        "position_source": "eta",
+        "safety_terminal_penalty": -50,
+        "t_p_term_s": 0.5,
+        "t_phi_term_s": 1
+      }
+    },
+    {
+      "config": "configs/lowlevel/goal136/curriculum/C3.json",
+      "depth_range_m": [
+        80.0,
+        150.0
+      ],
+      "goal_radius_m": 1.25,
+      "max_episode_steps": 2500,
+      "plant_bounds_m": [
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          0.0,
+          200.0
+        ]
+      ],
+      "reward": {
+        "approach_enter_m": 5.0,
+        "approach_full_m": 2.0,
+        "goal_bonus": 300.0,
+        "hold_bonus": false,
+        "mode": "pc_command_track_v2",
+        "out_of_bounds_penalty": 0,
+        "pc_ppo_scale": 0.01,
+        "terminal_progress_weight": 8.0,
+        "timeout_penalty": -100.0,
+        "w_3d": 0,
+        "w_action": 0,
+        "w_approach_pitch": 0.5,
+        "w_approach_vertical": 1.0,
+        "w_path_3d": 0.15,
+        "w_path_energy": 0,
+        "w_path_speed_smooth": 0,
+        "w_prog": 0,
+        "w_sat": 0,
+        "w_u": 0,
+        "w_yaw": 0
+      },
+      "sha256": "56ac17cab37a450e09ab78fb80c690ea3e424ecc7f559833d6c09b8c150ed7d2",
+      "stage": "C3",
+      "stage_mix": [
+        {
+          "stage": "C3",
+          "weight": 0.7
+        },
+        {
+          "stage": "C2",
+          "weight": 0.15
+        },
+        {
+          "stage": "C0",
+          "weight": 0.1
+        },
+        {
+          "stage": "C4",
+          "weight": 0.05
+        }
+      ],
+      "termination": {
+        "goal_plane_miss_distance_weight": 10.0,
+        "goal_plane_miss_penalty": -100.0,
+        "max_depth_m": 200.0,
+        "min_depth_m": 0.0,
+        "p_term_deg_s": 90,
+        "pc_goal_plane_miss_termination_enabled": true,
+        "phi_term_deg": 45,
+        "position_source": "eta",
+        "safety_terminal_penalty": -50,
+        "t_p_term_s": 0.5,
+        "t_phi_term_s": 1
+      }
+    },
+    {
+      "config": "configs/lowlevel/goal136/curriculum/C4.json",
+      "depth_range_m": [
+        150.0,
+        250.0
+      ],
+      "goal_radius_m": 1.25,
+      "max_episode_steps": 2500,
+      "plant_bounds_m": [
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          0.0,
+          260.0
+        ]
+      ],
+      "reward": {
+        "approach_enter_m": 5.0,
+        "approach_full_m": 2.0,
+        "goal_bonus": 300.0,
+        "hold_bonus": false,
+        "mode": "pc_command_track_v2",
+        "out_of_bounds_penalty": 0,
+        "pc_ppo_scale": 0.01,
+        "terminal_progress_weight": 8.0,
+        "timeout_penalty": -100.0,
+        "w_3d": 0,
+        "w_action": 0,
+        "w_approach_pitch": 0.5,
+        "w_approach_vertical": 1.0,
+        "w_path_3d": 0.15,
+        "w_path_energy": 0,
+        "w_path_speed_smooth": 0,
+        "w_prog": 0,
+        "w_sat": 0,
+        "w_u": 0,
+        "w_yaw": 0
+      },
+      "sha256": "34109d0c430e8c71485c2bcab8461bb8703c430bd30041f6ceed2445cd01546e",
+      "stage": "C4",
+      "stage_mix": [
+        {
+          "stage": "C4",
+          "weight": 0.7
+        },
+        {
+          "stage": "C3",
+          "weight": 0.15
+        },
+        {
+          "stage": "C0",
+          "weight": 0.1
+        },
+        {
+          "stage": "C5",
+          "weight": 0.05
+        }
+      ],
+      "termination": {
+        "goal_plane_miss_distance_weight": 10.0,
+        "goal_plane_miss_penalty": -100.0,
+        "max_depth_m": 260.0,
+        "min_depth_m": 0.0,
+        "p_term_deg_s": 90,
+        "pc_goal_plane_miss_termination_enabled": true,
+        "phi_term_deg": 45,
+        "position_source": "eta",
+        "safety_terminal_penalty": -50,
+        "t_p_term_s": 0.5,
+        "t_phi_term_s": 1
+      }
+    },
+    {
+      "config": "configs/lowlevel/goal136/curriculum/C5.json",
+      "depth_range_m": [
+        250.0,
+        400.0
+      ],
+      "goal_radius_m": 1.25,
+      "max_episode_steps": 2500,
+      "plant_bounds_m": [
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          0.0,
+          410.0
+        ]
+      ],
+      "reward": {
+        "approach_enter_m": 5.0,
+        "approach_full_m": 2.0,
+        "goal_bonus": 300.0,
+        "hold_bonus": false,
+        "mode": "pc_command_track_v2",
+        "out_of_bounds_penalty": 0,
+        "pc_ppo_scale": 0.01,
+        "terminal_progress_weight": 8.0,
+        "timeout_penalty": -100.0,
+        "w_3d": 0,
+        "w_action": 0,
+        "w_approach_pitch": 0.5,
+        "w_approach_vertical": 1.0,
+        "w_path_3d": 0.15,
+        "w_path_energy": 0,
+        "w_path_speed_smooth": 0,
+        "w_prog": 0,
+        "w_sat": 0,
+        "w_u": 0,
+        "w_yaw": 0
+      },
+      "sha256": "590e233a67aaead93741a47660d538848bdb69f54c81b62e7653ce596e22aa73",
+      "stage": "C5",
+      "stage_mix": [
+        {
+          "stage": "C5",
+          "weight": 0.7
+        },
+        {
+          "stage": "C4",
+          "weight": 0.15
+        },
+        {
+          "stage": "C0",
+          "weight": 0.1
+        },
+        {
+          "stage": "C6",
+          "weight": 0.05
+        }
+      ],
+      "termination": {
+        "goal_plane_miss_distance_weight": 10.0,
+        "goal_plane_miss_penalty": -100.0,
+        "max_depth_m": 410.0,
+        "min_depth_m": 0.0,
+        "p_term_deg_s": 90,
+        "pc_goal_plane_miss_termination_enabled": true,
+        "phi_term_deg": 45,
+        "position_source": "eta",
+        "safety_terminal_penalty": -50,
+        "t_p_term_s": 0.5,
+        "t_phi_term_s": 1
+      }
+    },
+    {
+      "config": "configs/lowlevel/goal136/curriculum/C6.json",
+      "depth_range_m": [
+        400.0,
+        500.0
+      ],
+      "goal_radius_m": 1.25,
+      "max_episode_steps": 2500,
+      "plant_bounds_m": [
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          -200.0,
+          200.0
+        ],
+        [
+          0.0,
+          510.0
+        ]
+      ],
+      "reward": {
+        "approach_enter_m": 5.0,
+        "approach_full_m": 2.0,
+        "goal_bonus": 300.0,
+        "hold_bonus": false,
+        "mode": "pc_command_track_v2",
+        "out_of_bounds_penalty": 0,
+        "pc_ppo_scale": 0.01,
+        "terminal_progress_weight": 8.0,
+        "timeout_penalty": -100.0,
+        "w_3d": 0,
+        "w_action": 0,
+        "w_approach_pitch": 0.5,
+        "w_approach_vertical": 1.0,
+        "w_path_3d": 0.15,
+        "w_path_energy": 0,
+        "w_path_speed_smooth": 0,
+        "w_prog": 0,
+        "w_sat": 0,
+        "w_u": 0,
+        "w_yaw": 0
+      },
+      "sha256": "28f191f62b1e8fc17d10c23eb9741184ba04f888fef85b38768f6c48a2077fb2",
+      "stage": "C6",
+      "stage_mix": [
+        {
+          "stage": "C6",
+          "weight": 0.8
+        },
+        {
+          "stage": "C5",
+          "weight": 0.15
+        },
+        {
+          "stage": "C0",
+          "weight": 0.05
+        }
+      ],
+      "termination": {
+        "goal_plane_miss_distance_weight": 10.0,
+        "goal_plane_miss_penalty": -100.0,
+        "max_depth_m": 510.0,
+        "min_depth_m": 0.0,
+        "p_term_deg_s": 90,
+        "pc_goal_plane_miss_termination_enabled": true,
+        "phi_term_deg": 45,
+        "position_source": "eta",
+        "safety_terminal_penalty": -50,
+        "t_p_term_s": 0.5,
+        "t_phi_term_s": 1
+      }
+    }
+  ]
+}

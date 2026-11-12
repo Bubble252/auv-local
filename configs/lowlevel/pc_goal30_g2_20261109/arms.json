@@ -1,0 +1,38 @@
+{
+  "H0_fixed10_50": {
+    "duration_s": 1.0,
+    "encoder_kind": "dual_horizon_transformer",
+    "long_stride": 1,
+    "long_window": 50
+  },
+  "H2_attn_fixed10_400": {
+    "duration_s": 8.0,
+    "encoder_kind": "dual_horizon_transformer_attention",
+    "long_stride": 1,
+    "long_window": 400
+  },
+  "H2_attn_fixed10_50": {
+    "duration_s": 1.0,
+    "encoder_kind": "dual_horizon_transformer_attention",
+    "long_stride": 1,
+    "long_window": 50
+  },
+  "H7_param_mean_fixed10_400": {
+    "duration_s": 8.0,
+    "encoder_kind": "dual_horizon_transformer_param_mean",
+    "long_stride": 1,
+    "long_window": 400
+  },
+  "H7_param_mean_fixed10_50": {
+    "duration_s": 1.0,
+    "encoder_kind": "dual_horizon_transformer_param_mean",
+    "long_stride": 1,
+    "long_window": 50
+  },
+  "W3_fixed10_400": {
+    "duration_s": 8.0,
+    "encoder_kind": "dual_horizon_transformer",
+    "long_stride": 1,
+    "long_window": 400
+  }
+}

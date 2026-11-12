@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Goal156 Step 6: materialize A_screen and run the 13 frozen arms on CPU/float64.
+#
+# This script is intentionally separate from run_goal156_formal.sh so the
+# preregistered 5M training runner is never edited while it is executing.
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PY="${PYTHON:-/data/yhx/underwater-robotics/envs/venvs/isaaclab/bin/python}"
+SB3="${SB3:-/data/yhx/underwater-robotics/src/stable-baselines3}"
+GLOBAL_SRC="${GLOBAL_SRC:-}"
+ROOT="${ROOT:-$REPO_ROOT/artifacts/lowlevel/goal156_full_train_eval_gate}"
+CONFIG_ROOT="$ROOT/standing_configs"
+MANIFEST="$CONFIG_ROOT/manifest.json"
+ARMS="$ROOT/standing_arms.json"
+OUT="$ROOT/standing_eval"
+MAX_PARALLEL="${MAX_PARALLEL:-10}"
+
+cd "$REPO_ROOT"
+
+if [[ ! -f "$MANIFEST" ]]; then
+  "$PY" scripts/build_pc_standing_eval_configs.py \
+    --tier A_screen \
+    --base-env configs/lowlevel/goal136/curriculum/C1.json \
+    --output-dir "$CONFIG_ROOT" \
+    --pressure nominal current10 noise_n2 plant20 \
+    --route legacy_sine --length 35 --speed 1.2 \
+    --radius default strict125
+else
+  echo "using existing frozen A_screen manifest: $MANIFEST"
+fi
+
+"$PY" scripts/build_goal156_standing_arms.py --root "$ROOT" --output "$ARMS"
+
+"$PY" scripts/run_pc_standing_eval_suite.py \
+  --manifest "$MANIFEST" \
+  --arms "$ARMS" \
+  --output-root "$OUT" \
+  --python "$PY" \
+  --sb3-root "$SB3" \
+  --global-src "$GLOBAL_SRC" \
+  --seed-start 20 --seed-count 40 \
+  --device cpu --dtype float64 \
+  --max-parallel "$MAX_PARALLEL" \
+  --skip-existing --analyze --zero-tag zero
+
+echo "Goal156 standing A_screen complete: $OUT"

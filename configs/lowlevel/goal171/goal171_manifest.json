@@ -1,0 +1,113 @@
+{
+  "arms": [
+    {
+      "algorithm": "PPO",
+      "arm": "R0_BC_PPO",
+      "base": "BC",
+      "config": "configs/lowlevel/goal171/train_r0_bc_ppo_seed86201.json",
+      "reward": "old_route"
+    },
+    {
+      "algorithm": "SAC",
+      "arm": "R0_BC_SAC",
+      "base": "BC",
+      "config": "configs/lowlevel/goal171/train_r0_bc_sac_seed86201.json",
+      "reward": "old_route"
+    },
+    {
+      "algorithm": "PPO",
+      "arm": "R0_ALOS_PPO",
+      "base": "ALOS",
+      "config": "configs/lowlevel/goal171/train_r0_alos_ppo_seed86201.json",
+      "reward": "old_route"
+    },
+    {
+      "algorithm": "SAC",
+      "arm": "R0_ALOS_SAC",
+      "base": "ALOS",
+      "config": "configs/lowlevel/goal171/train_r0_alos_sac_seed86201.json",
+      "reward": "old_route"
+    },
+    {
+      "algorithm": "PPO",
+      "arm": "R1_BC_PPO",
+      "base": "BC",
+      "config": "configs/lowlevel/goal171/train_r1_bc_ppo_seed86201.json",
+      "reward": "route_health"
+    },
+    {
+      "algorithm": "SAC",
+      "arm": "R1_BC_SAC",
+      "base": "BC",
+      "config": "configs/lowlevel/goal171/train_r1_bc_sac_seed86201.json",
+      "reward": "route_health"
+    },
+    {
+      "algorithm": "PPO",
+      "arm": "R1_ALOS_PPO",
+      "base": "ALOS",
+      "config": "configs/lowlevel/goal171/train_r1_alos_ppo_seed86201.json",
+      "reward": "route_health"
+    },
+    {
+      "algorithm": "SAC",
+      "arm": "R1_ALOS_SAC",
+      "base": "ALOS",
+      "config": "configs/lowlevel/goal171/train_r1_alos_sac_seed86201.json",
+      "reward": "route_health"
+    }
+  ],
+  "artifact_root": "artifacts/lowlevel/goal171_route_health_curriculum_depthfix_20261112",
+  "goal": "Goal171",
+  "ppo_bc_checkpoint": "artifacts/lowlevel/goal86/pa_residual_bc_path12_cmd3_current_20261110/pc_bc_actor.pt",
+  "ppo_bc_checkpoint_sha256": "80024ef5798cfbc9701b974ab14b0eb5ce082daaea9c665978431978d59ff9dd",
+  "protocol": {
+    "curriculum": {
+      "enabled": true,
+      "initial_stage": "C3",
+      "manifest_filename": "curriculum_episodes.jsonl",
+      "stage_mix": [
+        {
+          "stage": "C3",
+          "weight": 0.7
+        },
+        {
+          "stage": "C2",
+          "weight": 0.15
+        },
+        {
+          "stage": "C0",
+          "weight": 0.1
+        },
+        {
+          "stage": "C4",
+          "weight": 0.05
+        }
+      ]
+    },
+    "dev_seed_count": 40,
+    "dev_seed_start": 20,
+    "expected_eval_runs": 64,
+    "expected_total_eval_runs": 88,
+    "expected_zero_eval_runs": 24,
+    "heldout_open": false,
+    "heldout_seed_count": 50,
+    "heldout_seed_start": 100,
+    "levels": [
+      "nominal",
+      "current07",
+      "current10",
+      "current15"
+    ],
+    "max_depth_m": 300.0,
+    "max_ground_speed_mps": 2.5,
+    "radii": {
+      "default": 2.0,
+      "strict125": 1.25
+    }
+  },
+  "sac_bc_checkpoint": "checkpoints/goal26/d3/pc_bc_actor.pt",
+  "sac_bc_checkpoint_sha256": "7430b26308b701565a52a92ed31c382ccca9cf1721d183ab856e3fafd9f4ab73",
+  "screen_env_transitions": 200000,
+  "train_seed": 86201
+}

@@ -1,0 +1,78 @@
+{
+  "arms": {
+    "far_off_only": {
+      "learner_terminal_gate_mode": "none",
+      "residual_terminal_gate_enabled": true,
+      "residual_terminal_gate_enter_m": 10.0001,
+      "residual_terminal_gate_full_m": 10.0
+    },
+    "mid_only": {
+      "learner_terminal_gate_mode": "shell",
+      "residual_terminal_gate_enabled": true,
+      "residual_terminal_gate_enter_m": 10.0,
+      "residual_terminal_gate_full_m": 2.0
+    },
+    "near10_2": {
+      "learner_terminal_gate_mode": "none",
+      "residual_terminal_gate_enabled": true,
+      "residual_terminal_gate_enter_m": 10.0,
+      "residual_terminal_gate_full_m": 2.0
+    }
+  },
+  "configs": {
+    "far_off_only_seed86201": {
+      "path": "configs/lowlevel/goal155/far_off_only_seed86201.json",
+      "sha256": "47f182a09b1bd4b0428245a1ffa3de3aaecf0a67579eafb6eae56c660ed7f48a"
+    },
+    "far_off_only_seed86202": {
+      "path": "configs/lowlevel/goal155/far_off_only_seed86202.json",
+      "sha256": "d54e9e61e42587a4bcd668be0dcb7792d4b240b8b5b56cb0d0972ced9ed04985"
+    },
+    "far_off_only_seed86203": {
+      "path": "configs/lowlevel/goal155/far_off_only_seed86203.json",
+      "sha256": "3ee8febc20bbd76411f13ab59795bc654b0f124decfbbb4ad9c9c6a0e1ef479b"
+    },
+    "mid_only_seed86201": {
+      "path": "configs/lowlevel/goal155/mid_only_seed86201.json",
+      "sha256": "98e9a8515a0cd5d7e6f086a01a218d864ce02111c498a6d336e3cd46b295f85d"
+    },
+    "mid_only_seed86202": {
+      "path": "configs/lowlevel/goal155/mid_only_seed86202.json",
+      "sha256": "c9c0b00816389d3acefeec460e7e385d077f401e9cc4f9dbd2d6f9e961b490d6"
+    },
+    "mid_only_seed86203": {
+      "path": "configs/lowlevel/goal155/mid_only_seed86203.json",
+      "sha256": "b34cd0192a2a2c3f94a13d1abc7af0eb6830dd4e3fa625e3d5fd2d2253b595ab"
+    },
+    "near10_2_seed86201": {
+      "path": "configs/lowlevel/goal155/near10_2_seed86201.json",
+      "sha256": "bcf5315a9db63fdb96444764e4fe8834cb4abfd74fc9673fc16fb9934b034c88"
+    },
+    "near10_2_seed86202": {
+      "path": "configs/lowlevel/goal155/near10_2_seed86202.json",
+      "sha256": "9f1b44c73665fde387928d2971fb5a2a6b5fcadd20d2aefbf6ca5350132c23bd"
+    },
+    "near10_2_seed86203": {
+      "path": "configs/lowlevel/goal155/near10_2_seed86203.json",
+      "sha256": "ec56fc36b8a5899e8a6df7004886c72f4c3660aee0dd2d2c3cf2236ef49a4dd2"
+    }
+  },
+  "frozen_before_measurement": true,
+  "goal": "Goal155",
+  "source_config": "configs/lowlevel/goal86/pc_goal86_t2_sac_default_20261110.json",
+  "source_sha256": "029f8afff2388a74bce935b68efc2dca5faf83c7f01f38e303967b3ae2d7563e",
+  "training": {
+    "batch_size": 256,
+    "heldout_seeds": [
+      100,
+      149
+    ],
+    "num_envs": 256,
+    "screen_env_transitions": 1000000,
+    "train_seeds": [
+      86201,
+      86202,
+      86203
+    ]
+  }
+}

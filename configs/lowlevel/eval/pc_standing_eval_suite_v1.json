@@ -1,0 +1,301 @@
+{
+  "schema_version": "auv_pc_standing_eval_suite.v1",
+  "name": "PC standing multi-paradigm / multi-curriculum / multi-environment eval suite",
+  "effective_date": "2026-11-11",
+  "status": "canonical",
+  "owner_repo": "settled_局部规划器_反应式",
+  "canonical_analyzer": "scripts/analyze_pc_goal153_eval_grid.py",
+  "dev_seeds": {
+    "start": 20,
+    "count": 40
+  },
+  "heldout_seeds": {
+    "start": 100,
+    "end": 149,
+    "status": "closed"
+  },
+  "success_contract": {
+    "primary": "success_eta_tight_at_done",
+    "goal_radii_m": {
+      "default": 2.0,
+      "strict125": 1.25
+    },
+    "p_nav_used_as_performance_axis": false,
+    "p_nav_note": "p_nav/eta 的位置差暂不作为性能轴；只保留 eta 成功口径。若记录 p_nav，仅作诊断，不参与 Gate。",
+    "extra_position_offset": false,
+    "extra_latency": false
+  },
+  "paradigms": [
+    {
+      "id": "T0",
+      "base": "ALOS",
+      "residual": "none",
+      "algorithm": "traditional"
+    },
+    {
+      "id": "BC",
+      "base": "BC",
+      "residual": "none",
+      "algorithm": "supervised"
+    },
+    {
+      "id": "BC-PPO",
+      "base": "frozen_BC",
+      "residual": "actuator_or_command",
+      "algorithm": "PPO"
+    },
+    {
+      "id": "BC-SAC",
+      "base": "frozen_BC",
+      "residual": "actuator_or_command",
+      "algorithm": "SAC"
+    },
+    {
+      "id": "ALOS-PPO",
+      "base": "ALOS",
+      "residual": "actuator_or_command",
+      "algorithm": "PPO"
+    },
+    {
+      "id": "ALOS-SAC",
+      "base": "ALOS",
+      "residual": "actuator_or_command",
+      "algorithm": "SAC"
+    },
+    {
+      "id": "future-REDQ",
+      "base": "pre_registered",
+      "residual": "pre_registered",
+      "algorithm": "REDQ",
+      "status": "requires_new_preregistration"
+    },
+    {
+      "id": "future-DroQ",
+      "base": "pre_registered",
+      "residual": "pre_registered",
+      "algorithm": "DroQ",
+      "status": "requires_new_preregistration"
+    }
+  ],
+  "curricula": [
+    {
+      "id": "C-fixed",
+      "mode": "fixed",
+      "stages": ["C1"],
+      "eval_stage": "C1",
+      "final_stage": "C1",
+      "description": "固定 C1 分布，不晋级；用于回答 reward/authority，不与 C-full 做课程顺序比较。"
+    },
+    {
+      "id": "C-full",
+      "mode": "promotion",
+      "stages": ["C0", "C1", "C2", "C3", "C4", "C5", "C6"],
+      "eval_stage": "C6",
+      "final_stage": "C6",
+      "description": "按 Gate 晋级/回滚到 C6；课程顺序比较对象是 C-hard，不是 C-fixed。"
+    },
+    {
+      "id": "C-hard",
+      "mode": "fixed",
+      "stages": ["C6"],
+      "eval_stage": "C6",
+      "final_stage": "C6",
+      "description": "直接训练 C6 最终混合分布，用于隔离课程顺序收益；必须与 C-full 同预算、同最终分布。"
+    },
+    {
+      "id": "C-no-current",
+      "mode": "promotion",
+      "stages": ["C0", "C1", "C2", "C3", "C4", "C5", "C6"],
+      "eval_stage": "C6",
+      "final_stage": "C6",
+      "description": "物理洋流仍在，但 actor 不看 current estimate；最终分布必须与 C-full/C-hard 相同。"
+    }
+  ],
+  "authority_profiles": [
+    "zero",
+    "near_only",
+    "mid_only",
+    "far_off_only",
+    "near10_2",
+    "shell10_3",
+    "full",
+    "staged_0_to_1",
+    "full_scale_0.5",
+    "full_scale_0.75"
+  ],
+  "pressure_profiles": [
+    {
+      "id": "nominal",
+      "current_speed_range_mps": "use_base_config",
+      "current_shear_scale": "use_base_config",
+      "noise_scale_range": null,
+      "plant_scale_range": null
+    },
+    {
+      "id": "current05",
+      "current_speed_range_mps": [0.25, 0.45],
+      "current_shear_scale": 0.5,
+      "noise_scale_range": null,
+      "plant_scale_range": null
+    },
+    {
+      "id": "current07",
+      "current_speed_range_mps": [0.275, 0.5],
+      "current_shear_scale": 0.75,
+      "noise_scale_range": null,
+      "plant_scale_range": null
+    },
+    {
+      "id": "current10",
+      "current_speed_range_mps": [0.3, 0.55],
+      "current_shear_scale": 1.0,
+      "noise_scale_range": null,
+      "plant_scale_range": null
+    },
+    {
+      "id": "current15",
+      "current_speed_range_mps": [0.375, 0.675],
+      "current_shear_scale": 1.5,
+      "noise_scale_range": null,
+      "plant_scale_range": null
+    },
+    {
+      "id": "noise_n2",
+      "current_speed_range_mps": "use_base_config",
+      "current_shear_scale": "use_base_config",
+      "noise_scale_range": [0.5, 1.0],
+      "plant_scale_range": null
+    },
+    {
+      "id": "plant20",
+      "current_speed_range_mps": "use_base_config",
+      "current_shear_scale": "use_base_config",
+      "noise_scale_range": null,
+      "plant_scale_range": [0.8, 1.2]
+    },
+    {
+      "id": "combined20",
+      "current_speed_range_mps": [0.3, 0.55],
+      "current_shear_scale": 1.0,
+      "noise_scale_range": [0.5, 1.0],
+      "plant_scale_range": [0.8, 1.2],
+      "note": "current10 + N2 + plant20。旧 Goal134 combined20 若使用 current20，必须在结果中标记为 legacy，不得与本节静默合并。"
+    }
+  ],
+  "route_profiles": ["legacy_sine", "P0", "P1", "P2", "P3", "P4"],
+  "length_profiles_m": [30, 35, 45],
+  "speed_profiles_mps": [0.9, 1.2, 1.4, 1.8, 2.2, 2.5],
+  "speed_max_mps": 2.5,
+  "speed_curriculum": {
+    "status": "pre_registered_implemented_not_active_for_goal136_goal153",
+    "activation": "Only a new pre-registered curriculum Goal may enable this schedule through auv_lowlevel.curriculum.high_speed_curriculum_stages(). Existing Goal136/Goal143/Goal153 runs keep their frozen speed ranges; default_curriculum_stages() must not be changed.",
+    "rule": "Stage upper bounds must be non-decreasing; C6 must cover the full standing-eval speed axis up to 2.5 m/s. Speed is desired ground speed: curriculum sampling must satisfy v_cmd + v_current + v_variation <= 2.5 m/s. The 2.5 m/s endpoint is only valid with zero/weak current and zero/negligible speed variation, or as an explicitly labeled OOD stress case; infeasible/high-saturation cases must be reported, not removed.",
+    "stages_mps": {
+      "C0": [1.0, 1.2],
+      "C1": [1.1, 1.4],
+      "C2": [1.2, 1.6],
+      "C3": [1.3, 1.8],
+      "C4": [1.4, 2.0],
+      "C5": [1.5, 2.25],
+      "C6": [0.9, 2.5]
+    }
+  },
+  "depth_profiles_m": [10, 30, 80, 150, 250, 400, 500],
+  "tiers": [
+    {
+      "id": "A_screen",
+      "purpose": "快速 screen，不写正式结论",
+      "training_seeds": 1,
+      "eval_seeds": 40,
+      "pressure_profiles": ["nominal", "current10", "noise_n2", "plant20"],
+      "route_profiles": ["legacy_sine"],
+      "length_profiles_m": [35],
+      "speed_profiles_mps": [1.2]
+    },
+    {
+      "id": "B_robustness",
+      "purpose": "screen 通过后的压力与泛化检查",
+      "training_seeds": 1,
+      "eval_seeds": 40,
+      "pressure_profiles": ["nominal", "current05", "current10", "current15", "noise_n2", "plant20", "combined20"],
+      "route_profiles": ["legacy_sine", "P2", "P3"],
+      "length_profiles_m": [35, 45],
+      "speed_profiles_mps": [1.2, 1.4, 2.5]
+    },
+    {
+      "id": "C_full_geometry",
+      "purpose": "路线形状、长度、速度的完整几何审计",
+      "training_seeds": 1,
+      "eval_seeds": 40,
+      "pressure_profiles": ["nominal", "current10", "plant20", "combined20"],
+      "route_profiles": ["legacy_sine", "P0", "P1", "P2", "P3", "P4"],
+      "length_profiles_m": [30, 35, 45],
+      "speed_profiles_mps": [0.9, 1.2, 1.4, 1.8, 2.2, 2.5]
+    },
+    {
+      "id": "D_formal",
+      "purpose": "正式结果；必须多 seed 和多个压力档",
+      "training_seeds": 3,
+      "eval_seeds": 40,
+      "pressure_profiles": ["nominal", "current05", "current10", "current15", "noise_n2", "plant20", "combined20"],
+      "route_profiles": ["legacy_sine", "P0", "P1", "P2", "P3", "P4"],
+      "length_profiles_m": [30, 35, 45],
+      "speed_profiles_mps": [0.9, 1.2, 1.4, 1.8, 2.2, 2.5]
+    }
+  ],
+  "required_metrics": {
+    "task_outcome": [
+      "success_eta_tight_at_done_default",
+      "success_eta_tight_at_done_strict125",
+      "goal_plane_miss",
+      "time_limit",
+      "safety",
+      "terminal_kind_counts"
+    ],
+    "route_health": [
+      "pooled_path_rmse_3d",
+      "pooled_path_rmse_vertical",
+      "pooled_path_rmse_horizontal",
+      "path_p95",
+      "path_max",
+      "fraction_path_gt_1m",
+      "rmse_le2m",
+      "rmse_2to10m",
+      "rmse_gt10m",
+      "final_path_progress_fraction"
+    ],
+    "terminal_capture": [
+      "final_goal_distance_bins",
+      "closest_approach",
+      "entry_2m_vertical_abs_p90",
+      "entry_2m_horizontal_p90",
+      "final_vertical_signed",
+      "near_radius_fraction",
+      "near_goal_signed_bias"
+    ],
+    "direction_and_failure": [
+      "final_miss_n_sign",
+      "final_miss_e_sign",
+      "final_vertical_sign",
+      "success_failure_geometry_decomposition"
+    ],
+    "control_health": [
+      "policy_head_saturation_pre_global_scale",
+      "effective_residual_saturation_post_global_scale",
+      "actuator_saturation",
+      "material_saturation",
+      "scale_clip_fraction",
+      "rate_clip_fraction",
+      "residual_l2_ratio",
+      "residual_l2_ratio_gate_active",
+      "residual_channel_rms"
+    ],
+    "integrity": [
+      "all_episode_finite",
+      "checkpoint_sha256",
+      "environment_config_sha256",
+      "seed_count",
+      "eval_protocol"
+    ]
+  }
+}

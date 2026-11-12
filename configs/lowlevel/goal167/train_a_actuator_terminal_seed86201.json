@@ -1,0 +1,86 @@
+{
+  "action_interface": "actuator",
+  "actuator_max_action": 1.0,
+  "actuator_residual_scale": 0.25,
+  "environment_config": "configs/lowlevel/goal167/env_a_actuator_terminal_train_nu_ground.json",
+  "evaluation": {
+    "checkpoint": "final.zip",
+    "device": "cpu",
+    "dtype": "float64",
+    "success_frame": "both"
+  },
+  "experiment": {
+    "algorithm": "SAC",
+    "arm": "A_actuator_terminal",
+    "eval_seed_count": 40,
+    "eval_seed_start": 20,
+    "heldout_seed_count": 50,
+    "heldout_seed_start": 100,
+    "name": "pc_goal167_a_actuator_terminal_seed86201_20261112",
+    "output": "artifacts/lowlevel/goal167_action_parameterization_20261112/train/A_actuator_terminal/seed86201",
+    "train_seed_count": 1,
+    "train_seed_start": 86201,
+    "train_seeds": [
+      86201
+    ]
+  },
+  "observation": {
+    "command_dim": 3,
+    "current_dim": 3,
+    "path_dim": 12,
+    "privileged_current_dim": 3,
+    "privileged_state_dim": 15,
+    "state_dim": 12
+  },
+  "policy": {
+    "activation": "elu",
+    "architecture": "pc_z_t",
+    "bc_checkpoint": null,
+    "bc_path_dim": 12,
+    "current_encoder_alpha": 1,
+    "current_encoder_hidden_dims": [
+      64
+    ],
+    "d_z_total": 64,
+    "endpoint_encoder_alpha": 1,
+    "endpoint_encoder_hidden_dims": [
+      32
+    ],
+    "log_std_init": -3,
+    "n_in_reserved": 8,
+    "n_z_reserved": 4,
+    "path_encoder_alpha": 1,
+    "path_encoder_hidden_dims": [
+      64
+    ],
+    "state_encoder_hidden_dims": [
+      128,
+      128
+    ],
+    "zero_residual_init": true
+  },
+  "schema_version": "auv_goal86_pc_sac.v1",
+  "training": {
+    "actor_lr": 0.0003,
+    "batch_size": 512,
+    "buffer_size": 500000,
+    "critic_lr": 0.0003,
+    "gamma": 0.995,
+    "history_length": 10,
+    "learning_starts": 20000,
+    "net_arch": [
+      256,
+      128
+    ],
+    "num_envs": 256,
+    "screen_env_transitions": 1000000,
+    "seed": 86201,
+    "tau": 0.005,
+    "total_env_transitions": 1000000,
+    "update_to_data_ratio": 0.125
+  },
+  "residual_terminal_gate_enabled": true,
+  "residual_terminal_gate_enter_m": 10.0,
+  "residual_terminal_gate_full_m": 2.0,
+  "learner_terminal_gate_mode": "none"
+}

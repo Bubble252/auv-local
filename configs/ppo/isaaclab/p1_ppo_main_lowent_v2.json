@@ -1,0 +1,16 @@
+{
+  "extends": "p1_ppo_base.json",
+  "experiment": {
+    "name": "p1_ppo_main_lowent_v2",
+    "seed": 0,
+    "output": "outputs/ppo_isaaclab/p1_ppo_main_lowent_v2"
+  },
+  "env": {
+    "num_envs": 4096
+  },
+  "ppo": {
+    "max_iterations": 5000,
+    "save_interval": 100,
+    "entropy_coef": 0.001
+  }
+}

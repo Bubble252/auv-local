@@ -1,0 +1,30 @@
+{
+  "H0_fixed10_50": {
+    "duration_s": 1.0,
+    "encoder_kind": "dual_horizon_transformer",
+    "long_stride": 1,
+    "long_window": 50,
+    "role": "reference"
+  },
+  "H3_multiscale_10_40": {
+    "duration_s": 8.0,
+    "encoder_kind": "dual_horizon_transformer_multiscale",
+    "long_stride": 1,
+    "long_window": 400,
+    "role": "multiscale_candidate"
+  },
+  "N_uniform40_negative": {
+    "duration_s": 8.0,
+    "encoder_kind": "dual_horizon_transformer_uniform40",
+    "long_stride": 1,
+    "long_window": 400,
+    "role": "matched_sparse_negative_control"
+  },
+  "W3_fixed10_400": {
+    "duration_s": 8.0,
+    "encoder_kind": "dual_horizon_transformer",
+    "long_stride": 1,
+    "long_window": 400,
+    "role": "strong_fixed_baseline"
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "schema_version": "auv_odarrl_control.v1",
+  "experiment": {
+    "name": "odarrl_i2_residual_26d_rpm_only_hidden_timevarying_nocurrent",
+    "arm": "I",
+    "seed": 50000,
+    "output": "artifacts/lowlevel/i2_residual_26d_rpm_only_hidden_timevarying"
+  },
+  "plant": {
+    "backend": "pvs_remus100",
+    "vehicle": "REMUS100",
+    "dt_s": 0.02,
+    "control_hz": 50,
+    "max_episode_steps": 2500,
+    "goal_radius_m": 2,
+    "bounds_m": [
+      [
+        -200,
+        200
+      ],
+      [
+        -200,
+        200
+      ],
+      [
+        0,
+        200
+      ]
+    ],
+    "pvs_source_dir": null
+  },
+  "reference": {
+    "generator": "sinusoidal_3d_arclength",
+    "length_m": 35,
+    "speed_mps": 1.2,
+    "x_span_m": 30,
+    "lateral_amplitude_m": 1.5,
+    "lateral_cycles": 1,
+    "depth_start_m": 10,
+    "depth_slope_m": 2,
+    "depth_amplitude_m": 0.4,
+    "depth_cycles": 2,
+    "sample_spacing_m": 0.1,
+    "start_jitter_xy_m": 0.5,
+    "start_jitter_z_m": 0.5,
+    "start_jitter_yaw_rad": 0.0872664626
+  },
+  "current": {
+    "enabled": false,
+    "type": "uniform_horizontal",
+    "speed_mps": [
+      0.2,
+      0.4
+    ],
+    "direction_rad": [
+      -3.1415926536,
+      3.1415926536
+    ],
+    "constant_within_episode": true
+  },
+  "guidance": {
+    "horizontal_lookahead_m": 3,
+    "vertical_lookahead_m": 2,
+    "min_lookahead_m": 0.5,
+    "max_lookahead_m": 20,
+    "horizontal_gain": 1,
+    "vertical_gain": 1,
+    "lookahead_error_gain": 1,
+    "validity_period_s": 0.5,
+    "compensate_current": false,
+    "terminal_capture_distance_m": 16
+  },
+  "base_controller": {
+    "type": "remus100_tracking_pd_pi",
+    "use_current_field": false,
+    "nominal_step_s": 0.02,
+    "heading_gain": 2,
+    "heading_rate_gain": 0.6,
+    "pitch_gain": 2,
+    "pitch_rate_gain": 1,
+    "speed_feedforward_rpm_per_mps": 600,
+    "speed_gain_rpm_per_mps": 80,
+    "speed_integral_gain_rpm_per_mps_s": 10,
+    "max_speed_integral_rpm": 400
+  },
+  "residual": {
+    "scale_rudder": 0,
+    "scale_stern": 0,
+    "scale_rpm": 0.225,
+    "max_action": 1
+  },
+  "observation": {
+    "dim": 26,
+    "expose_current": false,
+    "speed_feedback": "ground",
+    "current_contract": "hidden"
+  },
+  "reward": {
+    "w_prog": 15,
+    "w_3d": 2,
+    "w_yaw": 0.8,
+    "w_u": 0.5,
+    "w_action": 0.05,
+    "w_sat": 0.1,
+    "goal_bonus": 50,
+    "timeout_penalty": -20,
+    "out_of_bounds_penalty": -50
+  },
+  "evaluation": {
+    "seed_start": 0,
+    "seed_count": 50,
+    "training_seed_start": 50000
+  }
+}

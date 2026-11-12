@@ -1,0 +1,69 @@
+{
+  "configs": [
+    {
+      "action_interface": "command",
+      "algorithm": "PPO",
+      "arm": "C-full-alos-command",
+      "base_policy": "none (pure ALOS + PD/PI)",
+      "config": "configs/lowlevel/goal144/C-full-alos-command_ppo_pilot.json",
+      "dev_seed_count": 40,
+      "dev_seed_start": 20,
+      "environment_config": "configs/lowlevel/goal136/curriculum/C0.json",
+      "heldout_closed": true,
+      "train_seed": 86201,
+      "transitions": 1000000
+    },
+    {
+      "action_interface": "command",
+      "algorithm": "SAC",
+      "arm": "C-full-alos-command",
+      "base_policy": "none (pure ALOS + PD/PI)",
+      "config": "configs/lowlevel/goal144/C-full-alos-command_sac_pilot.json",
+      "dev_seed_count": 40,
+      "dev_seed_start": 20,
+      "environment_config": "configs/lowlevel/goal136/curriculum/C0.json",
+      "heldout_closed": true,
+      "train_seed": 86201,
+      "transitions": 1000192
+    },
+    {
+      "action_interface": "actuator",
+      "algorithm": "PPO",
+      "arm": "C-full-alos-actuator",
+      "base_policy": "none (pure ALOS + PD/PI)",
+      "config": "configs/lowlevel/goal144/C-full-alos-actuator_ppo_pilot.json",
+      "dev_seed_count": 40,
+      "dev_seed_start": 20,
+      "environment_config": "configs/lowlevel/goal136/curriculum/C0.json",
+      "heldout_closed": true,
+      "train_seed": 86201,
+      "transitions": 1000000
+    },
+    {
+      "action_interface": "actuator",
+      "algorithm": "SAC",
+      "arm": "C-full-alos-actuator",
+      "base_policy": "none (pure ALOS + PD/PI)",
+      "config": "configs/lowlevel/goal144/C-full-alos-actuator_sac_pilot.json",
+      "dev_seed_count": 40,
+      "dev_seed_start": 20,
+      "environment_config": "configs/lowlevel/goal136/curriculum/C0.json",
+      "heldout_closed": true,
+      "train_seed": 86201,
+      "transitions": 1000192
+    }
+  ],
+  "control_change": "base_policy.mode=none; no frozen BC residual; C0/C1 use ALOS path tracking",
+  "goal": "Goal144",
+  "purpose": "Test PPO/SAC residual on pure ALOS, isolated from frozen-BC residual harm.",
+  "source_goal": "Goal143",
+  "unchanged": [
+    "reward",
+    "terminal",
+    "success",
+    "goal radius",
+    "C0-C6 bounds",
+    "dev/held-out split",
+    "PPO/SAC algorithm family"
+  ]
+}

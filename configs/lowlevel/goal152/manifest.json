@@ -1,0 +1,36 @@
+{
+  "configs": {
+    "86201": {
+      "path": "configs/lowlevel/goal152/near10_2_seed86201.json",
+      "sha256": "a3e48bb32f4b6499ea4b533b09e64ad01284c269cfe0e51f7e86da1125f7895b"
+    },
+    "86202": {
+      "path": "configs/lowlevel/goal152/near10_2_seed86202.json",
+      "sha256": "3df0ce4ae918693fd02a165591090238f888011aa220f08e956d9a4ee5cdbf1e"
+    },
+    "86203": {
+      "path": "configs/lowlevel/goal152/near10_2_seed86203.json",
+      "sha256": "8497b1e423492888787986241e18bc0d4941259a16eecfd3db64ca4a3e0a2af5"
+    }
+  },
+  "frozen_before_measurement": true,
+  "gate": {
+    "learner_terminal_gate_mode": "none",
+    "residual_terminal_gate_enabled": true,
+    "residual_terminal_gate_enter_m": 10.0,
+    "residual_terminal_gate_full_m": 2.0
+  },
+  "goal": "Goal152",
+  "source_config": "configs/lowlevel/goal151/near10_2.json",
+  "source_sha256": "27419c6c5f3b389dda4db5e9b78a92ef5feb93b01e7e7db8119870e02b03e69f",
+  "training": {
+    "batch_size": 256,
+    "num_envs": 256,
+    "screen_env_transitions": 1000000,
+    "train_seeds": [
+      86201,
+      86202,
+      86203
+    ]
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "schema_version": "auv_odarrl_control_ppo.v1",
+  "experiment": {
+    "name": "odarrl_i2_residual_ppo_26d_dade_transformer_legacy_fast_timevarying_seed73010",
+    "arm": "I",
+    "seed": 73010,
+    "output": "artifacts/lowlevel/i2_residual_ppo_26d_dade_transformer_legacy_fast_timevarying_seed73010",
+    "device": "cuda:3"
+  },
+  "environment": {
+    "config": "configs/lowlevel/odarrl_control_i_residual_26d_rpm_only_legacy_fast_timevarying.json",
+    "num_envs": 4096,
+    "max_episode_steps": null,
+    "observation_schema": "v2"
+  },
+  "base_policy": {
+    "mode": "frozen_bc",
+    "checkpoint": "artifacts/lowlevel/i0_26d_bc_dagger_r1_lineage_20261031/pi0.pt",
+    "checkpoint_sha256": "9a6574d9ee9f01650062442097c4bd0ab2fdc9cf19bc86b0fb2b8434ee832beb"
+  },
+  "vector_env": {
+    "backend": "batch_torch",
+    "physics_dtype": "float64",
+    "projection_search_radius": 8,
+    "compile_step": true,
+    "compile_mode": "default",
+    "validate_finite": false
+  },
+  "instrumentation": {
+    "record_step_timings": true,
+    "policy_metrics_sample_size": 8192,
+    "write_iteration_records": true
+  },
+  "training": {
+    "iterations": 40,
+    "initial_residual_zero": false
+  },
+  "history": {
+    "short_window": 10,
+    "long_window": 50
+  },
+  "encoder": {
+    "kind": "dual_horizon_transformer",
+    "feature_dim": 64,
+    "fusion_hidden": [
+      128,
+      64
+    ],
+    "output_dim": 64,
+    "dropout": 0.1,
+    "num_layers": 1,
+    "num_heads": 4,
+    "feedforward_dim": 128
+  },
+  "runner": {
+    "num_steps_per_env": 256,
+    "save_interval": 5,
+    "empirical_normalization": false,
+    "logger": "tensorboard"
+  },
+  "policy": {
+    "actor_hidden_dims": [
+      256,
+      128
+    ],
+    "critic_hidden_dims": [
+      256,
+      128
+    ],
+    "activation": "elu",
+    "init_noise_std": 0.03,
+    "noise_std_type": "scalar"
+  },
+  "algorithm": {
+    "num_learning_epochs": 4,
+    "num_mini_batches": 256,
+    "clip_param": 0.1,
+    "gamma": 0.99,
+    "lam": 0.95,
+    "value_loss_coef": 1,
+    "entropy_coef": 5e-05,
+    "learning_rate": 5e-05,
+    "max_grad_norm": 1,
+    "use_clipped_value_loss": true,
+    "schedule": "fixed",
+    "desired_kl": 0.01,
+    "normalize_advantage_per_mini_batch": false
+  }
+}

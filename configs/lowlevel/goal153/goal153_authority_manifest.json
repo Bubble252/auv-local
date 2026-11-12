@@ -1,0 +1,213 @@
+{
+  "arms": {
+    "R0": {
+      "base": "configs/lowlevel/goal153/train/R0_C1_sac.json",
+      "base_sha256": "138caccc208e781dc63103898e488193ffab7ae136493b2feaffcf67e31bd9dd",
+      "variants": {
+        "far_off_only": {
+          "enter": 10.0001,
+          "full": 10.0,
+          "gate": true,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R0_far_off_only.json",
+          "scale": 1.0,
+          "sha256": "2c432ebe6d21f1b295b8ef67d345540810337c97b7bc5864dd5db36a54b9ede1"
+        },
+        "full": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": false,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R0_full.json",
+          "scale": 1.0,
+          "sha256": "b36ec9883b8e2815e01af4d1b8341ee5c5f1ce85b0b603208ad1690fc356b2d6"
+        },
+        "full_scale_0.5": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": false,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R0_full_scale_0.5.json",
+          "scale": 0.5,
+          "sha256": "6e8212fbae36e37979e448bc502813f28453659f56acbdf5a3e0f9c0db470335"
+        },
+        "full_scale_0.75": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": false,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R0_full_scale_0.75.json",
+          "scale": 0.75,
+          "sha256": "949136ef32f6e250c39f0c74775df72aa1a0075d5373f2e367c7ad4e1ced1e83"
+        },
+        "mid_only": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": true,
+          "mode": "shell",
+          "path": "configs/lowlevel/goal153/authority/R0_mid_only.json",
+          "scale": 1.0,
+          "sha256": "fff5784e570e168d4391b010a96b3c4dfdb838d3a513f5e6718c5d972131116b"
+        },
+        "near10_2": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": true,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R0_near10_2.json",
+          "scale": 1.0,
+          "sha256": "ddce237915cae1961ebc2ca7ebdd69bf14fe9d0282d5a57686a5477cfc36c517"
+        },
+        "near_only": {
+          "enter": 2.0001,
+          "full": 2.0,
+          "gate": true,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R0_near_only.json",
+          "scale": 1.0,
+          "sha256": "7e047cbb3c1877becf2df12d01c8428dd5855e99ff7eadbc5c71489a911c2639"
+        }
+      }
+    },
+    "R1": {
+      "base": "configs/lowlevel/goal153/train/R1_C1_sac.json",
+      "base_sha256": "4b9a8071163f66528cbdeebe41ff4676fc76aa18e7ae0f651f11b9c77918644b",
+      "variants": {
+        "far_off_only": {
+          "enter": 10.0001,
+          "full": 10.0,
+          "gate": true,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R1_far_off_only.json",
+          "scale": 1.0,
+          "sha256": "2e09d59e910fb576f1b56c64d9dd1fc57b61ae7f0cfb1b97b41b94f42b1d72b2"
+        },
+        "full": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": false,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R1_full.json",
+          "scale": 1.0,
+          "sha256": "57af3717b6109ce8a7ee064766b255afbaf1c42079dd29f1e8fe42625955ffb9"
+        },
+        "full_scale_0.5": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": false,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R1_full_scale_0.5.json",
+          "scale": 0.5,
+          "sha256": "926a6ff47da67e4fa6d6e677d2f581bd7627458de57314805a9cc3e076133cf6"
+        },
+        "full_scale_0.75": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": false,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R1_full_scale_0.75.json",
+          "scale": 0.75,
+          "sha256": "61860e8a07da997ff7759b766cd177df12bc964b579172ce16e919b5b1778afb"
+        },
+        "mid_only": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": true,
+          "mode": "shell",
+          "path": "configs/lowlevel/goal153/authority/R1_mid_only.json",
+          "scale": 1.0,
+          "sha256": "b3a38e5708e7b32755a0e60fa16c6a0e5db60faa074bbdc5cc7aa55f493f222f"
+        },
+        "near10_2": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": true,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R1_near10_2.json",
+          "scale": 1.0,
+          "sha256": "54bed049012f92c87126008cd63292e25be92a6c5e3493ead939f74c6ec0a2d9"
+        },
+        "near_only": {
+          "enter": 2.0001,
+          "full": 2.0,
+          "gate": true,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R1_near_only.json",
+          "scale": 1.0,
+          "sha256": "3a3f3a23b6d231be3c6f610ad2d973350ff52ce0413a6c6d6fd68bf949622725"
+        }
+      }
+    },
+    "R2": {
+      "base": "configs/lowlevel/goal153/train/R2_C1_sac.json",
+      "base_sha256": "44c57017056e2f72936721d766e80cbc21db7741c30da35973355aa2454eba70",
+      "variants": {
+        "far_off_only": {
+          "enter": 10.0001,
+          "full": 10.0,
+          "gate": true,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R2_far_off_only.json",
+          "scale": 1.0,
+          "sha256": "b0b50d49caa24e5f86d2c64de8403a84d307adf12c66143792b51b6c7934b5f8"
+        },
+        "full": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": false,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R2_full.json",
+          "scale": 1.0,
+          "sha256": "f17d8512ddfee298a59fc741ffd942828b15e9474b72d22e8745304e2d0b034f"
+        },
+        "full_scale_0.5": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": false,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R2_full_scale_0.5.json",
+          "scale": 0.5,
+          "sha256": "baa9acb8e1f06b945911ee6eba455d684aded3d13678b139272ab134769c9ea6"
+        },
+        "full_scale_0.75": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": false,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R2_full_scale_0.75.json",
+          "scale": 0.75,
+          "sha256": "d8d669f5274643c2b6bb3640d32dcaa141f029dbe3e56f06769aebb25a083cec"
+        },
+        "mid_only": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": true,
+          "mode": "shell",
+          "path": "configs/lowlevel/goal153/authority/R2_mid_only.json",
+          "scale": 1.0,
+          "sha256": "9d2c43c22f5aecac63a814a734078a4e709bba8caf194242ef464769c2dd324e"
+        },
+        "near10_2": {
+          "enter": 10.0,
+          "full": 2.0,
+          "gate": true,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R2_near10_2.json",
+          "scale": 1.0,
+          "sha256": "bc11a459b022f08ddb2bde2042e270891db2701cdf7ef296fdfc7e89b090cca9"
+        },
+        "near_only": {
+          "enter": 2.0001,
+          "full": 2.0,
+          "gate": true,
+          "mode": "none",
+          "path": "configs/lowlevel/goal153/authority/R2_near_only.json",
+          "scale": 1.0,
+          "sha256": "9561a7885025af669c3210d3649ec5baba57eecc9df31613f4d12e5f38067f6f"
+        }
+      }
+    }
+  },
+  "frozen_before_measurement": true,
+  "goal": "Goal153"
+}

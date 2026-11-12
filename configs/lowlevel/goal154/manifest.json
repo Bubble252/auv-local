@@ -1,0 +1,71 @@
+{
+  "frozen_before_measurement": true,
+  "goal": "Goal154",
+  "source": "configs/lowlevel/goal86/pc_goal86_t2_sac_default_20261110.json",
+  "source_sha256": "029f8afff2388a74bce935b68efc2dca5faf83c7f01f38e303967b3ae2d7563e",
+  "variants": {
+    "far_off_only": {
+      "enter": 10.0001,
+      "full": 10.0,
+      "gate": true,
+      "mode": "none",
+      "path": "configs/lowlevel/goal154/authority/far_off_only.json",
+      "scale": 1.0,
+      "sha256": "e02c13c0ee33bfcfa0849f52900b5781bc7cecb9b641b6fdefc911ca4a05b50b"
+    },
+    "full": {
+      "enter": 10.0,
+      "full": 2.0,
+      "gate": false,
+      "mode": "none",
+      "path": "configs/lowlevel/goal154/authority/full.json",
+      "scale": 1.0,
+      "sha256": "549915448be721fa546631f5b95df959fdfbfc6525d4a473852af9da0131b109"
+    },
+    "full_scale_0.5": {
+      "enter": 10.0,
+      "full": 2.0,
+      "gate": false,
+      "mode": "none",
+      "path": "configs/lowlevel/goal154/authority/full_scale_0.5.json",
+      "scale": 0.5,
+      "sha256": "04ec0aa7ddaa30706ff7b04826ae9a9f9f9f3315b3077bc4fdbff8a19f7a38ad"
+    },
+    "full_scale_0.75": {
+      "enter": 10.0,
+      "full": 2.0,
+      "gate": false,
+      "mode": "none",
+      "path": "configs/lowlevel/goal154/authority/full_scale_0.75.json",
+      "scale": 0.75,
+      "sha256": "b485397483e10a889029047490ac093fa4ee11f2c0104bd88a5e5af3eb9cf992"
+    },
+    "mid_only": {
+      "enter": 10.0,
+      "full": 2.0,
+      "gate": true,
+      "mode": "shell",
+      "path": "configs/lowlevel/goal154/authority/mid_only.json",
+      "scale": 1.0,
+      "sha256": "b22cbfe68cd2d9cbcdb2441f39bbdcd0ea109cba93a29a7454f1f40a690acb96"
+    },
+    "near10_2": {
+      "enter": 10.0,
+      "full": 2.0,
+      "gate": true,
+      "mode": "none",
+      "path": "configs/lowlevel/goal154/authority/near10_2.json",
+      "scale": 1.0,
+      "sha256": "8dc311fff9f447081e84c4eeff107c9bd943e5d72e7738cc72629128a58bf9d7"
+    },
+    "near_only": {
+      "enter": 2.0001,
+      "full": 2.0,
+      "gate": true,
+      "mode": "none",
+      "path": "configs/lowlevel/goal154/authority/near_only.json",
+      "scale": 1.0,
+      "sha256": "b1c277c60614da20557e0230cde69fb9d7900645b15d3dbeb1830ff2a2b9880b"
+    }
+  }
+}

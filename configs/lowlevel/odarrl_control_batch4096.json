@@ -1,0 +1,59 @@
+{
+  "schema_version": "auv_odarrl_control_ppo.v1",
+  "experiment": {
+    "name": "odarrl_batch4096_smoke_v1",
+    "arm": "I",
+    "seed": 30000,
+    "output": "artifacts/lowlevel/batch4096_smoke",
+    "device": "cuda:0"
+  },
+  "environment": {
+    "config": "configs/lowlevel/odarrl_control_base.json",
+    "num_envs": 4096,
+    "max_episode_steps": null,
+    "observation_schema": "v1"
+  },
+  "base_policy": {
+    "mode": "online_pd_pi",
+    "checkpoint": null,
+    "checkpoint_sha256": null
+  },
+  "vector_env": {
+    "backend": "batch_torch",
+    "physics_dtype": "float64",
+    "projection_search_radius": 8,
+    "validate_finite": false
+  },
+  "training": {
+    "iterations": 10,
+    "initial_residual_zero": true
+  },
+  "runner": {
+    "num_steps_per_env": 256,
+    "save_interval": 1,
+    "empirical_normalization": false,
+    "logger": "tensorboard"
+  },
+  "policy": {
+    "actor_hidden_dims": [256, 128],
+    "critic_hidden_dims": [256, 128],
+    "activation": "elu",
+    "init_noise_std": 0.15,
+    "noise_std_type": "scalar"
+  },
+  "algorithm": {
+    "num_learning_epochs": 4,
+    "num_mini_batches": 64,
+    "clip_param": 0.15,
+    "gamma": 0.99,
+    "lam": 0.95,
+    "value_loss_coef": 1.0,
+    "entropy_coef": 0.001,
+    "learning_rate": 0.0003,
+    "max_grad_norm": 1.0,
+    "use_clipped_value_loss": true,
+    "schedule": "fixed",
+    "desired_kl": 0.01,
+    "normalize_advantage_per_mini_batch": false
+  }
+}

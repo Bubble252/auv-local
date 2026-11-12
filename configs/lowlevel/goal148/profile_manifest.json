@@ -1,0 +1,100 @@
+{
+  "schema_version": "auv_goal148_k4_stress_profiles.v1",
+  "base_config": "configs/lowlevel/goal136/curriculum/C0.json",
+  "base_sha256": "fb85e27dc1f2cf4e932c8f7c074a56b436b91be10ac56a38d4e5f1493cebc20a",
+  "frozen_before_measurement": true,
+  "goal_radius_m": 1.25,
+  "levels": {
+    "nominal": {
+      "path": "configs/lowlevel/goal148/env_nominal.json",
+      "sha256": "bc6c589235f9b2df84b7bce31befdd57ff38166dcac9ad0116fa506f45a516a2",
+      "current_speed_mps": [
+        0.25,
+        0.45
+      ],
+      "plant_randomization": null
+    },
+    "current15": {
+      "path": "configs/lowlevel/goal148/env_current15.json",
+      "sha256": "706ed4ed8c211e4f53c5d65aab50b1c17a2bdf3c5546ea8c2873d79b905086cc",
+      "current_speed_mps": [
+        0.375,
+        0.675
+      ],
+      "plant_randomization": null
+    },
+    "current20": {
+      "path": "configs/lowlevel/goal148/env_current20.json",
+      "sha256": "ef2b6fbef813dc69326e6dba29af13623088f45c3c53915de32966952800edad",
+      "current_speed_mps": [
+        0.5,
+        0.9
+      ],
+      "plant_randomization": null
+    },
+    "plant20": {
+      "path": "configs/lowlevel/goal148/env_plant20.json",
+      "sha256": "7632c9e0f60e9b2abc02cfca9d27a5b41af28d2da346ead5ac0fd9eaeffb0345",
+      "current_speed_mps": [
+        0.25,
+        0.45
+      ],
+      "plant_randomization": {
+        "actuator_time_scale": [
+          0.8,
+          1.2
+        ],
+        "added_mass_scale": [
+          0.8,
+          1.2
+        ],
+        "drag_scale": [
+          0.8,
+          1.2
+        ],
+        "enabled": true,
+        "fin_scale": [
+          0.8,
+          1.2
+        ],
+        "seed": 13420,
+        "thrust_scale": [
+          0.8,
+          1.2
+        ]
+      }
+    },
+    "combined20": {
+      "path": "configs/lowlevel/goal148/env_combined20.json",
+      "sha256": "68af17e70b5c4753c42ec35ee75ad6f81addb17cb2217d6d3feb6a221e04df14",
+      "current_speed_mps": [
+        0.5,
+        0.9
+      ],
+      "plant_randomization": {
+        "actuator_time_scale": [
+          0.8,
+          1.2
+        ],
+        "added_mass_scale": [
+          0.8,
+          1.2
+        ],
+        "drag_scale": [
+          0.8,
+          1.2
+        ],
+        "enabled": true,
+        "fin_scale": [
+          0.8,
+          1.2
+        ],
+        "seed": 13420,
+        "thrust_scale": [
+          0.8,
+          1.2
+        ]
+      }
+    }
+  }
+}

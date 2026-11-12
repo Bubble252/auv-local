@@ -1,0 +1,95 @@
+{
+  "environment": {
+    "dt_s": 0.2,
+    "integration_step_s": 0.02,
+    "max_episode_steps": 300,
+    "sensor_max_range_m": 120.0,
+    "local_effective_range_m": 20.0,
+    "sensor_min_range_m": 0.2,
+    "sensor_vertical_half_width_m": 0.5,
+    "sensor_origin_body_m": [
+      0.8,
+      0.0,
+      0.0
+    ],
+    "sensor_field_of_view_rad": 2.2689280275926285,
+    "sensor_ray_count": 1300,
+    "sensor_validity_s": 0.5,
+    "sensor_id": "oceansim-pcl",
+    "action_max_accel_mps2": 0.5,
+    "action_max_yaw_rate_rps": 0.2617993877991494,
+    "start_jitter_xy_m": 0.0,
+    "start_jitter_yaw_rad": 0.0,
+    "active_scenario_keys": [
+      "s1",
+      "s2"
+    ],
+    "reward": {
+      "distance_penalty_factor": -1.0,
+      "near_obstacle_penalty": -2.0,
+      "far_obstacle_penalty": -1.0,
+      "collision_penalty": -80.0,
+      "goal_bonus": 50.0,
+      "obstacle_influence_fraction": 0.7
+    },
+    "perception": {
+      "backend": "oceansim",
+      "mode": "p1_a_geometry_pcl",
+      "camera_resolution": [
+        1300,
+        200
+      ],
+      "noise": false,
+      "include_unlabelled": false
+    }
+  },
+  "oceansim": {
+    "sensor_prim_path": "/World/P1Sonar",
+    "scan_device": "cpu",
+    "vertical_fov_deg": 20.0,
+    "angular_res_deg": 0.1,
+    "range_res_m": 0.05,
+    "scan_attempts": 60,
+    "warmup_frames": 60,
+    "scene_obstacle_depth_m": 5.0
+  },
+  "training": {
+    "total_timesteps": 20000,
+    "seed": 0,
+    "learning_rate": 0.0002,
+    "actor_lr": 0.0002,
+    "critic_lr": 0.0002,
+    "gamma": 0.98,
+    "tau": 0.005,
+    "batch_size": 64,
+    "buffer_size": 100000,
+    "learning_starts": 1000,
+    "net_arch": [
+      160,
+      154
+    ],
+    "gru_hidden_size": 64,
+    "history_length": 10,
+    "use_noisy": true,
+    "use_gru": false,
+    "use_pper": true,
+    "per_alpha": 0.6,
+    "per_beta_start": 0.4,
+    "per_beta_steps": 100000,
+    "per_epsilon": 1e-06,
+    "grad_clip_norm": 1.0,
+    "noise_sigma": [
+      0.05,
+      0.02
+    ],
+    "eval_seeds": [
+      0,
+      1,
+      2
+    ],
+    "critic_activation": "silu",
+    "layer_norm": false,
+    "actor_activation": "silu"
+  },
+  "output": "outputs/m4/p1/ablations/saturation/s1/seed_000"
+}

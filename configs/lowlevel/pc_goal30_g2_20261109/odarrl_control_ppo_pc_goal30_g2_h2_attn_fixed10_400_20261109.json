@@ -1,0 +1,116 @@
+{
+  "schema_version": "auv_odarrl_control_ppo.v1",
+  "experiment": {
+    "name": "pc_goal30_g2_h2_attn_fixed10_400_20261109",
+    "arm": "PC",
+    "seed": 94030,
+    "output": "artifacts/lowlevel/pc_goal30_g2/H2_attn_fixed10_400",
+    "device": "cuda"
+  },
+  "environment": {
+    "config": "configs/lowlevel/odarrl_control_pc_c3_random_realistic_v1_rewardscale001.json",
+    "num_envs": 4096,
+    "max_episode_steps": null,
+    "observation_schema": "pc_v1"
+  },
+  "base_policy": {
+    "mode": "frozen_pc_bc_residual",
+    "checkpoint": "artifacts/lowlevel/pc_bc_c0_c1_c2_c3random_v1_dz64_20261103/pc_bc_actor.pt",
+    "checkpoint_sha256": "f56c359648a99e3fc8fde51f2e529af5c9916371450ff0d7a942c0f620d33936",
+    "residual_scale": 1.0
+  },
+  "vector_env": {
+    "backend": "batch_torch",
+    "physics_dtype": "float64",
+    "projection_search_radius": 8,
+    "compile_step": false,
+    "compile_mode": "default",
+    "validate_finite": false
+  },
+  "instrumentation": {
+    "record_step_timings": true,
+    "policy_metrics_sample_size": 8192,
+    "write_iteration_records": true
+  },
+  "training": {
+    "iterations": 100,
+    "initial_residual_zero": false,
+    "privileged_current_critic": false
+  },
+  "history": {
+    "short_window": 10,
+    "long_window": 400,
+    "short_stride": 1,
+    "long_stride": 1,
+    "current_frame_dropout_prob": 0,
+    "current_frame_dropout_mode": "full"
+  },
+  "encoder": {
+    "kind": "dual_horizon_transformer_attention",
+    "feature_dim": 64,
+    "fusion_hidden": [
+      128,
+      64
+    ],
+    "output_dim": 64,
+    "dropout": 0,
+    "num_layers": 2,
+    "num_heads": 4,
+    "feedforward_dim": 128
+  },
+  "pc": {
+    "d_z_total": 64,
+    "n_in_reserved": 8,
+    "n_z_reserved": 4,
+    "state_encoder_hidden_dims": [
+      128,
+      128
+    ],
+    "dade_enabled": true,
+    "aux_current_coef": 0.5,
+    "aux_current_steps": 8,
+    "dade_warmstart_input_scale": 0.03,
+    "dade_action_head_enabled": true,
+    "dade_action_head_isolated": true,
+    "dade_state_mode": "pose",
+    "actor_state_mode": "pose"
+  },
+  "runner": {
+    "num_steps_per_env": 256,
+    "save_interval": 10,
+    "empirical_normalization": false,
+    "logger": "tensorboard"
+  },
+  "policy": {
+    "actor_hidden_dims": [
+      256,
+      128
+    ],
+    "critic_hidden_dims": [
+      256,
+      128
+    ],
+    "activation": "elu",
+    "init_noise_std": 0.1,
+    "noise_std_type": "scalar"
+  },
+  "algorithm": {
+    "num_learning_epochs": 1,
+    "num_mini_batches": 128,
+    "clip_param": 0.02,
+    "gamma": 0.995,
+    "lam": 0.95,
+    "value_loss_coef": 1,
+    "entropy_coef": 0.0001,
+    "learning_rate": 0.0003,
+    "max_grad_norm": 1,
+    "use_clipped_value_loss": true,
+    "schedule": "fixed",
+    "desired_kl": 0.005,
+    "normalize_advantage_per_mini_batch": false,
+    "learning_rate_actor": 0.0003,
+    "learning_rate_critic": 0.0003,
+    "learning_rate_dade_head": 0.0005,
+    "critic_warmup_iterations": 5
+  }
+}

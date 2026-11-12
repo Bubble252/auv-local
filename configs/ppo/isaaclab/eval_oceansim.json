@@ -1,0 +1,14 @@
+{
+  "schema_version": "auv_ppo_isaaclab.eval.v1",
+  "checkpoint": null,
+  "backend": "oceansim_p1_a",
+  "observation_source": "oceansim_simplified_pcl",
+  "sensor_prim_path": "/World/P1Sonar",
+  "seeds": [0, 1, 2],
+  "scenario_keys": ["s1", "s2"],
+  "latency_gate_ms": {
+    "median_max": 20.0,
+    "p95_max": 20.0
+  },
+  "output": "artifacts/ppo_isaaclab/eval_oceansim"
+}

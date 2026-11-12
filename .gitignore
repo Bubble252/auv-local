@@ -6,3 +6,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 outputs/
+artifacts/
+logs/
+checkpoints/
+*.log

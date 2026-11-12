@@ -1,0 +1,60 @@
+{
+  "goal": "Goal166",
+  "date": "2026-11-12",
+  "upstream": "Goal165 GATE165_C_FAIL_NO_TERMINAL_TRAINING",
+  "only_training_change": {
+    "field": "training.num_envs",
+    "from": 1024,
+    "to": 256
+  },
+  "algorithm": "SAC",
+  "architecture": "pc_z_t",
+  "stage": "C3",
+  "control_mode": "ALOS",
+  "action_interface": "controller_gain",
+  "velocity_contract": "nu_ground",
+  "speed_semantics": "nu_ground; controller uses water-relative surge",
+  "remus100_max_speed_mps": 2.5,
+  "training_speed_contract": {
+    "reference_speed_mps": 1.2,
+    "current_speed_range_mps": [
+      0.275,
+      0.55
+    ],
+    "current_variation_amplitude_mps": 0.1,
+    "worst_case_ground_speed_mps": 1.85,
+    "curriculum_enabled": false
+  },
+  "seeds": [
+    86201,
+    86202,
+    86203
+  ],
+  "total_env_transitions_per_seed": 1000000,
+  "steps_per_env": 3906,
+  "max_episode_steps": 2500,
+  "eval": {
+    "dev_seed_start": 20,
+    "dev_seed_count": 40,
+    "radii": [
+      "default:2.0",
+      "strict125:1.25"
+    ],
+    "levels": [
+      "nominal",
+      "current07",
+      "current10",
+      "current15"
+    ],
+    "zero": "reuse Goal165 corrected zero",
+    "heldout": "100-149 closed"
+  },
+  "configs": {
+    "configs/lowlevel/goal166/env_h3_gain_near10_2_eval_nu_ground.json": "8fc2fcf495d5a2a6ae002b6e00e229e39168dce073ede708ec17b7c4c41dfe85",
+    "configs/lowlevel/goal166/env_h3_gain_near10_2_train_nu_ground.json": "ab18239edb437e12ed85312a57dc0b13c7017705230c3d1e42ff46469c00bc57",
+    "configs/lowlevel/goal166/eval_g1_gain_near10_2.json": "ba10612976e638c1d1c476f8fe57f77d923eeb937191e29e8a6e5efbdeafeaba",
+    "configs/lowlevel/goal166/train_g1_gain_near10_2_seed86201.json": "67d63afcc8b722fee1d6b59c490e2b6b95039f529aca95d4b3cb2249c3da6a73",
+    "configs/lowlevel/goal166/train_g1_gain_near10_2_seed86202.json": "21567427dfc026fbb16770d3d40342de8fa072aef1d65b6b54a5ee399ab947bb",
+    "configs/lowlevel/goal166/train_g1_gain_near10_2_seed86203.json": "2575b0ca97e76cbec782114f28023747d338fc256eadc015f016e127df6233c5"
+  }
+}

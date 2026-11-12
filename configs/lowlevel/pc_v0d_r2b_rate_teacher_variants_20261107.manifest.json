@@ -1,0 +1,146 @@
+{
+  "base_config": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_current.json",
+  "base_config_sha256": "8e4ac934a305f93ae5bc2737a9eec1cf9725fe17adb4e4a9f96f348610464b23",
+  "schema_version": "auv_pc_v0d_r2b_rate_teacher_variants.v1",
+  "suffix": "20261107",
+  "variants": {
+    "rate020_012_default": {
+      "changes": [
+        {
+          "after": "pc_c3_random_realistic_v0d_teacher_r2b_rate020_012_20261107",
+          "before": "pc_c3_random_realistic_v0d_teacher_r2b_current",
+          "path": "experiment.name"
+        },
+        {
+          "after": "artifacts/lowlevel/pc_c3_random_realistic_v0d_teacher_r2b_rate020_012_20261107",
+          "before": "artifacts/lowlevel/pc_v0d_teacher_r2b_current",
+          "path": "experiment.output"
+        },
+        {
+          "after": true,
+          "before": null,
+          "path": "guidance.command_rate_limit_enabled"
+        },
+        {
+          "after": 0.2,
+          "before": 0.5235987756,
+          "path": "guidance.heading_rate_limit_rad_s"
+        },
+        {
+          "after": 0.12,
+          "before": 0.2617993878,
+          "path": "guidance.pitch_rate_limit_rad_s"
+        }
+      ],
+      "goal_radius_m": 2.0,
+      "path": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_rate020_012_20261107.json",
+      "sha256": "8f4d764b0f5f685f97669d4c8ee581289fee8509b5f3d8192e36bacc0dfd09cd"
+    },
+    "rate020_012_strict125": {
+      "changes": [
+        {
+          "after": "pc_c3_random_realistic_v0d_teacher_r2b_rate020_012_20261107_strict125",
+          "before": "pc_c3_random_realistic_v0d_teacher_r2b_current",
+          "path": "experiment.name"
+        },
+        {
+          "after": "artifacts/lowlevel/pc_c3_random_realistic_v0d_teacher_r2b_rate020_012_20261107_strict125",
+          "before": "artifacts/lowlevel/pc_v0d_teacher_r2b_current",
+          "path": "experiment.output"
+        },
+        {
+          "after": true,
+          "before": null,
+          "path": "guidance.command_rate_limit_enabled"
+        },
+        {
+          "after": 0.2,
+          "before": 0.5235987756,
+          "path": "guidance.heading_rate_limit_rad_s"
+        },
+        {
+          "after": 0.12,
+          "before": 0.2617993878,
+          "path": "guidance.pitch_rate_limit_rad_s"
+        },
+        {
+          "after": 1.25,
+          "before": 2.0,
+          "path": "plant.goal_radius_m"
+        }
+      ],
+      "goal_radius_m": 1.25,
+      "path": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_rate020_012_20261107_strict125.json",
+      "sha256": "267aafebb1d4f24f61b365271184c9dfc1b28e783a898eb7d795d2f3c37d5fc6"
+    },
+    "rate035_018_default": {
+      "changes": [
+        {
+          "after": "pc_c3_random_realistic_v0d_teacher_r2b_rate035_018_20261107",
+          "before": "pc_c3_random_realistic_v0d_teacher_r2b_current",
+          "path": "experiment.name"
+        },
+        {
+          "after": "artifacts/lowlevel/pc_c3_random_realistic_v0d_teacher_r2b_rate035_018_20261107",
+          "before": "artifacts/lowlevel/pc_v0d_teacher_r2b_current",
+          "path": "experiment.output"
+        },
+        {
+          "after": true,
+          "before": null,
+          "path": "guidance.command_rate_limit_enabled"
+        },
+        {
+          "after": 0.35,
+          "before": 0.5235987756,
+          "path": "guidance.heading_rate_limit_rad_s"
+        },
+        {
+          "after": 0.18,
+          "before": 0.2617993878,
+          "path": "guidance.pitch_rate_limit_rad_s"
+        }
+      ],
+      "goal_radius_m": 2.0,
+      "path": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_rate035_018_20261107.json",
+      "sha256": "3b2d906b42a041abecab84e18725486737c0c73596ef7b7a099e592cdc07f182"
+    },
+    "rate035_018_strict125": {
+      "changes": [
+        {
+          "after": "pc_c3_random_realistic_v0d_teacher_r2b_rate035_018_20261107_strict125",
+          "before": "pc_c3_random_realistic_v0d_teacher_r2b_current",
+          "path": "experiment.name"
+        },
+        {
+          "after": "artifacts/lowlevel/pc_c3_random_realistic_v0d_teacher_r2b_rate035_018_20261107_strict125",
+          "before": "artifacts/lowlevel/pc_v0d_teacher_r2b_current",
+          "path": "experiment.output"
+        },
+        {
+          "after": true,
+          "before": null,
+          "path": "guidance.command_rate_limit_enabled"
+        },
+        {
+          "after": 0.35,
+          "before": 0.5235987756,
+          "path": "guidance.heading_rate_limit_rad_s"
+        },
+        {
+          "after": 0.18,
+          "before": 0.2617993878,
+          "path": "guidance.pitch_rate_limit_rad_s"
+        },
+        {
+          "after": 1.25,
+          "before": 2.0,
+          "path": "plant.goal_radius_m"
+        }
+      ],
+      "goal_radius_m": 1.25,
+      "path": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_rate035_018_20261107_strict125.json",
+      "sha256": "abbf70848d42376f1a79d772ca957c2ceff1122f722cb6ed71e506eb592b8a95"
+    }
+  }
+}

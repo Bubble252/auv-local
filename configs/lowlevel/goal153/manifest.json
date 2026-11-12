@@ -1,0 +1,49 @@
+{
+  "base_env": "configs/lowlevel/goal136/curriculum/C1.json",
+  "base_env_sha256": "f50cab87f7a12e1c1ac55f8cec76aba091b2cc9082b3479bf58b94725ab65011",
+  "base_sac": "configs/lowlevel/goal144/C-full-alos-actuator_sac_pilot.json",
+  "base_sac_sha256": "2532a692051b4d44f8a9516480a6bc2482f46c4e693276de7e2c0e991bec9645",
+  "bc_initialized": true,
+  "configs": {
+    "R0": {
+      "env": "configs/lowlevel/goal153/env/R0_C1.json",
+      "env_sha256": "3a87b5635fb0b4d37617dc9e70a0748924c3518c422c3bf4b61e9bee9b8588cb",
+      "train": "configs/lowlevel/goal153/train/R0_C1_sac.json",
+      "train_sha256": "ee67a5ca2134abbe0dd10ca28b6f348c7e6c34437f29c709a6d4431cab26e6c3"
+    },
+    "R1": {
+      "env": "configs/lowlevel/goal153/env/R1_C1.json",
+      "env_sha256": "7d87080dfee3564af20780a32e0dc1c793dec8695e67000d7f947604d9417e3f",
+      "train": "configs/lowlevel/goal153/train/R1_C1_sac.json",
+      "train_sha256": "69ce0680289cb9bc87eb9a8ca72bc30555505368cd5a2f24e02e5e140ce24e19"
+    },
+    "R2": {
+      "env": "configs/lowlevel/goal153/env/R2_C1.json",
+      "env_sha256": "4fe49b11378117f97de8b859584265bd1617580fc2a385022460c73c9a2589e0",
+      "train": "configs/lowlevel/goal153/train/R2_C1_sac.json",
+      "train_sha256": "da8ab048a1257e64d770f74924954affb845c20cf07555672e75a6ea041dd4d1"
+    }
+  },
+  "frozen_before_measurement": true,
+  "goal": "Goal153",
+  "rewards": {
+    "R0": {
+      "w_approach_vertical": 1.0,
+      "w_heave_potential": 0.0,
+      "w_vertical_potential": 0.0
+    },
+    "R1": {
+      "w_approach_vertical": 1.0,
+      "w_heave_potential": 0.0,
+      "w_vertical_potential": 5.0
+    },
+    "R2": {
+      "w_approach_vertical": 1.0,
+      "w_heave_potential": 2.0,
+      "w_vertical_potential": 5.0
+    }
+  },
+  "seed": 86201,
+  "tag": "1m",
+  "transitions": 1000000
+}

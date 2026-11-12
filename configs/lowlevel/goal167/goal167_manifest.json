@@ -1,0 +1,69 @@
+{
+  "goal": "Goal167",
+  "date": "2026-11-12",
+  "upstream": "Goal166 GATE166_B_FAIL_ACTION_AUTHORITY_NULL",
+  "algorithm": "SAC",
+  "architecture": "pc_z_t",
+  "stage": "C3",
+  "control_mode": "ALOS",
+  "velocity_contract": "nu_ground",
+  "num_envs": 256,
+  "total_env_transitions_per_seed": 1000000,
+  "seeds": [
+    86201,
+    86202,
+    86203
+  ],
+  "arms": {
+    "A_actuator_terminal": {
+      "action_interface": "actuator",
+      "actuator_residual_scale": 0.25,
+      "residual_terminal_gate": [
+        10.0,
+        2.0
+      ]
+    },
+    "B_command_terminal": {
+      "action_interface": "command",
+      "command_residual_scale": [
+        0.0875,
+        0.0425,
+        0.15
+      ],
+      "residual_terminal_gate": [
+        10.0,
+        2.0
+      ]
+    }
+  },
+  "eval": {
+    "dev_seed_start": 20,
+    "dev_seed_count": 40,
+    "radii": [
+      "default:2.0",
+      "strict125:1.25"
+    ],
+    "levels": [
+      "nominal",
+      "current07",
+      "current10",
+      "current15"
+    ],
+    "zero": "reuse Goal165 corrected zero",
+    "heldout": "100-149 closed"
+  },
+  "configs": {
+    "configs/lowlevel/goal167/env_a_actuator_terminal_eval_nu_ground.json": "89b9b6c3198410500fe4b9b9dcd976a1f3c55abdd41075412af79a3fd6589036",
+    "configs/lowlevel/goal167/env_a_actuator_terminal_train_nu_ground.json": "49ff3567aa71e765e5eae3d556a350ccf67f9da534d916bf6f6404e480959ad4",
+    "configs/lowlevel/goal167/env_b_command_terminal_eval_nu_ground.json": "9e17346159312149e2f39f94d0fd15e723286ccf307f01bac1ff7f7fce513f8e",
+    "configs/lowlevel/goal167/env_b_command_terminal_train_nu_ground.json": "1810fc7b0bbe8d70fb411eed8a882cc71cdbebfa3d3e7842f99be466c116d578",
+    "configs/lowlevel/goal167/eval_a_actuator_terminal.json": "4154db06724ddf2744a0c9f340c9bdaedbe3bbca19f152308efe7573c6852164",
+    "configs/lowlevel/goal167/eval_b_command_terminal.json": "a2001a2c4ede5378a4291fdad012521de034181966d4653321b92c0d70e5569e",
+    "configs/lowlevel/goal167/train_a_actuator_terminal_seed86201.json": "0b3cd01ed9ae616da6b09137253b403fde121852a2dbd32cabbf12f1466fe416",
+    "configs/lowlevel/goal167/train_a_actuator_terminal_seed86202.json": "4d2bac69404ebd2dd94b01e06892ef767256b746c015c0db615ef00276d80e79",
+    "configs/lowlevel/goal167/train_a_actuator_terminal_seed86203.json": "9a7d9e2fe6119f77d27272a95aa8affdf29e00c0ecbebbe00db1b81db3dd55af",
+    "configs/lowlevel/goal167/train_b_command_terminal_seed86201.json": "118b3806fa6f3b5ecae7964f382014fe10722b328f7b031de6436c59f09e288d",
+    "configs/lowlevel/goal167/train_b_command_terminal_seed86202.json": "9287afc9dfc31364d8cd9cea174f3be606c7f2d40f8d0c61d9cd337ecfc1ccec",
+    "configs/lowlevel/goal167/train_b_command_terminal_seed86203.json": "5edf221e50fea3afce0c01acfa1aeac85188303b3127864c08158eb238f4122c"
+  }
+}

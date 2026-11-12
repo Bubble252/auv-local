@@ -1,0 +1,86 @@
+{
+  "schema_version": "auv_goal59_pc_offpolicy.v1",
+  "environment_config": "configs/lowlevel/pc_goal59_terminal_bounded_default_20261109.json",
+  "experiment": {
+    "name": "pc_goal59_offpolicy_tanh_g12_20261109",
+    "output": "artifacts/lowlevel/pc_goal59_offpolicy_t12",
+    "train_seed_start": 240,
+    "train_seed_count": 128,
+    "eval_seed_start": 20,
+    "eval_seed_count": 40,
+    "heldout_seed_start": 100,
+    "heldout_seed_count": 50
+  },
+  "training": {
+    "num_envs": 128,
+    "total_env_transitions": 5000000,
+    "screen_env_transitions": 1000000,
+    "update_to_data_ratio": 0.125,
+    "net_arch": [
+      256,
+      256
+    ],
+    "gru_hidden_size": 64,
+    "history_length": 10,
+    "gamma": 0.995,
+    "tau": 0.005,
+    "actor_lr": 0.0002,
+    "critic_lr": 0.0002,
+    "batch_size": 256,
+    "buffer_size": 500000,
+    "learning_starts": 20000,
+    "use_noisy": true,
+    "use_gru": true,
+    "activation": "relu",
+    "actor_activation": "relu",
+    "critic_activation": "relu",
+    "layer_norm": false,
+    "actor_output_scale": 1.0,
+    "actor_output_squash": "tanh",
+    "actor_output_noise": true,
+    "actor_output_sigma_init": 0.1,
+    "actor_hidden_sigma_init": 0.3,
+    "actor_noise_sigma_trainable": true,
+    "policy_delay": 2,
+    "actor_warmup_updates": 0,
+    "twin_critics": true,
+    "target_policy_noise_sigma": 0.1,
+    "target_policy_noise_clip": 0.25,
+    "saturation_penalty": 0.0,
+    "saturation_threshold_fraction": 0.9,
+    "privileged_dim": 18,
+    "bc_auxiliary_weight": 0.0,
+    "bc_auxiliary_decay_updates": 0,
+    "use_pper": true,
+    "per_alpha": 0.6,
+    "per_beta_start": 0.4,
+    "per_beta_steps": 500000,
+    "per_epsilon": 1e-6,
+    "grad_clip_norm": 1.0,
+    "cuda_graph_update": false
+  },
+  "observation": {
+    "path_dim": 12,
+    "state_dim": 12,
+    "command_dim": 3,
+    "current_dim": 3,
+    "privileged_state_dim": 15,
+    "privileged_current_dim": 3,
+    "path_zero_supported": true
+  },
+  "evaluation": {
+    "device": "cpu",
+    "dtype": "float64",
+    "termination_mode": "endpoint_stop",
+    "scenarios": [
+      "default",
+      "strict125"
+    ],
+    "action_modes": [
+      "policy",
+      "zero-residual"
+    ],
+    "path_ablation": "path-zero",
+    "checkpoint": "final.pt"
+  }
+}

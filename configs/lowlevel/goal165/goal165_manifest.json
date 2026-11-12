@@ -1,0 +1,53 @@
+{
+  "schema": "auv_goal165_controller_feedback_manifest.v1",
+  "date": "2026-11-12",
+  "action_interface": "controller_gain",
+  "action_dim": 2,
+  "base_controller": {
+    "heading_gain": 3,
+    "pitch_gain": 4,
+    "heading_rate_gain": 0.6,
+    "pitch_rate_gain": 1
+  },
+  "gain_delta": {
+    "heading_gain": 1,
+    "pitch_gain": 1.5
+  },
+  "terminal_gate": {
+    "enabled": true,
+    "enter_m": 10,
+    "full_m": 2
+  },
+  "train_seeds": [
+    86201,
+    86202,
+    86203
+  ],
+  "train_env": "configs/lowlevel/goal165/env_h3_gain_near10_2_train_nu_ground.json",
+  "eval_env": "configs/lowlevel/goal165/env_h3_gain_near10_2_eval_nu_ground.json",
+  "eval_policy": "configs/lowlevel/goal165/eval_g1_gain_near10_2.json",
+  "train_configs": [
+    "configs/lowlevel/goal165/train_g1_gain_near10_2_seed86201.json",
+    "configs/lowlevel/goal165/train_g1_gain_near10_2_seed86202.json",
+    "configs/lowlevel/goal165/train_g1_gain_near10_2_seed86203.json"
+  ],
+  "velocity_contract": "nu_ground",
+  "controller_feedback": {
+    "nu_order": "[linear_velocity, angular_rate]",
+    "speed_surge": "water_relative",
+    "legacy_branch_preserved": true
+  },
+  "compute": {
+    "num_envs": 1024,
+    "batch_size": 512,
+    "update_to_data_ratio": 0.125,
+    "total_env_transitions": 1000000
+  },
+  "speed_contract": {
+    "reference_speed_mps": 1.2,
+    "remus100_max_speed_mps": 2.5,
+    "curriculum_v2_active": false,
+    "episode_joint_cap": "speed+current+variation<=2.5"
+  },
+  "heldout_seeds": "100-149 closed"
+}

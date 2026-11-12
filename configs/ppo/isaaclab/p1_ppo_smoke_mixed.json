@@ -1,0 +1,22 @@
+{
+  "extends": "p1_ppo_smoke.json",
+  "experiment": {
+    "name": "p1_ppo_smoke_mixed_v1",
+    "seed": 0,
+    "output": "outputs/ppo_isaaclab/p1_ppo_smoke_mixed_v1"
+  },
+  "curriculum": {
+    "stage": "smoke_s1_s2",
+    "scenario_mix": {
+      "s1": 0.5,
+      "s2": 0.5,
+      "c1": 0.0,
+      "c2": 0.0,
+      "c3": 0.0
+    }
+  },
+  "evaluation": {
+    "seeds": [0],
+    "scenario_keys": ["s1", "s2"]
+  }
+}

@@ -1,0 +1,203 @@
+{
+  "schema_version": "auv_odarrl_control.v1",
+  "experiment": {
+    "name": "pc_c3_random_realistic_v1_nominal_p5_n8_strict125_20261107",
+    "arm": "PC",
+    "seed": 81300,
+    "output": "artifacts/lowlevel/pc_v0d_nominal_bc_rebase_20261107/p5/envs/pc_c3_random_realistic_v1_nominal_p5_n8_strict125_20261107",
+    "policy_mode": "pure_controller",
+    "sensor_source": "synthetic",
+    "pc_stage": "C3",
+    "pc_control_mode": "path_learned_speed"
+  },
+  "plant": {
+    "backend": "batch_torch_remus100",
+    "vehicle": "REMUS100",
+    "dt_s": 0.02,
+    "control_hz": 50,
+    "max_episode_steps": 2500,
+    "goal_radius_m": 1.25,
+    "bounds_m": [
+      [
+        -200,
+        200
+      ],
+      [
+        -200,
+        200
+      ],
+      [
+        0,
+        200
+      ]
+    ],
+    "pvs_source_dir": null
+  },
+  "reference": {
+    "generator": "sinusoidal_3d_arclength",
+    "length_m": 35,
+    "speed_mps": 1.2,
+    "x_span_m": 30,
+    "lateral_amplitude_m": 1.5,
+    "lateral_cycles": 1,
+    "depth_start_m": 10,
+    "depth_slope_m": 2,
+    "depth_amplitude_m": 0.4,
+    "depth_cycles": 2,
+    "sample_spacing_m": 0.1,
+    "start_jitter_xy_m": 0.5,
+    "start_jitter_z_m": 0.5,
+    "start_jitter_yaw_rad": 0.0872664626,
+    "path_bank_size": 32,
+    "path_bank_seed": 41
+  },
+  "current": {
+    "enabled": true,
+    "type": "sheared_horizontal",
+    "speed_mps": [
+      0.25,
+      0.45
+    ],
+    "direction_rad": [
+      -3.1415926536,
+      3.1415926536
+    ],
+    "constant_within_episode": false,
+    "time_variation": {
+      "speed_amplitude_mps": 0.1,
+      "direction_amplitude_rad": 0.3,
+      "period_s": 8
+    },
+    "shear": {
+      "velocity_gradient_per_s": [
+        [
+          0.004,
+          0,
+          0
+        ],
+        [
+          0,
+          -0.003,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      "origin_ned_m": [
+        0,
+        0,
+        10
+      ]
+    }
+  },
+  "guidance": {
+    "horizontal_lookahead_m": 3,
+    "vertical_lookahead_m": 2,
+    "min_lookahead_m": 0.5,
+    "max_lookahead_m": 20,
+    "horizontal_gain": 2.5,
+    "vertical_gain": 1,
+    "lookahead_error_gain": 1,
+    "validity_period_s": 0.5,
+    "compensate_current": false,
+    "terminal_capture_distance_m": 20,
+    "terminal_speed_mps": 0,
+    "current_estimate_max_age_s": 0.9,
+    "initial_speed_ratio": 1.0,
+    "initial_speed_ratio_range": [
+      0.75,
+      1.25
+    ],
+    "initial_propeller_rpm_ratio": 0.0,
+    "initial_propeller_rpm_ratio_range": [
+      0.0,
+      1.0
+    ]
+  },
+  "base_controller": {
+    "type": "remus100_tracking_pd_pi",
+    "use_current_field": false,
+    "nominal_step_s": 0.02,
+    "heading_gain": 2,
+    "heading_rate_gain": 0.6,
+    "pitch_gain": 2,
+    "pitch_rate_gain": 1,
+    "speed_feedforward_rpm_per_mps": 600,
+    "speed_gain_rpm_per_mps": 80,
+    "speed_integral_gain_rpm_per_mps_s": 10,
+    "max_speed_integral_rpm": 400
+  },
+  "residual": {
+    "scale_rudder": 0,
+    "scale_stern": 0,
+    "scale_rpm": 0,
+    "max_action": 1
+  },
+  "observation": {
+    "dim": 26,
+    "expose_current": false,
+    "speed_feedback": "ground",
+    "current_contract": "hidden",
+    "path_endpoint_context_enabled": false,
+    "ideal_actor_observations": false
+  },
+  "reward": {
+    "mode": "pc_path_track",
+    "hold_bonus": false,
+    "w_prog": 2.0,
+    "w_3d": 1.0,
+    "w_yaw": 0.5,
+    "w_u": 0.0,
+    "w_action": 0.0,
+    "w_sat": 0.0,
+    "terminal_progress_weight": 1.0,
+    "goal_bonus": 50.0,
+    "timeout_penalty": -20.0,
+    "out_of_bounds_penalty": -50.0,
+    "pc_ppo_scale": 0.01,
+    "w_path_speed_smooth": 0.1,
+    "w_path_energy": 0.01
+  },
+  "termination": {
+    "phi_term_deg": 45,
+    "t_phi_term_s": 1,
+    "p_term_deg_s": 90,
+    "t_p_term_s": 0.5,
+    "safety_terminal_penalty": -50,
+    "pc_goal_plane_miss_termination_enabled": true,
+    "goal_plane_miss_penalty": -20.0,
+    "goal_plane_miss_distance_weight": 0.0
+  },
+  "sensors": {
+    "profile": "realistic_calibrated",
+    "seed": 81300
+  },
+  "normalization": {
+    "position_scale_m": 100,
+    "attitude_scale_rad": 3.141592653589793,
+    "angular_rate_scale_rad_s": 1,
+    "surge_speed_scale_mps": 2.5,
+    "sway_heave_speed_scale_mps": 1,
+    "current_scale_mps": 0.5
+  },
+  "actuator": {
+    "envelope": "pc20",
+    "max_rudder_angle_deg": 20,
+    "max_stern_plane_angle_deg": 20,
+    "max_fin_rate_deg_s": 150,
+    "max_propeller_rpm": 1525,
+    "plant_max_rudder_angle_deg": 20,
+    "plant_max_stern_plane_angle_deg": 20,
+    "plant_max_fin_rate_deg_s": 150,
+    "plant_max_propeller_rpm": 1525,
+    "material_tolerance_fraction": 0.01
+  },
+  "evaluation": {
+    "seed_start": 0,
+    "seed_count": 50,
+    "training_seed_start": 90000
+  }
+}

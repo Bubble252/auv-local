@@ -1,0 +1,51 @@
+{
+  "schema_version": "auv_pc_bc_training_recipe.v1",
+  "name": "R-BC-0D",
+  "description": "state + 8D path -> action BC base for Goal9 V-0D frozen residual",
+  "dataset": {
+    "observation_schema": "pc_v1",
+    "actor_command_dim": 0,
+    "path_dim": 8,
+    "path_feature_names": [
+      "signed_cross_track_m",
+      "signed_vertical_error_m",
+      "tangent_heading_error_rad",
+      "tangent_pitch_error_rad",
+      "progress_ratio",
+      "remaining_ratio",
+      "curvature_1_per_m",
+      "lookahead_heading_delta_rad"
+    ]
+  },
+  "collection": {
+    "script": "scripts/collect_pc_bc_demos.py",
+    "environment_config": "configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_learned_speed.json",
+    "path_dim": 8,
+    "actor_command_dim": 0,
+    "teacher": "BatchedPCTeacher ALOS, mid/low-speed trajectory mixture"
+  },
+  "training": {
+    "script": "scripts/train_pc_bc.py",
+    "state_encoder_hidden_sizes": [128, 128],
+    "actor_hidden_sizes": [256, 128],
+    "d_z_total": 64,
+    "n_in_reserved": 8,
+    "n_z_reserved": 4,
+    "activation": "elu",
+    "batch_size": 4096,
+    "max_epochs": 300,
+    "patience": 30,
+    "learning_rate": 0.001,
+    "weight_decay": 0.00001,
+    "validation_fraction": 0.15,
+    "actor_command_dim": 0,
+    "path_dim": 8,
+    "path_encoder_hidden_sizes": [64],
+    "path_encoder_alpha": 1.0
+  },
+  "checkpoint": {
+    "output": "artifacts/lowlevel/pc_v0d_bc0d_20261106",
+    "filename": "pc_bc_actor.pt",
+    "sha256": "bddb393175f8c4594746290abdf465ab9064e294b116e20e174d2f96335e4cf0"
+  }
+}

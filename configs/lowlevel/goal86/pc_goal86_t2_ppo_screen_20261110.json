@@ -1,0 +1,137 @@
+{
+  "algorithm": {
+    "clip_param": 0.02,
+    "critic_warmup_iterations": 5,
+    "desired_kl": 0.005,
+    "entropy_coef": 0.0001,
+    "gamma": 0.995,
+    "lam": 0.95,
+    "learning_rate": 0.0003,
+    "learning_rate_actor": 0.0003,
+    "learning_rate_critic": 0.0003,
+    "max_grad_norm": 1.0,
+    "normalize_advantage_per_mini_batch": false,
+    "num_learning_epochs": 1,
+    "num_mini_batches": 100,
+    "schedule": "fixed",
+    "use_clipped_value_loss": true,
+    "value_loss_coef": 1.0
+  },
+  "base_policy": {
+    "checkpoint": null,
+    "checkpoint_sha256": null,
+    "mode": "none"
+  },
+  "encoder": {
+    "dropout": 0.0,
+    "feature_dim": 64,
+    "feedforward_dim": 128,
+    "fusion_hidden": [
+      128,
+      64
+    ],
+    "kind": "dual_horizon_transformer",
+    "num_heads": 4,
+    "num_layers": 2,
+    "output_dim": 64
+  },
+  "environment": {
+    "config": "configs/lowlevel/pc_goal85_unbiased_default_candidate_20261110.json",
+    "max_episode_steps": null,
+    "num_envs": 1000,
+    "observation_schema": "pc_v1"
+  },
+  "experiment": {
+    "arm": "PC",
+    "device": "cuda",
+    "name": "pc_goal86_t2_ppo_screen_20261110",
+    "output": "artifacts/lowlevel/goal86/screen/t2_ppo",
+    "seed": 86031
+  },
+  "history": {
+    "current_frame_dropout_mode": "full",
+    "current_frame_dropout_prob": 0.0,
+    "long_stride": 1,
+    "long_window": 50,
+    "short_stride": 1,
+    "short_window": 10
+  },
+  "instrumentation": {
+    "policy_metrics_sample_size": 8192,
+    "record_step_timings": true,
+    "write_iteration_records": true
+  },
+  "pc": {
+    "action_interface": "actuator",
+    "actor_command_dim": 3,
+    "actor_current_encoder_alpha": 1.0,
+    "actor_current_encoder_enabled": true,
+    "actor_current_encoder_hidden_dims": [
+      64
+    ],
+    "actor_state_mode": "full",
+    "actuator_max_action": 1.0,
+    "actuator_residual_scale": 0.25,
+    "aux_current_coef": 0,
+    "aux_current_steps": 0,
+    "bc_path_dim": 12,
+    "critic_command_dim": 3,
+    "d_z_total": 64,
+    "dade_action_head_enabled": false,
+    "dade_action_head_isolated": false,
+    "dade_enabled": false,
+    "dade_history_mode": "raw",
+    "dade_state_mode": "full",
+    "dade_warmstart_input_scale": 0,
+    "endpoint_encoder_alpha": 1.0,
+    "endpoint_encoder_hidden_dims": [
+      32
+    ],
+    "n_in_reserved": 8,
+    "n_z_reserved": 4,
+    "path_curriculum": [],
+    "path_dim": 12,
+    "path_encoder_alpha": 1.0,
+    "path_encoder_hidden_dims": [
+      64
+    ],
+    "path_encoder_zero_init": false,
+    "state_encoder_hidden_dims": [
+      128,
+      128
+    ]
+  },
+  "policy": {
+    "activation": "elu",
+    "actor_hidden_dims": [
+      256,
+      128
+    ],
+    "critic_hidden_dims": [
+      256,
+      128
+    ],
+    "init_noise_std": 0.1,
+    "noise_std_type": "scalar"
+  },
+  "runner": {
+    "empirical_normalization": false,
+    "logger": "tensorboard",
+    "num_steps_per_env": 125,
+    "save_interval": 10
+  },
+  "schema_version": "auv_odarrl_control_ppo.v1",
+  "training": {
+    "initial_residual_zero": true,
+    "iterations": 8,
+    "privileged_current_critic": false
+  },
+  "vector_env": {
+    "backend": "batch_torch",
+    "compile_mode": "default",
+    "compile_step": false,
+    "physics_dtype": "float64",
+    "projection_search_radius": 8,
+    "validate_finite": false
+  }
+}

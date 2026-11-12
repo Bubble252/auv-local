@@ -1,0 +1,36 @@
+{
+  "configs": {
+    "full_seed86201": {
+      "path": "configs/lowlevel/goal156/full_seed86201.json",
+      "sha256": "c3a3426422714f6577605977de33c23676399b10b54a06a08c04811be8797340"
+    },
+    "full_seed86202": {
+      "path": "configs/lowlevel/goal156/full_seed86202.json",
+      "sha256": "983387509d6e68ac77f761d78cd6890c8e359652a9526ffbb8a72a4f04b29174"
+    },
+    "full_seed86203": {
+      "path": "configs/lowlevel/goal156/full_seed86203.json",
+      "sha256": "d45e4c4f511a3e46b1f76ab77fd45d2deffbcaec9cbc81deb48d74487b0add00"
+    }
+  },
+  "frozen_before_measurement": true,
+  "goal": "Goal156",
+  "source_config": "configs/lowlevel/goal86/pc_goal86_t2_sac_default_20261110.json",
+  "source_sha256": "029f8afff2388a74bce935b68efc2dca5faf83c7f01f38e303967b3ae2d7563e",
+  "training": {
+    "batch_size": 256,
+    "formal_env_transitions": 5000000,
+    "heldout_seeds": [
+      100,
+      149
+    ],
+    "num_envs": 256,
+    "residual_authority": "full",
+    "terminal_gate_training": false,
+    "train_seeds": [
+      86201,
+      86202,
+      86203
+    ]
+  }
+}

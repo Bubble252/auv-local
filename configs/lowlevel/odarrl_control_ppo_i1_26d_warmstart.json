@@ -1,0 +1,66 @@
+{
+  "schema_version": "auv_odarrl_control_ppo.v1",
+  "experiment": {
+    "name": "odarrl_i1_residual_ppo_26d_warmstart",
+    "arm": "I",
+    "seed": 50000,
+    "output": "artifacts/lowlevel/i1_residual_ppo_26d_r2_warmstart",
+    "device": "cuda:5"
+  },
+  "environment": {
+    "config": "configs/lowlevel/odarrl_control_i_residual_26d.json",
+    "num_envs": 4096,
+    "max_episode_steps": null,
+    "observation_schema": "v2"
+  },
+  "base_policy": {
+    "mode": "frozen_bc",
+    "checkpoint": "artifacts/lowlevel/i0_26d_bc_dagger_r1_lineage_20261031/pi0.pt",
+    "checkpoint_sha256": "9a6574d9ee9f01650062442097c4bd0ab2fdc9cf19bc86b0fb2b8434ee832beb"
+  },
+  "vector_env": {
+    "backend": "batch_torch",
+    "physics_dtype": "float64",
+    "projection_search_radius": 8,
+    "compile_step": true,
+    "compile_mode": "default",
+    "validate_finite": false
+  },
+  "instrumentation": {
+    "record_step_timings": true,
+    "policy_metrics_sample_size": 32768,
+    "write_iteration_records": true
+  },
+  "training": {
+    "iterations": 40,
+    "initial_residual_zero": false
+  },
+  "runner": {
+    "num_steps_per_env": 256,
+    "save_interval": 5,
+    "empirical_normalization": false,
+    "logger": "tensorboard"
+  },
+  "policy": {
+    "actor_hidden_dims": [256, 128],
+    "critic_hidden_dims": [256, 128],
+    "activation": "elu",
+    "init_noise_std": 0.03,
+    "noise_std_type": "scalar"
+  },
+  "algorithm": {
+    "num_learning_epochs": 4,
+    "num_mini_batches": 64,
+    "clip_param": 0.1,
+    "gamma": 0.99,
+    "lam": 0.95,
+    "value_loss_coef": 1.0,
+    "entropy_coef": 0.0001,
+    "learning_rate": 0.0001,
+    "max_grad_norm": 1.0,
+    "use_clipped_value_loss": true,
+    "schedule": "fixed",
+    "desired_kl": 0.01,
+    "normalize_advantage_per_mini_batch": false
+  }
+}

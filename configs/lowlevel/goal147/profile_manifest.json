@@ -1,0 +1,73 @@
+{
+  "schema_version": "auv_goal147_terminal_pitch_profiles.v1",
+  "base_config": "configs/lowlevel/goal136/curriculum/C0.json",
+  "base_sha256": "fb85e27dc1f2cf4e932c8f7c074a56b436b91be10ac56a38d4e5f1493cebc20a",
+  "frozen_before_measurement": true,
+  "arms": {
+    "z": {
+      "guidance": {
+        "path": "configs/lowlevel/goal147/guidance_z.json",
+        "sha256": "fb85e27dc1f2cf4e932c8f7c074a56b436b91be10ac56a38d4e5f1493cebc20a",
+        "changes": {},
+        "section": "guidance"
+      },
+      "controller": null
+    },
+    "b85": {
+      "guidance": {
+        "path": "configs/lowlevel/goal147/guidance_b85.json",
+        "sha256": "d87b9166f9b32868612013148918a302f0adc18e0df932f2f1304690dd5e085a",
+        "changes": {
+          "terminal_braking_enabled": true,
+          "terminal_speed_ratio": 0.85
+        },
+        "section": "guidance"
+      },
+      "controller": null
+    },
+    "b75": {
+      "guidance": {
+        "path": "configs/lowlevel/goal147/guidance_b75.json",
+        "sha256": "99b619d00b7ed4359c5650dfdfba3f9f5d68a9f5499b20529d979acf7ec5138f",
+        "changes": {
+          "terminal_braking_enabled": true,
+          "terminal_speed_ratio": 0.75
+        },
+        "section": "guidance"
+      },
+      "controller": null
+    },
+    "k4": {
+      "guidance": {
+        "path": "configs/lowlevel/goal147/guidance_k4.json",
+        "sha256": "fb85e27dc1f2cf4e932c8f7c074a56b436b91be10ac56a38d4e5f1493cebc20a",
+        "changes": {},
+        "section": "guidance"
+      },
+      "controller": {
+        "path": "configs/lowlevel/goal147/controller_k4.json",
+        "sha256": "5f6e2909146065fbff965af75624ba175d8270706a43f8f800f210a5f9788c24",
+        "changes": {
+          "pitch_gain": 4.0
+        },
+        "section": "base_controller"
+      }
+    },
+    "r2": {
+      "guidance": {
+        "path": "configs/lowlevel/goal147/guidance_r2.json",
+        "sha256": "fb85e27dc1f2cf4e932c8f7c074a56b436b91be10ac56a38d4e5f1493cebc20a",
+        "changes": {},
+        "section": "guidance"
+      },
+      "controller": {
+        "path": "configs/lowlevel/goal147/controller_r2.json",
+        "sha256": "fd964f56d5a3201866893ed697cd8a13f6a4e7c115a5d692ee235b6a2daf30ea",
+        "changes": {
+          "pitch_rate_gain": 2.0
+        },
+        "section": "base_controller"
+      }
+    }
+  }
+}

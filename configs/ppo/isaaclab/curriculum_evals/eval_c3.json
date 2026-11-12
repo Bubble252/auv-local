@@ -1,0 +1,355 @@
+{
+  "schema_version": "auv_ppo_isaaclab.eval.v1",
+  "base_config": "../p1_ppo_base.json",
+  "checkpoint": null,
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "start_jitter_xy_m": 0.5,
+  "start_jitter_yaw_rad": 0.05235987755982989,
+  "scenarios": [
+    {
+      "key": "s1",
+      "start_xyz_m": [
+        -8.0,
+        0.0,
+        -5.0
+      ],
+      "goal_xyz_m": [
+        15.0,
+        0.0,
+        -5.0
+      ],
+      "obstacles": []
+    },
+    {
+      "key": "s2",
+      "start_xyz_m": [
+        -8.0,
+        0.0,
+        -5.0
+      ],
+      "goal_xyz_m": [
+        15.0,
+        0.0,
+        -5.0
+      ],
+      "obstacles": [
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            4.0,
+            0.0,
+            -6.0
+          ],
+          "radius_m": 1.0,
+          "height_m": 12.0
+        }
+      ]
+    },
+    {
+      "key": "c3",
+      "start_xyz_m": [
+        -8.0,
+        0.0,
+        -5.0
+      ],
+      "goal_xyz_m": [
+        15.0,
+        0.0,
+        -5.0
+      ],
+      "obstacles": [
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            1.4320746975775438,
+            -1.9969524981860198,
+            -6.0
+          ],
+          "radius_m": 0.5786450062140253,
+          "height_m": 12.0
+        },
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            6.6868130574336115,
+            2.473213542611381,
+            -6.0
+          ],
+          "radius_m": 0.6009829438382827,
+          "height_m": 12.0
+        }
+      ],
+      "variant": "c3_slalom_00"
+    },
+    {
+      "key": "c3",
+      "start_xyz_m": [
+        -8.0,
+        0.0,
+        -5.0
+      ],
+      "goal_xyz_m": [
+        15.0,
+        0.0,
+        -5.0
+      ],
+      "obstacles": [
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            1.2096246284815453,
+            1.9422640882290483,
+            -6.0
+          ],
+          "radius_m": 0.5507482939689488,
+          "height_m": 12.0
+        },
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            7.221153573044771,
+            -2.350916823805809,
+            -6.0
+          ],
+          "radius_m": 0.774718273296823,
+          "height_m": 12.0
+        }
+      ],
+      "variant": "c3_slalom_01"
+    },
+    {
+      "key": "c3",
+      "start_xyz_m": [
+        -8.0,
+        0.0,
+        -5.0
+      ],
+      "goal_xyz_m": [
+        15.0,
+        0.0,
+        -5.0
+      ],
+      "obstacles": [
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            2.3018609075796257,
+            -1.990408355204225,
+            -6.0
+          ],
+          "radius_m": 0.8631319232282857,
+          "height_m": 12.0
+        },
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            6.584477696089369,
+            1.8155600398750948,
+            -6.0
+          ],
+          "radius_m": 0.6616956452107041,
+          "height_m": 12.0
+        }
+      ],
+      "variant": "c3_slalom_02"
+    },
+    {
+      "key": "c3",
+      "start_xyz_m": [
+        -8.0,
+        0.0,
+        -5.0
+      ],
+      "goal_xyz_m": [
+        15.0,
+        0.0,
+        -5.0
+      ],
+      "obstacles": [
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            2.0535407165155712,
+            1.6578040742033666,
+            -6.0
+          ],
+          "radius_m": 0.62516836523306,
+          "height_m": 12.0
+        },
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            7.7878719218473975,
+            -1.3469344172994548,
+            -6.0
+          ],
+          "radius_m": 0.5687126000082647,
+          "height_m": 12.0
+        }
+      ],
+      "variant": "c3_slalom_03"
+    },
+    {
+      "key": "c3",
+      "start_xyz_m": [
+        -8.0,
+        0.0,
+        -5.0
+      ],
+      "goal_xyz_m": [
+        15.0,
+        0.0,
+        -5.0
+      ],
+      "obstacles": [
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            1.9369394365314136,
+            -1.3610775639932797,
+            -6.0
+          ],
+          "radius_m": 0.707085056764619,
+          "height_m": 12.0
+        },
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            6.025069812660666,
+            1.9666136271039334,
+            -6.0
+          ],
+          "radius_m": 0.6299900057860073,
+          "height_m": 12.0
+        }
+      ],
+      "variant": "c3_slalom_04"
+    },
+    {
+      "key": "c3",
+      "start_xyz_m": [
+        -8.0,
+        0.0,
+        -5.0
+      ],
+      "goal_xyz_m": [
+        15.0,
+        0.0,
+        -5.0
+      ],
+      "obstacles": [
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            2.2043471044552714,
+            1.5241150646236312,
+            -6.0
+          ],
+          "radius_m": 0.6572803372951314,
+          "height_m": 12.0
+        },
+        {
+          "type": "cylinder",
+          "center_xyz_m": [
+            6.830470062473573,
+            -2.0963311597705694,
+            -6.0
+          ],
+          "radius_m": 0.8578379917209769,
+          "height_m": 12.0
+        }
+      ],
+      "variant": "c3_slalom_05"
+    },
+    {
+      "key": "c3",
+      "start_xyz_m": [
+        -8.0,
+        0.0,
+        -5.0
+      ],
+      "goal_xyz_m": [
+        15.0,
+        0.0,
+        -5.0
+      ],
+      "obstacles": [
+        {
+          "type": "box",
+          "center_xyz_m": [
+            4.0,
+            -2.6,
+            -6.0
+          ],
+          "half_extents_m": [
+            14.0,
+            0.1,
+            6.0
+          ]
+        },
+        {
+          "type": "box",
+          "center_xyz_m": [
+            4.0,
+            2.6,
+            -6.0
+          ],
+          "half_extents_m": [
+            14.0,
+            0.1,
+            6.0
+          ]
+        },
+        {
+          "type": "box",
+          "center_xyz_m": [
+            4.5,
+            -1.15,
+            -6.0
+          ],
+          "half_extents_m": [
+            0.1,
+            1.35,
+            6.0
+          ]
+        },
+        {
+          "type": "box",
+          "center_xyz_m": [
+            4.5,
+            2.35,
+            -6.0
+          ],
+          "half_extents_m": [
+            0.1,
+            0.15,
+            6.0
+          ]
+        }
+      ],
+      "variant": "c3_gate_00"
+    }
+  ],
+  "success_gates": {
+    "episodes_per_scenario": 3,
+    "s1_min_successes": 2,
+    "s2_min_successes": 1,
+    "max_action_saturation": 0.5,
+    "max_both_action_saturation": 0.1
+  },
+  "metrics": [
+    "success",
+    "collision",
+    "out_of_bounds",
+    "timeout",
+    "min_clearance_m",
+    "time_to_goal_s",
+    "path_length_m",
+    "action_saturation"
+  ],
+  "output": "artifacts/ppo_isaaclab/eval_curriculum/c3"
+}

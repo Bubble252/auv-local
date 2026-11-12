@@ -1,0 +1,153 @@
+{
+  "schema_version": "auv_odarrl_server_resources.v1",
+  "recorded_at": "2026-10-30T16:48:59+08:00",
+  "hostname": "zhulab3-AS-4125GS-TNRT",
+  "ssh_host": "152.136.183.51:43127",
+  "repository_path": "/data/yhx/underwater-robotics/src/plan_p1/settled_局部规划器_反应式",
+  "server_checkout_is_git": false,
+  "source_commit": "daef64f",
+  "source_worktree_note": "server copy is not a git checkout; local uncommitted G1 files were synced additively",
+  "cpu": {
+    "logical_cores": 384,
+    "load_average_1m": 97.25,
+    "load_average_5m": 110.69,
+    "load_average_15m": 126.14,
+    "reserved_cpu_range": "160-191",
+    "workers": 16
+  },
+  "memory_gib": {
+    "total": 503,
+    "used": 76,
+    "available": 422
+  },
+  "disk_data_bytes": {
+    "total": 3779301580800,
+    "used": 3053778030592,
+    "available": 533469044736
+  },
+  "gpus": [
+    {"index": 0, "memory_used_mib": 7135, "utilization_percent": 17},
+    {"index": 1, "memory_used_mib": 15902, "utilization_percent": 99},
+    {"index": 2, "memory_used_mib": 10539, "utilization_percent": 70},
+    {"index": 3, "memory_used_mib": 6939, "utilization_percent": 100},
+    {"index": 4, "memory_used_mib": 1355, "utilization_percent": 30},
+    {"index": 5, "memory_used_mib": 9902, "utilization_percent": 96},
+    {"index": 6, "memory_used_mib": 4811, "utilization_percent": 99},
+    {"index": 7, "memory_used_mib": 22363, "utilization_percent": 100}
+  ],
+  "gpu_note": "all GPUs carried other users' work; G1 baseline and I-arm demonstration collection are CPU-only and use no GPU",
+  "pvs": {
+    "source_dir": "/data/yhx/underwater-robotics/src/plan_p1/python/PythonVehicleSimulator-master/src"
+  },
+  "python_envs": {
+    "oceansim": {
+      "python": "/data/yhx/underwater-robotics/envs/conda_envs/oceansim/bin/python",
+      "python_version": "3.11.13",
+      "numpy": "1.26.0",
+      "torch": "2.7.0+cu126",
+      "cuda_available": true,
+      "pip_freeze_sha256": "08f751122c2879423e38910a6d009448ffd894ccc4301efda95804b3261f0548"
+    },
+    "isaaclab": {
+      "python": "/data/yhx/underwater-robotics/envs/venvs/isaaclab/bin/python",
+      "python_version": "3.11.13",
+      "torch": "2.7.0+cu128",
+      "rsl_rl_installed": true,
+      "pip_freeze_sha256": "c6b9ac39d0d2043c881c974965bc2de74c25ff549312ec8aff3fde2e813edbf8"
+    }
+  },
+  "non_invasive_checks": {
+    "pvs_source_modified": false,
+    "isaaclab_source_modified": false,
+    "rsl_rl_source_modified": false,
+    "package_installed_into_existing_env": false
+  },
+  "runs": [
+    {
+      "name": "server_smoke_b0",
+      "config": "configs/lowlevel/odarrl_control_base.json",
+      "seeds": "0",
+      "max_steps": 50,
+      "output": "artifacts/lowlevel/server_smoke_b0"
+    },
+    {
+      "name": "server_b0_50seed_pre_terminal_capture",
+      "config": "configs/lowlevel/odarrl_control_base.json",
+      "seeds": "0-49",
+      "output": "artifacts/lowlevel/server_b0_50seed",
+      "note": "negative evidence: goal_radius=2.5, no terminal capture, 15 timeouts after passing the goal"
+    },
+    {
+      "name": "server_b0_50seed_cap16_r1",
+      "config": "configs/lowlevel/odarrl_control_base.json",
+      "seeds": "0-49",
+      "output": "artifacts/lowlevel/server_b0_50seed_cap16_r1",
+      "note": "terminal capture 16 m, goal radius 1.0 m, 48/50 success"
+    },
+    {
+      "name": "server_b0_50seed_final",
+      "config": "configs/lowlevel/odarrl_control_base.json",
+      "seeds": "0-49",
+      "output": "artifacts/lowlevel/server_b0_50seed_final",
+      "note": "terminal capture 16 m, goal radius 1.25 m, 50/50 success"
+    },
+    {
+      "name": "i_bc_180",
+      "config": "configs/lowlevel/odarrl_control_i_bc.json",
+      "episodes": 180,
+      "workers": 16,
+      "output": "artifacts/lowlevel/i_bc_180",
+      "note": "superseded by i_bc_180_r2 after goal radius changed to 2.0 m"
+    },
+    {
+      "name": "server_b0_50seed_r2",
+      "config": "configs/lowlevel/odarrl_control_base.json",
+      "seeds": "0-49",
+      "output": "artifacts/lowlevel/server_b0_50seed_r2",
+      "note": "final B0: terminal capture 16 m, goal radius 2.0 m, 50/50 success"
+    },
+    {
+      "name": "i_bc_180_r2",
+      "config": "configs/lowlevel/odarrl_control_i_bc.json",
+      "episodes": 180,
+      "workers": 16,
+      "output": "artifacts/lowlevel/i_bc_180_r2",
+      "note": "255,467 samples, success 1.00, shadow-teacher margin 0"
+    },
+    {
+      "name": "i_bc_model_r2",
+      "config": "configs/lowlevel/odarrl_control_i_bc.json",
+      "output": "artifacts/lowlevel/i_bc_model_r2",
+      "note": "single-pass BC; 50-seed closed-loop gate failed with 26.08 m RMSE gap"
+    },
+    {
+      "name": "i_dagger_r1",
+      "config": "configs/lowlevel/odarrl_control_i_bc.json",
+      "episodes": 40,
+      "workers": 16,
+      "output": "artifacts/lowlevel/i_dagger_r1",
+      "note": "98,938 DAgger samples; gate RMSE gap 0.119 m"
+    },
+    {
+      "name": "i_dagger_r2",
+      "config": "configs/lowlevel/odarrl_control_i_bc.json",
+      "episodes": 60,
+      "workers": 16,
+      "output": "artifacts/lowlevel/i_dagger_r2",
+      "note": "86,109 DAgger samples; student perturbation rollouts 98.3% success"
+    },
+    {
+      "name": "i_bc_dagger2",
+      "config": "configs/lowlevel/odarrl_control_i_bc.json",
+      "output": "artifacts/lowlevel/i_bc_dagger2",
+      "note": "440,514 merged samples from base + DAgger r1 + r2"
+    },
+    {
+      "name": "i0_gate_dagger2_50seed",
+      "config": "configs/lowlevel/odarrl_control_i_bc.json",
+      "seeds": "0-49",
+      "output": "artifacts/lowlevel/i0_gate_dagger2_50seed",
+      "note": "passed: RMSE gap 0.0203 m, success drop 0.0, material saturation 0.0073"
+    }
+  ]
+}

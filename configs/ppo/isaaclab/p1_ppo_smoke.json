@@ -1,0 +1,32 @@
+{
+  "extends": "p1_ppo_base.json",
+  "experiment": {
+    "name": "p1_ppo_smoke_s1_v1",
+    "seed": 0,
+    "output": "outputs/ppo_isaaclab/p1_ppo_smoke_s1_v1"
+  },
+  "env": {
+    "num_envs": 64,
+    "max_episode_steps": 600
+  },
+  "curriculum": {
+    "stage": "smoke_s1",
+    "scenario_mix": {
+      "s1": 1.0,
+      "s2": 0.0,
+      "c1": 0.0,
+      "c2": 0.0,
+      "c3": 0.0
+    }
+  },
+  "ppo": {
+    "max_iterations": 10,
+    "save_interval": 10,
+    "num_mini_batches": 4
+  },
+  "evaluation": {
+    "eval_every_iterations": 5,
+    "seeds": [0],
+    "scenario_keys": ["s1"]
+  }
+}

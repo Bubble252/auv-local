@@ -1,0 +1,16 @@
+{
+  "extends": "p1_ppo_base.json",
+  "experiment": {
+    "name": "p1_ppo_main_lr1e4_v3",
+    "seed": 0,
+    "output": "outputs/ppo_isaaclab/p1_ppo_main_lr1e4_v3"
+  },
+  "env": {
+    "num_envs": 4096
+  },
+  "ppo": {
+    "max_iterations": 5000,
+    "save_interval": 100,
+    "learning_rate": 0.0001
+  }
+}

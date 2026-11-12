@@ -1,0 +1,86 @@
+{
+  "base_config": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_current.json",
+  "base_config_sha256": "8e4ac934a305f93ae5bc2737a9eec1cf9725fe17adb4e4a9f96f348610464b23",
+  "schema_version": "auv_pc_v0d_r2b_smooth_teacher_variants.v1",
+  "suffix": "20261107",
+  "variants": {
+    "gov_default": {
+      "goal_radius_m": 2.0,
+      "guidance_overrides": {
+        "saturation_governor_enabled": true,
+        "saturation_governor_max_reduction": 0.12,
+        "saturation_governor_min_scale": 0.88,
+        "saturation_governor_span": 0.3,
+        "saturation_governor_start": 0.25
+      },
+      "path": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_smooth_gov_20261107.json",
+      "sha256": "16999e40e7cbf7f8815a63f37daaf95b04690cb119579230bcda457b24d0f179"
+    },
+    "gov_strict125": {
+      "goal_radius_m": 1.25,
+      "guidance_overrides": {
+        "saturation_governor_enabled": true,
+        "saturation_governor_max_reduction": 0.12,
+        "saturation_governor_min_scale": 0.88,
+        "saturation_governor_span": 0.3,
+        "saturation_governor_start": 0.25
+      },
+      "path": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_smooth_gov_20261107_strict125.json",
+      "sha256": "4fcc5620d7c9f5c9e79b2e404583c391c2f56035d6a5549b719f551698403cae"
+    },
+    "h15_default": {
+      "goal_radius_m": 2.0,
+      "guidance_overrides": {
+        "horizontal_gain": 1.5,
+        "vertical_gain": 1.0
+      },
+      "path": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_smooth_h15_20261107.json",
+      "sha256": "81b90b7fab12f0053fc5af15d14191154b4d33d77469e4b612bcd4fd9e7baa12"
+    },
+    "h15_strict125": {
+      "goal_radius_m": 1.25,
+      "guidance_overrides": {
+        "horizontal_gain": 1.5,
+        "vertical_gain": 1.0
+      },
+      "path": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_smooth_h15_20261107_strict125.json",
+      "sha256": "e3d368483e07f98c8fa6b86d47129db1c89ddc9915c97540087e1da462f790c4"
+    },
+    "h20_default": {
+      "goal_radius_m": 2.0,
+      "guidance_overrides": {
+        "horizontal_gain": 2.0,
+        "vertical_gain": 0.8
+      },
+      "path": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_smooth_h20_20261107.json",
+      "sha256": "0eb5e2a85074912c4c1d2888f473cd94d62c20e4db448f55b243443ca9e65655"
+    },
+    "h20_strict125": {
+      "goal_radius_m": 1.25,
+      "guidance_overrides": {
+        "horizontal_gain": 2.0,
+        "vertical_gain": 0.8
+      },
+      "path": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_smooth_h20_20261107_strict125.json",
+      "sha256": "c78bba781e7bedde2c869a3de89d53fef3162137fd504a89d7576c10898774de"
+    },
+    "rate_default": {
+      "goal_radius_m": 2.0,
+      "guidance_overrides": {
+        "heading_rate_limit_rad_s": 0.35,
+        "pitch_rate_limit_rad_s": 0.18
+      },
+      "path": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_smooth_rate_20261107.json",
+      "sha256": "fdf5cc96f9900da96f2a3ec4749afa51fae4fad8fe1347f4f06aada18f9273ea"
+    },
+    "rate_strict125": {
+      "goal_radius_m": 1.25,
+      "guidance_overrides": {
+        "heading_rate_limit_rad_s": 0.35,
+        "pitch_rate_limit_rad_s": 0.18
+      },
+      "path": "/home/bubble/\u6c34\u4e0b\u673a\u5668\u4eba/settled_\u5c40\u90e8\u89c4\u5212\u5668_\u53cd\u5e94\u5f0f/configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0d_teacher_r2b_smooth_rate_20261107_strict125.json",
+      "sha256": "8d8431678fdba7b9991bee6e00eca08dcdc183fb0b730a636af7f4ad96198e2f"
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "configs": {
+    "R0": {
+      "base": "configs/lowlevel/goal153/train/R0_C1_sac.json",
+      "base_sha256": "ee67a5ca2134abbe0dd10ca28b6f348c7e6c34437f29c709a6d4431cab26e6c3",
+      "environment_config": "configs/lowlevel/goal153/env/R0_C1.json",
+      "gate": {
+        "enabled": true,
+        "enter_m": 10.0,
+        "full_m": 2.0,
+        "mode": "shell"
+      },
+      "path": "configs/lowlevel/goal153/train/R0_mid_C1_sac.json",
+      "sha256": "659ac4c4a0b1acc4db2e100673fcd904aae51f2abde9e304278f55fae62af1b8"
+    },
+    "R1": {
+      "base": "configs/lowlevel/goal153/train/R1_C1_sac.json",
+      "base_sha256": "69ce0680289cb9bc87eb9a8ca72bc30555505368cd5a2f24e02e5e140ce24e19",
+      "environment_config": "configs/lowlevel/goal153/env/R1_C1.json",
+      "gate": {
+        "enabled": true,
+        "enter_m": 10.0,
+        "full_m": 2.0,
+        "mode": "shell"
+      },
+      "path": "configs/lowlevel/goal153/train/R1_mid_C1_sac.json",
+      "sha256": "c78cd27a7ac4d7dbe29ec4a1b3aa26f7bfa4a2ecc7d385e930b278f5a990fb35"
+    },
+    "R2": {
+      "base": "configs/lowlevel/goal153/train/R2_C1_sac.json",
+      "base_sha256": "da8ab048a1257e64d770f74924954affb845c20cf07555672e75a6ea041dd4d1",
+      "environment_config": "configs/lowlevel/goal153/env/R2_C1.json",
+      "gate": {
+        "enabled": true,
+        "enter_m": 10.0,
+        "full_m": 2.0,
+        "mode": "shell"
+      },
+      "path": "configs/lowlevel/goal153/train/R2_mid_C1_sac.json",
+      "sha256": "5a37b3177b247754d7569a9bc907f15f1aa62f0eab59829f3c14004b6e5bbaa3"
+    }
+  },
+  "frozen_before_measurement": true,
+  "goal": "Goal153",
+  "variant": "mid_only"
+}

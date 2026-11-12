@@ -1,0 +1,130 @@
+{
+  "actuator_eval_environment": {
+    "path": "configs/lowlevel/goal160/env_h3_actuator_default_eval.json",
+    "sha256": "75e958b34bba5f2fbb30c702f50372322db26691171871e93f4919ecaabb3030"
+  },
+  "arms": {
+    "A_actuator_near10_2": {
+      "action_interface": "actuator",
+      "command_residual": {
+        "enabled": false,
+        "scale_heading_rad": 0.35,
+        "scale_pitch_rad": 0.17,
+        "scale_speed_mps": 0.6,
+        "terminal_gate_enabled": false,
+        "terminal_gate_enter_m": 20.0,
+        "terminal_gate_full_m": 5.0
+      },
+      "description": "actuator residual baseline; train full, deploy near10_2",
+      "environment_config": "configs/lowlevel/goal160/env_a_actuator_near10_2.json",
+      "environment_sha256": "2d26cd7f167b416e44ed19625e1e58425ee112ef29c10998296ce0991898c00e",
+      "terminal_train_gate": false,
+      "train_speed_mps": 1.2
+    },
+    "B_command_near10_2": {
+      "action_interface": "command",
+      "command_residual": {
+        "enabled": true,
+        "scale_heading_rad": 0.35,
+        "scale_pitch_rad": 0.17,
+        "scale_speed_mps": 0.6,
+        "terminal_gate_enabled": false,
+        "terminal_gate_enter_m": 20.0,
+        "terminal_gate_full_m": 5.0
+      },
+      "description": "3-D command residual; train full, deploy near10_2",
+      "environment_config": "configs/lowlevel/goal160/env_b_command_near10_2.json",
+      "environment_sha256": "406e356d8659d469b920beae94f361ffa4c51e1c8da0b5a3bf42ac5702ce43d3",
+      "terminal_train_gate": false,
+      "train_speed_mps": 1.2
+    },
+    "C_command_terminal_train": {
+      "action_interface": "command",
+      "command_residual": {
+        "enabled": true,
+        "scale_heading_rad": 0.35,
+        "scale_pitch_rad": 0.17,
+        "scale_speed_mps": 0.6,
+        "terminal_gate_enabled": true,
+        "terminal_gate_enter_m": 10.0,
+        "terminal_gate_full_m": 2.0
+      },
+      "description": "3-D command residual trained only inside 10 m -> 2 m",
+      "environment_config": "configs/lowlevel/goal160/env_c_command_terminal_train.json",
+      "environment_sha256": "acf415c3b8f181e71bfc169e14e9fbc5be81d54eea475c7821b75c9e6d4d73bf",
+      "terminal_train_gate": true,
+      "train_speed_mps": 1.2
+    }
+  },
+  "command_eval_environment": {
+    "path": "configs/lowlevel/goal160/env_h3_command_near10_2_eval.json",
+    "sha256": "5a0801aa448dcd4faf9539fb5551d5c970cd030dfd488a03a640ce30d5e7c2c0"
+  },
+  "command_eval_policy": {
+    "path": "configs/lowlevel/goal160/eval_command_near10_2.json",
+    "sha256": "d32176688103abd5c22f6651f7259a1d5e9cd9a9dd689fbad63709e0280edd45"
+  },
+  "date": "2026-11-12",
+  "goal": "Goal160",
+  "heldout": "closed",
+  "max_speed_mps": 2.5,
+  "schema_version": "auv_goal160_action_parameterization.v1",
+  "speed_contract": "v_cmd + v_current + v_variation <= 2.5; 2.5 only with zero/weak current and negligible variation",
+  "train_configs": [
+    {
+      "arm": "A_actuator_near10_2",
+      "path": "configs/lowlevel/goal160/train_a_actuator_near10_2_seed86201.json",
+      "seed": 86201,
+      "sha256": "ac4544c31596fcd4d2095a536410ec4e9988df8f76028a5912345cada8293b91"
+    },
+    {
+      "arm": "A_actuator_near10_2",
+      "path": "configs/lowlevel/goal160/train_a_actuator_near10_2_seed86202.json",
+      "seed": 86202,
+      "sha256": "7153e14e7bfc7c48b5a39b77f2299559621f8f65f278fde390680bb6f73c3db1"
+    },
+    {
+      "arm": "A_actuator_near10_2",
+      "path": "configs/lowlevel/goal160/train_a_actuator_near10_2_seed86203.json",
+      "seed": 86203,
+      "sha256": "a490d8ea31a00aac81ca7a0b7c02b49ef4f2e677240ff822594898dec15fbffd"
+    },
+    {
+      "arm": "B_command_near10_2",
+      "path": "configs/lowlevel/goal160/train_b_command_near10_2_seed86201.json",
+      "seed": 86201,
+      "sha256": "90ae67b18ee4e3c3a3cf7599ad1f5a7ff57736aefe7b102431915a28c90f04fb"
+    },
+    {
+      "arm": "B_command_near10_2",
+      "path": "configs/lowlevel/goal160/train_b_command_near10_2_seed86202.json",
+      "seed": 86202,
+      "sha256": "ae6069b3ab2cec9faa19c39af43eef2b3da2d0cb501b3b4a0d4b100ae7816c3f"
+    },
+    {
+      "arm": "B_command_near10_2",
+      "path": "configs/lowlevel/goal160/train_b_command_near10_2_seed86203.json",
+      "seed": 86203,
+      "sha256": "09d6fb1eb0e090e78021b9cb31c614206cd9859f9a713364e1cc9a77db00770d"
+    },
+    {
+      "arm": "C_command_terminal_train",
+      "path": "configs/lowlevel/goal160/train_c_command_terminal_train_seed86201.json",
+      "seed": 86201,
+      "sha256": "51864103e0bdc03285fb232ed15df67e046e8278510bc1850017f3ff50d73a3c"
+    },
+    {
+      "arm": "C_command_terminal_train",
+      "path": "configs/lowlevel/goal160/train_c_command_terminal_train_seed86202.json",
+      "seed": 86202,
+      "sha256": "51e57f7c17def828596d29e26b7e97bbb6f12203aa8470a492d09796cbf6d258"
+    },
+    {
+      "arm": "C_command_terminal_train",
+      "path": "configs/lowlevel/goal160/train_c_command_terminal_train_seed86203.json",
+      "seed": 86203,
+      "sha256": "7a4f6797e09f93b35b6f99ba9783e26d33f967f5e1be3595e52a1818ffe19767"
+    }
+  ],
+  "train_speed_mps": 1.2
+}

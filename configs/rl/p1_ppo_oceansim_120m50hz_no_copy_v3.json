@@ -1,0 +1,63 @@
+{
+  "environment": {
+    "dt_s": 0.02,
+    "integration_step_s": 0.02,
+    "max_episode_steps": 3000,
+    "sensor_max_range_m": 120.0,
+    "local_effective_range_m": 120.0,
+    "reward_obstacle_range_m": 20.0,
+    "reward_step_scale": 0.1,
+    "observation_version": "2.0-120m",
+    "sensor_min_range_m": 0.2,
+    "sensor_vertical_half_width_m": 0.5,
+    "sensor_origin_body_m": [0.8, 0.0, 0.0],
+    "sensor_field_of_view_rad": 2.2689280275926285,
+    "sensor_ray_count": 1300,
+    "sensor_validity_s": 0.5,
+    "sensor_id": "oceansim-pcl",
+    "action_max_accel_mps2": 0.5,
+    "action_max_yaw_rate_rps": 0.2617993877991494,
+    "start_jitter_xy_m": 0.0,
+    "start_jitter_yaw_rad": 0.0,
+    "active_scenario_keys": ["s1", "s2"],
+    "reward": {
+      "distance_penalty_factor": -1.0,
+      "near_obstacle_penalty": -2.0,
+      "far_obstacle_penalty": -1.0,
+      "collision_penalty": -1000.0,
+      "timeout_penalty": -500.0,
+      "goal_bonus": 700.0,
+      "obstacle_influence_fraction": 0.7
+    },
+    "perception": {
+      "backend": "oceansim",
+      "mode": "p1_a_geometry_pcl",
+      "camera_resolution": [1300, 200],
+      "noise": false,
+      "include_unlabelled": false
+    }
+  },
+  "oceansim": {
+    "sensor_prim_path": "/World/P1Sonar",
+    "scan_device": "cpu",
+    "if_array_copy": false,
+    "vertical_fov_deg": 20.0,
+    "angular_res_deg": 0.1,
+    "range_res_m": 0.05,
+    "scan_attempts": 60,
+    "warmup_frames": 60,
+    "scene_obstacle_depth_m": 5.0
+  },
+  "training": {
+    "history_length": 16,
+    "eval_seeds": [0, 1, 2]
+  },
+  "evaluation": {
+    "policy_kind": "ppo",
+    "latency_threshold_ms": 20.0,
+    "latency_steps": 30,
+    "latency_warmup_steps": 5,
+    "latency_scenario": "s2"
+  },
+  "output": "outputs/ppo_isaaclab/oceansim_eval_no_copy_v3"
+}

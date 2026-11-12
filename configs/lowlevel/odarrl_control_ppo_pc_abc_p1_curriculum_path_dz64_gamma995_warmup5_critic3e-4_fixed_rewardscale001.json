@@ -1,0 +1,106 @@
+{
+  "schema_version": "auv_odarrl_control_ppo.v1",
+  "experiment": {
+    "name": "pc_ppo_abc_p1_curriculum_path_dz64_gamma995_warmup5_critic3e-4_fixed_rewardscale001",
+    "arm": "PC",
+    "seed": 91430,
+    "output": "artifacts/lowlevel/pc_abc_prework_20261105/P1_path_obs/training/P1_curriculum_seed91430",
+    "device": "cpu"
+  },
+  "environment": {
+    "config": "configs/lowlevel/odarrl_control_pc_c3_random_realistic_v1_rewardscale001.json",
+    "num_envs": 128,
+    "max_episode_steps": null,
+    "observation_schema": "pc_v1"
+  },
+  "base_policy": {
+    "mode": "none",
+    "checkpoint": null,
+    "checkpoint_sha256": null
+  },
+  "vector_env": {
+    "backend": "batch_torch",
+    "physics_dtype": "float64",
+    "projection_search_radius": 8,
+    "compile_step": false,
+    "compile_mode": "default",
+    "validate_finite": false
+  },
+  "instrumentation": {
+    "record_step_timings": true,
+    "policy_metrics_sample_size": 8192,
+    "write_iteration_records": true
+  },
+  "training": {
+    "iterations": 32,
+    "initial_residual_zero": false,
+    "privileged_current_critic": false
+  },
+  "history": {
+    "short_window": 10,
+    "long_window": 50,
+    "short_stride": 1,
+    "long_stride": 1,
+    "current_frame_dropout_prob": 0
+  },
+  "encoder": {
+    "kind": "dual_horizon_transformer",
+    "feature_dim": 64,
+    "fusion_hidden": [128, 64],
+    "output_dim": 64,
+    "dropout": 0,
+    "num_layers": 2,
+    "num_heads": 4,
+    "feedforward_dim": 128
+  },
+  "pc": {
+    "d_z_total": 64,
+    "n_in_reserved": 8,
+    "n_z_reserved": 4,
+    "state_encoder_hidden_dims": [128, 128],
+    "dade_enabled": true,
+    "aux_current_coef": 0.1,
+    "aux_current_steps": 4,
+    "dade_warmstart_input_scale": 0.03,
+    "path_dim": 8,
+    "path_encoder_hidden_dims": [64],
+    "path_encoder_alpha": 0.01,
+    "path_curriculum": [
+      {"start_iteration": 0, "blocks": ["state_base"]},
+      {"start_iteration": 8, "blocks": ["state_base", "path_geom"]},
+      {"start_iteration": 16, "blocks": ["state_base", "path_geom", "path_context"]},
+      {"start_iteration": 24, "blocks": ["state_base", "path_geom", "path_context"]}
+    ]
+  },
+  "runner": {
+    "num_steps_per_env": 256,
+    "save_interval": 10,
+    "empirical_normalization": false,
+    "logger": "tensorboard"
+  },
+  "policy": {
+    "actor_hidden_dims": [256, 128],
+    "critic_hidden_dims": [256, 128],
+    "activation": "elu",
+    "init_noise_std": 0.1,
+    "noise_std_type": "scalar"
+  },
+  "algorithm": {
+    "num_learning_epochs": 1,
+    "num_mini_batches": 128,
+    "clip_param": 0.02,
+    "gamma": 0.995,
+    "lam": 0.95,
+    "value_loss_coef": 1,
+    "entropy_coef": 0.0001,
+    "learning_rate": 1e-05,
+    "max_grad_norm": 1,
+    "use_clipped_value_loss": true,
+    "schedule": "fixed",
+    "desired_kl": 0.005,
+    "normalize_advantage_per_mini_batch": false,
+    "learning_rate_actor": 1e-05,
+    "learning_rate_critic": 0.0003,
+    "critic_warmup_iterations": 5
+  }
+}

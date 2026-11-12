@@ -1,0 +1,22 @@
+{
+  "correction": "pc_stage C0 -> C3 and hold_bonus true -> false to disable the direct-command training scaffold. hold_bonus is changed only because it is a C0/C1 reward flag; terminal, success, goal radius, current range, and all other reward terms are unchanged.",
+  "environment": "configs/lowlevel/goal159/env_h3_current07_10_train_c3.json",
+  "environment_sha256": "16764cac2b5d895b620478562dd968c5321f1240fb329a71b39a80913d6896dd",
+  "schema_version": "auv_goal159c_config_manifest.v1",
+  "source_environment": "configs/lowlevel/goal159/env_h3_current07_10_train.json",
+  "source_environment_sha256": "cdc2718bbc81a3c9934314ff5fd16ed313164765b7d797b45890eec701322c6d",
+  "train_configs": [
+    {
+      "path": "configs/lowlevel/goal159/train_c3_seed86201.json",
+      "sha256": "22470dd7d9b9343da0c7affc1e960735b5c93b9c9dbb0b4ba78fe417a7609e63"
+    },
+    {
+      "path": "configs/lowlevel/goal159/train_c3_seed86202.json",
+      "sha256": "8622f90f972ca6af6a577f0fa100ff6add1760164aeed13c60182c1e7036af36"
+    },
+    {
+      "path": "configs/lowlevel/goal159/train_c3_seed86203.json",
+      "sha256": "82c3c6d3537e649ff9696cceb700e438b724d617f48821836b1234886e116fdc"
+    }
+  ]
+}

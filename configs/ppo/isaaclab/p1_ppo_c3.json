@@ -1,0 +1,25 @@
+{
+  "extends": "p1_ppo_base.json",
+  "experiment": {
+    "name": "p1_ppo_c3_v1",
+    "seed": 0,
+    "output": "outputs/ppo_isaaclab/p1_ppo_c3_v1"
+  },
+  "curriculum": {
+    "stage": "c3_slalom_gate_mix",
+    "scenario_mix": {
+      "s1": 0.05,
+      "s2": 0.1,
+      "c1": 0.2,
+      "c2": 0.25,
+      "c3": 0.4
+    },
+    "start_jitter_xy_m": 0.5,
+    "start_jitter_yaw_rad": 0.05235987755982989
+  },
+  "ppo": {
+    "max_iterations": 5000,
+    "save_interval": 100,
+    "learning_rate": 0.0001
+  }
+}

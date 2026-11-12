@@ -1,0 +1,47 @@
+{
+  "schema_version": "auv_ppo_isaaclab.eval.v1",
+  "base_config": "p1_ppo_base.json",
+  "checkpoint": null,
+  "seeds": [0, 1, 2],
+  "start_jitter_xy_m": 0.5,
+  "start_jitter_yaw_rad": 0.05235987755982989,
+  "scenarios": [
+    {
+      "key": "s1",
+      "start_xyz_m": [-8.0, 0.0, -5.0],
+      "goal_xyz_m": [15.0, 0.0, -5.0],
+      "obstacles": []
+    },
+    {
+      "key": "s2",
+      "start_xyz_m": [-8.0, 0.0, -5.0],
+      "goal_xyz_m": [15.0, 0.0, -5.0],
+      "obstacles": [
+        {
+          "type": "cylinder",
+          "center_xyz_m": [4.0, 0.0, -6.0],
+          "radius_m": 1.0,
+          "height_m": 12.0
+        }
+      ]
+    }
+  ],
+  "success_gates": {
+    "episodes_per_scenario": 3,
+    "s1_min_successes": 2,
+    "s2_min_successes": 1,
+    "max_action_saturation": 0.5,
+    "max_both_action_saturation": 0.1
+  },
+  "metrics": [
+    "success",
+    "collision",
+    "out_of_bounds",
+    "timeout",
+    "min_clearance_m",
+    "time_to_goal_s",
+    "path_length_m",
+    "action_saturation"
+  ],
+  "output": "artifacts/ppo_isaaclab/eval_analytic"
+}

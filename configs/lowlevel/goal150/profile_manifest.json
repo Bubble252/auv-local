@@ -1,0 +1,39 @@
+{
+  "schema_version": "auv_goal150_current07_residual_profiles.v1",
+  "env_base": "configs/lowlevel/goal148/env_nominal.json",
+  "ppo_base": "configs/lowlevel/goal144/C-full-alos-command_ppo_pilot.json",
+  "sac_base": "configs/lowlevel/goal144/C-full-alos-command_sac_pilot.json",
+  "current_speed_range_mps": [
+    0.275,
+    0.5
+  ],
+  "shear_scale": 0.75,
+  "base_controller_pitch_gain": 4.0,
+  "screen_env_transitions": 1000000,
+  "frozen_before_measurement": true,
+  "profiles": {
+    "env": {
+      "path": "configs/lowlevel/goal150/env_current07_k4.json",
+      "sha256": "c939bad10742cfbdbf1df52d7053c23e22ea1a12bbd8b002a379011cbecac984"
+    },
+    "ppo_ent1e4": {
+      "entropy_coef": 0.0001,
+      "path": "configs/lowlevel/goal150/ppo_ent1e4.json",
+      "sha256": "13aafb4d56ffd08dfae4d9afdcd06ab372b5886f198023552b14e4af5dbb247d"
+    },
+    "ppo_ent1e3": {
+      "entropy_coef": 0.001,
+      "path": "configs/lowlevel/goal150/ppo_ent1e3.json",
+      "sha256": "34033e6b19855f83626c848125d216c1da9c78e0e352d75fa2c80eb4f1c9b2e4"
+    },
+    "ppo_ent1e2": {
+      "entropy_coef": 0.01,
+      "path": "configs/lowlevel/goal150/ppo_ent1e2.json",
+      "sha256": "cf4e5c08b473df2657c9c4e8eb66ceb8368c3a191fe9759d41f28be20529d0d8"
+    },
+    "sac": {
+      "path": "configs/lowlevel/goal150/sac_current07_k4.json",
+      "sha256": "83b5ae9b49db5d82669b1fc2951059120ce2dd3c1507cf5deb34f8dd7f0bcea5"
+    }
+  }
+}

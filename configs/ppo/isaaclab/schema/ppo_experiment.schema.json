@@ -1,0 +1,424 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/auv/ppo_experiment.schema.json",
+  "title": "P1 PPO IsaacLab experiment config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment",
+    "env",
+    "observation",
+    "reward",
+    "curriculum",
+    "ppo",
+    "evaluation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "auv_ppo_isaaclab.v1"
+    },
+    "extends": {
+      "type": "string",
+      "minLength": 1
+    },
+    "experiment": {
+      "$ref": "#/$defs/experiment"
+    },
+    "env": {
+      "$ref": "#/$defs/env"
+    },
+    "observation": {
+      "$ref": "#/$defs/observation"
+    },
+    "reward": {
+      "$ref": "#/$defs/reward"
+    },
+    "curriculum": {
+      "$ref": "#/$defs/curriculum"
+    },
+    "ppo": {
+      "$ref": "#/$defs/ppo"
+    },
+    "evaluation": {
+      "$ref": "#/$defs/evaluation"
+    }
+  },
+  "$defs": {
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "seed", "output"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "env": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "num_envs",
+        "dt_s",
+        "integration_step_s",
+        "max_episode_steps",
+        "sensor_max_range_m",
+        "local_effective_range_m",
+        "goal_radius_m",
+        "action_max_accel_mps2",
+        "action_max_yaw_rate_rps"
+      ],
+      "properties": {
+        "num_envs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "dt_s": {
+          "const": 0.02
+        },
+        "integration_step_s": {
+          "const": 0.02
+        },
+        "max_episode_steps": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "sensor_max_range_m": {
+          "const": 120.0
+        },
+        "local_effective_range_m": {
+          "const": 120.0
+        },
+        "goal_radius_m": {
+          "const": 1.0
+        },
+        "action_max_accel_mps2": {
+          "const": 0.5
+        },
+        "action_max_yaw_rate_rps": {
+          "const": 0.2617993877991494
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "history_length",
+        "sector_count",
+        "field_of_view_rad",
+        "ray_count",
+        "min_range_m",
+        "origin_body_m",
+        "vertical_half_width_m",
+        "sector_width_deg",
+        "normalize",
+        "normalization_max_range_m"
+      ],
+      "properties": {
+        "name": {
+          "const": "forward13_target_u_r"
+        },
+        "version": {
+          "const": "2.0-120m"
+        },
+        "history_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "sector_count": {
+          "const": 13
+        },
+        "field_of_view_rad": {
+          "const": 2.2689280275926285
+        },
+        "ray_count": {
+          "const": 1300
+        },
+        "min_range_m": {
+          "const": 0.2
+        },
+        "origin_body_m": {
+          "const": [0.8, 0.0, 0.0]
+        },
+        "vertical_half_width_m": {
+          "const": 0.5
+        },
+        "sector_width_deg": {
+          "const": 10.0
+        },
+        "normalize": {
+          "type": "boolean"
+        },
+        "normalization_max_range_m": {
+          "const": 120.0
+        }
+      }
+    },
+    "reward": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "distance_penalty_factor",
+        "action_penalty_factor",
+        "near_obstacle_penalty",
+        "far_obstacle_penalty",
+        "collision_penalty",
+        "timeout_penalty",
+        "goal_bonus",
+        "reward_obstacle_range_m",
+        "obstacle_influence_fraction",
+        "reward_step_scale",
+        "ppo_reward_scale"
+      ],
+      "properties": {
+        "version": {
+          "const": "paper"
+        },
+        "distance_penalty_factor": {
+          "type": "number",
+          "maximum": 0.0
+        },
+        "action_penalty_factor": {
+          "type": "number",
+          "maximum": 0.0
+        },
+        "near_obstacle_penalty": {
+          "type": "number",
+          "maximum": 0.0
+        },
+        "far_obstacle_penalty": {
+          "type": "number",
+          "maximum": 0.0
+        },
+        "collision_penalty": {
+          "type": "number",
+          "exclusiveMaximum": 0.0
+        },
+        "timeout_penalty": {
+          "type": "number",
+          "maximum": 0.0
+        },
+        "goal_bonus": {
+          "type": "number",
+          "exclusiveMinimum": 0.0
+        },
+        "reward_obstacle_range_m": {
+          "type": "number",
+          "exclusiveMinimum": 0.0,
+          "maximum": 120.0
+        },
+        "obstacle_influence_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0.0,
+          "exclusiveMaximum": 1.0
+        },
+        "reward_step_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0.0
+        },
+        "ppo_reward_scale": {
+          "type": "number",
+          "exclusiveMinimum": 0.0
+        }
+      }
+    },
+    "curriculum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "scenario_mix", "start_jitter_xy_m", "start_jitter_yaw_rad"],
+      "properties": {
+        "stage": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_mix": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["s1", "s2", "c1", "c2", "c3"],
+          "properties": {
+            "s1": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "s2": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "c1": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "c2": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            },
+            "c3": {
+              "type": "number",
+              "minimum": 0.0,
+              "maximum": 1.0
+            }
+          }
+        },
+        "start_jitter_xy_m": {
+          "type": "number",
+          "minimum": 0.0
+        },
+        "start_jitter_yaw_rad": {
+          "type": "number",
+          "minimum": 0.0
+        }
+      }
+    },
+    "ppo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "num_steps_per_env",
+        "max_iterations",
+        "save_interval",
+        "learning_rate",
+        "gamma",
+        "lam",
+        "clip_param",
+        "entropy_coef",
+        "value_loss_coef",
+        "num_learning_epochs",
+        "num_mini_batches",
+        "max_grad_norm",
+        "actor_hidden_dims",
+        "critic_hidden_dims"
+      ],
+      "properties": {
+        "num_steps_per_env": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "save_interval": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "learning_rate": {
+          "type": "number",
+          "exclusiveMinimum": 0.0
+        },
+        "gamma": {
+          "type": "number",
+          "exclusiveMinimum": 0.0,
+          "exclusiveMaximum": 1.0
+        },
+        "lam": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "clip_param": {
+          "type": "number",
+          "exclusiveMinimum": 0.0,
+          "exclusiveMaximum": 1.0
+        },
+        "entropy_coef": {
+          "type": "number",
+          "minimum": 0.0
+        },
+        "value_loss_coef": {
+          "type": "number",
+          "minimum": 0.0
+        },
+        "num_learning_epochs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "num_mini_batches": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024
+        },
+        "max_grad_norm": {
+          "type": "number",
+          "exclusiveMinimum": 0.0
+        },
+        "actor_hidden_dims": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          }
+        },
+        "critic_hidden_dims": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          }
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eval_every_iterations", "seeds", "scenario_keys"],
+      "properties": {
+        "eval_every_iterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "seeds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "scenario_keys": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["s1", "s2", "c1", "c2", "c3"]
+          }
+        }
+      }
+    }
+  }
+}
