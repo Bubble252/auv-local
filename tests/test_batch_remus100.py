@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -9,8 +10,11 @@ from auv_core.dynamics.remus100 import _load_pvs
 
 from auv_lowlevel.batch.dynamics import BatchedRemus100Dynamics, Remus100BatchState
 
-PVS_SOURCE = (
-    Path(__file__).resolve().parents[2] / "python" / "PythonVehicleSimulator-master" / "src"
+PVS_SOURCE = Path(
+    os.environ.get(
+        "PVS_SOURCE_DIR",
+        Path(__file__).resolve().parents[2] / "python" / "PythonVehicleSimulator-master" / "src",
+    )
 )
 
 
