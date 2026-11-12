@@ -5,7 +5,7 @@
 
 ## 0. 独立仓库边界
 
-- 本目录现在对应独立 Git 仓库 `/home/bubble/水下机器人-local`，分支 `main`。
+- 本目录现在对应独立 Git 仓库 `/home/bubble/水下机器人/local`，分支 `main`。
 - Python 包是 `auv_local` / `auv_rl` / `auv_lowlevel` / `auv_isaaclab`。
 - 只允许依赖已安装的 `auv-core`；不得导入 `auv_planner`，也不得引用
   `../settled_全局规划器/src`。
