@@ -44,6 +44,7 @@ SUPPORTED_CURRICULUM_PATH_FAMILIES = frozenset({"P0", "P1", "P2", "P3", "P4"})
 SUPPORTED_PC_STAGES = frozenset({"C0", "C1", "C2", "C3", "C4", "C5", "C6"})
 SUPPORTED_PC_CONTROL_MODES = frozenset({"alos", "path_fixed_speed", "path_learned_speed"})
 SUPPORTED_VELOCITY_CONTRACTS = frozenset({"legacy_water_nu", "nu_ground"})
+SUPPORTED_CURRENT_COMPENSATION_SOURCES = frozenset({"none", "true", "estimated"})
 
 
 def _mapping(
@@ -430,6 +431,7 @@ class GuidanceConfig:
     terminal_path_preserving_enabled: bool = False
     terminal_reference_extension_m: float = 0.0
     current_crab_enabled: bool = False
+    current_compensation_source: str = "none"
     current_estimate_max_age_s: float = 0.6
     current_estimate_tau_s: float = 1.5
     current_estimate_max_speed_mps: float = 1.5
@@ -499,6 +501,21 @@ class GuidanceConfig:
             raise ValueError(
                 "guidance.terminal_path_preserving_enabled requires "
                 "robust_terminal_enabled"
+            )
+        if self.current_compensation_source not in SUPPORTED_CURRENT_COMPENSATION_SOURCES:
+            raise ValueError(
+                "guidance.current_compensation_source must be one of "
+                f"{sorted(SUPPORTED_CURRENT_COMPENSATION_SOURCES)}"
+            )
+        if self.compensate_current and self.current_crab_enabled:
+            raise ValueError(
+                "guidance.compensate_current and guidance.current_crab_enabled "
+                "are mutually exclusive"
+            )
+        if self.compensate_current and self.current_compensation_source == "none":
+            raise ValueError(
+                "guidance.compensate_current=true requires "
+                "current_compensation_source in {'true', 'estimated'}"
             )
         if not math.isfinite(self.terminal_reference_extension_m) or (
             self.terminal_reference_extension_m < 0.0
@@ -1483,6 +1500,7 @@ def _parse_guidance(value: Any) -> GuidanceConfig:
             "terminal_path_preserving_enabled",
             "terminal_reference_extension_m",
             "current_crab_enabled",
+            "current_compensation_source",
             "current_estimate_max_age_s",
             "current_estimate_tau_s",
             "current_estimate_max_speed_mps",
@@ -1517,6 +1535,12 @@ def _parse_guidance(value: Any) -> GuidanceConfig:
             "speed_rate_limit_mps2",
         },
     )
+    compensate_current = _boolean(
+        data["compensate_current"], "guidance.compensate_current"
+    )
+    current_compensation_source = data.get("current_compensation_source")
+    if current_compensation_source is None:
+        current_compensation_source = "true" if compensate_current else "none"
     return GuidanceConfig(
         horizontal_lookahead_m=_positive(
             data["horizontal_lookahead_m"], "guidance.horizontal_lookahead_m"
@@ -1532,7 +1556,7 @@ def _parse_guidance(value: Any) -> GuidanceConfig:
             data["lookahead_error_gain"], "guidance.lookahead_error_gain"
         ),
         validity_period_s=_positive(data["validity_period_s"], "guidance.validity_period_s"),
-        compensate_current=_boolean(data["compensate_current"], "guidance.compensate_current"),
+        compensate_current=compensate_current,
         terminal_capture_distance_m=_positive(
             data["terminal_capture_distance_m"], "guidance.terminal_capture_distance_m"
         ),
@@ -1576,6 +1600,10 @@ def _parse_guidance(value: Any) -> GuidanceConfig:
         ),
         current_crab_enabled=_boolean(
             data.get("current_crab_enabled", False), "guidance.current_crab_enabled"
+        ),
+        current_compensation_source=_string(
+            current_compensation_source,
+            "guidance.current_compensation_source",
         ),
         current_estimate_max_age_s=_positive(
             data.get("current_estimate_max_age_s", 0.6),
@@ -2460,7 +2488,7 @@ def _validate_pc_contract(config: LowLevelConfig) -> None:
 
     The legacy residual arms keep their historical 15-degree contract. A PC
     run must be explicit and internally consistent: pure-controller actions,
-    a 20-degree policy/plant envelope, ground-speed feedback, no current
+    a 20-degree policy/plant envelope, ground-speed feedback, estimated-current
     compensation in ALOS, and the synthetic sensor source selected for v1.
     """
 
@@ -2495,7 +2523,16 @@ def _validate_pc_contract(config: LowLevelConfig) -> None:
     if config.plant.backend == "pvs_remus100":
         raise ValueError("PVS REMUS100 is limited to 15 degrees and cannot back a PC20 run")
     if config.guidance.compensate_current:
-        raise ValueError("PC requires guidance.compensate_current=false")
+        if config.guidance.current_compensation_source != "estimated":
+            raise ValueError(
+                "PC ALOS compensation requires "
+                "guidance.current_compensation_source='estimated'"
+            )
+        if config.guidance.current_crab_enabled:
+            raise ValueError(
+                "PC ALOS current modes are mutually exclusive: use estimated-current "
+                "compensation or crab, not both"
+            )
     if config.controller.use_current_field:
         raise ValueError("PC requires base_controller.use_current_field=false")
     if config.plant.velocity_contract == "legacy_water_nu":
@@ -2641,7 +2678,10 @@ def _validate_current_visibility(config: LowLevelConfig) -> None:
     if config.observation.expose_current:
         return
     leaks: list[str] = []
-    if config.guidance.compensate_current:
+    if (
+        config.guidance.compensate_current
+        and config.guidance.current_compensation_source != "estimated"
+    ):
         leaks.append("guidance.compensate_current")
     if config.controller.use_current_field:
         leaks.append("base_controller.use_current_field")
@@ -2677,6 +2717,7 @@ __all__ = [
     "ResidualConfig",
     "RewardConfig",
     "SensorConfig",
+    "SUPPORTED_CURRENT_COMPENSATION_SOURCES",
     "SUPPORTED_ACTUATOR_ENVELOPES",
     "SUPPORTED_POLICY_MODES",
     "SUPPORTED_REWARD_MODES",

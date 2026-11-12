@@ -1,7 +1,7 @@
 {
   "schema_version": "auv_pc_standing_eval_suite.v1",
   "name": "PC standing multi-paradigm / multi-curriculum / multi-environment eval suite",
-  "effective_date": "2026-11-11",
+  "effective_date": "2026-11-12",
   "status": "canonical",
   "owner_repo": "settled_局部规划器_反应式",
   "canonical_analyzer": "scripts/analyze_pc_goal153_eval_grid.py",
@@ -14,6 +14,26 @@
     "end": 149,
     "status": "closed"
   },
+  "alos_current_modes": [
+    {
+      "id": "ALOS-NONE",
+      "role": "control",
+      "compensate_current": false,
+      "current_crab_enabled": false,
+      "current_compensation_source": "none",
+      "description": "ALOS 不读取洋流做任何前馈或 crab 补偿。"
+    },
+    {
+      "id": "ALOS-COMP",
+      "role": "default",
+      "compensate_current": true,
+      "current_crab_enabled": false,
+      "current_compensation_source": "estimated",
+      "description": "ALOS 只用传感器估计洋流做 compensate_current 对水速度前馈；禁止 crab 和 true-current 泄漏。"
+    }
+  ],
+  "default_alos_current_mode": "ALOS-COMP",
+  "alos_current_mode_rule": "新训练/评价只允许 ALOS-NONE 与 ALOS-COMP 两组；ALOS-COMP 为默认，ALOS-NONE 为无洋流补偿对照。current_crab_enabled 仅保留历史复现，不进入 canonical 矩阵。",
   "success_contract": {
     "primary": "success_eta_tight_at_done",
     "goal_radii_m": {
@@ -30,51 +50,66 @@
       "id": "T0",
       "base": "ALOS",
       "residual": "none",
-      "algorithm": "traditional"
+      "algorithm": "traditional",
+      "alos_current_mode": "ALOS-COMP"
+    },
+    {
+      "id": "T0-NONE",
+      "base": "ALOS",
+      "residual": "none",
+      "algorithm": "traditional",
+      "alos_current_mode": "ALOS-NONE"
     },
     {
       "id": "BC",
       "base": "BC",
       "residual": "none",
-      "algorithm": "supervised"
+      "algorithm": "supervised",
+      "alos_current_mode": "ALOS-COMP"
     },
     {
       "id": "BC-PPO",
       "base": "frozen_BC",
       "residual": "actuator_or_command",
-      "algorithm": "PPO"
+      "algorithm": "PPO",
+      "alos_current_mode": "ALOS-COMP"
     },
     {
       "id": "BC-SAC",
       "base": "frozen_BC",
       "residual": "actuator_or_command",
-      "algorithm": "SAC"
+      "algorithm": "SAC",
+      "alos_current_mode": "ALOS-COMP"
     },
     {
       "id": "ALOS-PPO",
       "base": "ALOS",
       "residual": "actuator_or_command",
-      "algorithm": "PPO"
+      "algorithm": "PPO",
+      "alos_current_mode": "ALOS-COMP"
     },
     {
       "id": "ALOS-SAC",
       "base": "ALOS",
       "residual": "actuator_or_command",
-      "algorithm": "SAC"
+      "algorithm": "SAC",
+      "alos_current_mode": "ALOS-COMP"
     },
     {
       "id": "future-REDQ",
       "base": "pre_registered",
       "residual": "pre_registered",
       "algorithm": "REDQ",
-      "status": "requires_new_preregistration"
+      "status": "requires_new_preregistration",
+      "alos_current_mode": "ALOS-COMP"
     },
     {
       "id": "future-DroQ",
       "base": "pre_registered",
       "residual": "pre_registered",
       "algorithm": "DroQ",
-      "status": "requires_new_preregistration"
+      "status": "requires_new_preregistration",
+      "alos_current_mode": "ALOS-COMP"
     }
   ],
   "curricula": [
@@ -288,7 +323,11 @@
       "rate_clip_fraction",
       "residual_l2_ratio",
       "residual_l2_ratio_gate_active",
-      "residual_channel_rms"
+      "residual_channel_rms",
+      "alos_current_mode",
+      "alos_current_compensation_source",
+      "alos_crab_angle_rad",
+      "alos_current_estimate_age_s"
     ],
     "integrity": [
       "all_episode_finite",

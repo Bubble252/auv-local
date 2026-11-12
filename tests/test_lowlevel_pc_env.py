@@ -122,6 +122,48 @@ def test_c0_clean_env_reset_and_short_rollout() -> None:
     )
 
 
+def test_pc_alos_compensation_uses_masked_estimated_current() -> None:
+    config = _pc_config("C3", profile="realistic", current_enabled=True)
+    config = replace(
+        config,
+        guidance=replace(
+            config.guidance,
+            compensate_current=True,
+            current_crab_enabled=False,
+            current_compensation_source="estimated",
+        ),
+    )
+    env = BatchedPCLowLevelEnv(config, num_envs=2, validate_finite=True)
+    env.reset([701, 702])
+    assert env.sensor_output is not None and env._projection_hint is not None
+
+    estimated = torch.tensor(
+        [[0.30, -0.10, 0.02], [0.20, 0.15, -0.01]], dtype=torch.float64
+    )
+    valid = torch.tensor([True, False])
+    env._current_estimate_for_guidance = lambda: (
+        estimated,
+        valid,
+        torch.zeros(2, dtype=torch.float64),
+    )
+    captured: dict[str, torch.Tensor] = {}
+    original = env.guidance
+
+    class SpyGuidance:
+        compensate_current = True
+
+        def solve(self, **kwargs):
+            captured.update(kwargs)
+            return original.solve(**kwargs)
+
+    env.guidance = SpyGuidance()
+    env._alos_command()
+    expected = torch.tensor(
+        [[0.30, -0.10, 0.02], [0.0, 0.0, 0.0]], dtype=torch.float64
+    )
+    torch.testing.assert_close(captured["current_ned_mps"], expected)
+
+
 def test_ideal_actor_observations_use_true_state_current_and_endpoint_path() -> None:
     config = _pc_config("C3", profile="realistic", current_enabled=True)
     config = replace(

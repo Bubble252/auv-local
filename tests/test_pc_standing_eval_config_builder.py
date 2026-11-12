@@ -42,6 +42,32 @@ def test_a_screen_expands_pressure_and_both_radii(tmp_path: Path) -> None:
     ids = {item["id"] for item in manifest["scenarios"]}
     assert "p-nominal__r-legacy_sine__l35__v1p2__g-default" in ids
     assert "p-plant20__r-legacy_sine__l35__v1p2__g-strict125" in ids
+    default_payload = next(iter(manifest["scenarios"]))["payload"]
+    assert default_payload["guidance"]["compensate_current"] is True
+    assert default_payload["guidance"]["current_crab_enabled"] is False
+    assert (
+        default_payload["guidance"]["current_compensation_source"] == "estimated"
+    )
+
+
+def test_alos_current_mode_ablation_is_explicit_and_collision_free(tmp_path: Path) -> None:
+    manifest = _manifest(
+        tmp_path,
+        alos_current_mode="ALOS-NONE",
+        pressure_ids=["nominal"],
+        routes=["legacy_sine"],
+        lengths=[35],
+        speeds=[1.2],
+        radii=["default"],
+    )
+    assert manifest["scenario_count"] == 1
+    scenario = manifest["scenarios"][0]
+    assert scenario["id"].endswith("__a-ALOS-NONE")
+    assert scenario["axes"]["alos_current_mode"] == "ALOS-NONE"
+    guidance = scenario["payload"]["guidance"]
+    assert guidance["compensate_current"] is False
+    assert guidance["current_crab_enabled"] is False
+    assert guidance["current_compensation_source"] == "none"
 
 
 def test_pressure_and_geometry_are_applied_explicitly(tmp_path: Path) -> None:

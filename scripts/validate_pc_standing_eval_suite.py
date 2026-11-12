@@ -13,7 +13,28 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SUITE = REPO_ROOT / "configs/lowlevel/eval/pc_standing_eval_suite_v1.json"
 SCHEMA = "auv_pc_standing_eval_suite.v1"
 
-REQUIRED_PARADIGMS = {"T0", "BC", "BC-PPO", "BC-SAC", "ALOS-PPO", "ALOS-SAC"}
+REQUIRED_PARADIGMS = {
+    "T0",
+    "T0-NONE",
+    "BC",
+    "BC-PPO",
+    "BC-SAC",
+    "ALOS-PPO",
+    "ALOS-SAC",
+}
+REQUIRED_ALOS_CURRENT_MODES = {"ALOS-NONE", "ALOS-COMP"}
+EXPECTED_ALOS_CURRENT_MODES = {
+    "ALOS-NONE": {
+        "compensate_current": False,
+        "current_crab_enabled": False,
+        "current_compensation_source": "none",
+    },
+    "ALOS-COMP": {
+        "compensate_current": True,
+        "current_crab_enabled": False,
+        "current_compensation_source": "estimated",
+    },
+}
 REQUIRED_CURRICULA = {"C-fixed", "C-full", "C-hard", "C-no-current"}
 REQUIRED_STAGES = {f"C{index}" for index in range(7)}
 REQUIRED_PRESSURE = {
@@ -70,10 +91,43 @@ def validate(payload: dict[str, Any]) -> list[str]:
     if (heldout.get("start"), heldout.get("end")) != (100, 149):
         errors.append("heldout_seeds must be exactly 100-149 and closed")
 
-    paradigms = {item.get("id") for item in payload.get("paradigms", []) if isinstance(item, dict)}
-    missing = REQUIRED_PARADIGMS - paradigms
+    alos_modes = {
+        item.get("id"): item
+        for item in payload.get("alos_current_modes", [])
+        if isinstance(item, dict)
+    }
+    if set(alos_modes) != REQUIRED_ALOS_CURRENT_MODES:
+        errors.append(
+            "alos_current_modes must contain exactly "
+            f"{sorted(REQUIRED_ALOS_CURRENT_MODES)}"
+        )
+    for mode_id, expected in EXPECTED_ALOS_CURRENT_MODES.items():
+        mode = alos_modes.get(mode_id) or {}
+        for field, value in expected.items():
+            if mode.get(field) != value:
+                errors.append(f"alos_current_modes.{mode_id}.{field} must be {value!r}")
+    if payload.get("default_alos_current_mode") != "ALOS-COMP":
+        errors.append("default_alos_current_mode must be 'ALOS-COMP'")
+
+    paradigm_items = {
+        item.get("id"): item
+        for item in payload.get("paradigms", [])
+        if isinstance(item, dict)
+    }
+    missing = REQUIRED_PARADIGMS - set(paradigm_items)
     if missing:
         errors.append(f"missing paradigms: {sorted(missing)}")
+    for paradigm_id, paradigm in paradigm_items.items():
+        mode_id = paradigm.get("alos_current_mode")
+        if mode_id not in REQUIRED_ALOS_CURRENT_MODES:
+            errors.append(
+                f"paradigms.{paradigm_id}.alos_current_mode must be one of "
+                f"{sorted(REQUIRED_ALOS_CURRENT_MODES)}"
+            )
+    if (paradigm_items.get("T0") or {}).get("alos_current_mode") != "ALOS-COMP":
+        errors.append("paradigm T0 must use ALOS-COMP")
+    if (paradigm_items.get("T0-NONE") or {}).get("alos_current_mode") != "ALOS-NONE":
+        errors.append("paradigm T0-NONE must use ALOS-NONE")
 
     curricula = {
         item.get("id"): item for item in payload.get("curricula", []) if isinstance(item, dict)
@@ -150,7 +204,10 @@ def validate(payload: dict[str, Any]) -> list[str]:
                 f"({REQUIRED_MAX_SPEED_MPS} m/s)"
             )
         upper_bounds.append(upper)
-    if upper_bounds and any(left > right + 1e-12 for left, right in zip(upper_bounds, upper_bounds[1:])):
+    if upper_bounds and any(
+        left > right + 1e-12
+        for left, right in zip(upper_bounds, upper_bounds[1:], strict=False)
+    ):
         errors.append("speed_curriculum upper bounds must be non-decreasing from C0 to C6")
     c6 = stage_speeds.get("C6")
     if isinstance(c6, list) and len(c6) == 2:

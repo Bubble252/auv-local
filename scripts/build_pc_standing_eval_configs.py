@@ -5,6 +5,7 @@ This builder deliberately changes only explicit evaluation axes:
 
 * pressure: current speed/shear, sensor-noise scale, plant randomization;
 * geometry: route family, reference length and speed;
+* ALOS ocean-current mode: default ALOS-COMP, optional ALOS-NONE ablation;
 * success radius: default=2.0 m or strict125=1.25 m.
 
 It disables the training curriculum in generated configs so one scenario does
@@ -17,8 +18,9 @@ import argparse
 import copy
 import hashlib
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SUITE = REPO_ROOT / "configs/lowlevel/eval/pc_standing_eval_suite_v1.json"
@@ -73,11 +75,16 @@ def scenario_id(
     length_m: float,
     speed_mps: float,
     radius: str,
+    alos_current_mode: str = "ALOS-COMP",
+    default_alos_current_mode: str = "ALOS-COMP",
 ) -> str:
-    return (
+    base = (
         f"p-{pressure}__r-{route}__l{_num_tag(length_m)}"
         f"__v{_num_tag(speed_mps)}__g-{radius}"
     )
+    if alos_current_mode == default_alos_current_mode:
+        return base
+    return f"{base}__a-{alos_current_mode}"
 
 
 def _profile_map(suite: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -101,6 +108,20 @@ def _tier_map(suite: dict[str, Any]) -> dict[str, dict[str, Any]]:
         if not isinstance(tier, dict) or "id" not in tier:
             raise ValueError("every tier must be an object with an id")
         result[str(tier["id"])] = tier
+    return result
+
+
+def _alos_current_mode_map(suite: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    modes = suite.get("alos_current_modes")
+    if not isinstance(modes, list):
+        raise ValueError("suite.alos_current_modes must be a list")
+    result: dict[str, dict[str, Any]] = {}
+    for mode in modes:
+        if not isinstance(mode, dict) or "id" not in mode:
+            raise ValueError("every ALOS current mode must be an object with an id")
+        result[str(mode["id"])] = mode
+    if set(result) != {"ALOS-NONE", "ALOS-COMP"}:
+        raise ValueError("suite must define exactly ALOS-NONE and ALOS-COMP")
     return result
 
 
@@ -202,6 +223,21 @@ def apply_geometry(
     return payload
 
 
+def apply_alos_current_mode(
+    payload: dict[str, Any],
+    profile: dict[str, Any],
+) -> dict[str, Any]:
+    """Apply exactly one canonical ALOS ocean-current mode."""
+
+    guidance = payload.setdefault("guidance", {})
+    if not isinstance(guidance, dict):
+        raise ValueError("environment guidance must be an object")
+    guidance["compensate_current"] = bool(profile["compensate_current"])
+    guidance["current_crab_enabled"] = bool(profile["current_crab_enabled"])
+    guidance["current_compensation_source"] = str(profile["current_compensation_source"])
+    return payload
+
+
 def apply_eval_contract(
     payload: dict[str, Any],
     *,
@@ -243,12 +279,21 @@ def build_manifest(
     routes: list[str] | None = None,
     lengths: list[float] | None = None,
     speeds: list[float] | None = None,
+    alos_current_mode: str | None = None,
 ) -> dict[str, Any]:
     tiers = _tier_map(suite)
     if tier_id not in tiers:
         raise ValueError(f"unknown tier: {tier_id}; available={sorted(tiers)}")
     tier = tiers[tier_id]
     profiles = _profile_map(suite)
+    alos_modes = _alos_current_mode_map(suite)
+    default_alos_mode = str(suite.get("default_alos_current_mode", "ALOS-COMP"))
+    selected_alos_mode = str(alos_current_mode or default_alos_mode)
+    if selected_alos_mode not in alos_modes:
+        raise ValueError(
+            f"unsupported ALOS current mode: {selected_alos_mode}; "
+            f"available={sorted(alos_modes)}"
+        )
 
     requested_pressures = _selected(tier["pressure_profiles"], pressure_ids, name="pressure profile")
     requested_routes = _selected(tier["route_profiles"], routes, name="route profile")
@@ -278,6 +323,8 @@ def build_manifest(
                             length_m=length_m,
                             speed_mps=speed_mps,
                             radius=radius,
+                            alos_current_mode=selected_alos_mode,
+                            default_alos_current_mode=default_alos_mode,
                         )
                         payload = copy.deepcopy(base_env)
                         apply_pressure(payload, profile)
@@ -287,6 +334,7 @@ def build_manifest(
                             length_m=length_m,
                             speed_mps=speed_mps,
                         )
+                        apply_alos_current_mode(payload, alos_modes[selected_alos_mode])
                         apply_eval_contract(
                             payload,
                             radius=radius,
@@ -306,6 +354,7 @@ def build_manifest(
                                     "speed_mps": speed_mps,
                                     "goal_radius": radius,
                                     "goal_radius_m": float(goal_radii[radius]),
+                                    "alos_current_mode": selected_alos_mode,
                                 },
                             }
                         )
@@ -329,6 +378,8 @@ def build_manifest(
             "length_profiles_m": requested_lengths,
             "speed_profiles_mps": requested_speeds,
             "goal_radii": requested_radii,
+            "alos_current_mode": selected_alos_mode,
+            "alos_current_modes": sorted(alos_modes),
         },
         "speed_max_mps": suite.get("speed_max_mps"),
         "scenario_count": len(scenarios),
@@ -361,6 +412,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--length", nargs="*", type=float, default=None)
     parser.add_argument("--speed", nargs="*", type=float, default=None)
     parser.add_argument("--radius", nargs="*", default=None)
+    parser.add_argument("--alos-current-mode", default=None)
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
@@ -383,6 +435,7 @@ def main() -> int:
         routes=args.route,
         lengths=args.length,
         speeds=args.speed,
+        alos_current_mode=args.alos_current_mode,
     )
     if args.dry_run:
         preview = copy.deepcopy(manifest)

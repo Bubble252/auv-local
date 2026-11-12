@@ -119,7 +119,8 @@ authority schedule 与 terminal capture 审计；不换算法、不扫 seed。
 
 | paradigm | base | residual | 算法 | 最低 screen |
 |---|---|---|---|---|
-| `T0` | 纯 ALOS | 无 | 传统控制器 | nominal + current10 + plant20 |
+| `T0`（ALOS-COMP） | 纯 ALOS + estimated-current `compensate_current` | 无 | 传统控制器 | nominal + current10 + plant20 |
+| `T0-NONE` | 纯 ALOS，无 crab、无 compensate | 无 | 传统控制器 | 同 `T0`，作为洋流补偿消融 |
 | `BC-PPO` | frozen BC | actuator | PPO | R0 C1-fixed |
 | `BC-SAC` | frozen BC | actuator | SAC | R0 C1-fixed |
 | `ALOS-PPO` | 纯 ALOS | actuator | PPO | R0 C1-fixed |
@@ -128,6 +129,12 @@ authority schedule 与 terminal capture 审计；不换算法、不扫 seed。
 
 硬约束：所有范式共用同一 success/terminal/radius、dev seeds、环境档位和指标表；
 不能因为某个范式难训就少报环境或换 split。
+
+**2026-11-12 用户追加裁决**：ALOS 洋流补偿只保留两组，`ALOS-NONE`（crab 与
+compensate 都关）和 `ALOS-COMP`（只开 estimated-current `compensate_current`）。
+`ALOS-COMP` 是默认主基线，`ALOS-NONE` 是对照；`current_crab_enabled=true` 只保留
+历史复现，不进入新训练/评价矩阵。详见
+`doc/goals/goal174_alos_current_compensation_paradigm_20261112.md`。
 
 ### 3.3 Phase 1：reward pilot（1 seed × 200k）
 
@@ -199,7 +206,7 @@ residual L1/L2 与 gate-active 比例。该要求不改变本 Goal 已冻结的 
 | 长度 | `30 / 35 / 45 m` | 长路径与 timeout 必须同时报 |
 | 速度 | `0.9 / 1.2 / 1.4 / 1.8 / 2.2 / 2.5 m/s` | REMUS100 上界为 `2.5`；训练侧 `CurriculumStageSpec.speed_range_mps` 同样硬校验 `<=2.5`；速度收益不能牺牲 path/饱和 |
 | 课程 | `C-fixed / C-full / C-hard` | C-full 与 C-fixed 同预算 |
-| 范式 | `T0 / BC / BC-PPO / BC-SAC / ALOS-PPO / ALOS-SAC` | REDQ/DroQ 另开预注册 |
+| 范式 | `T0 / BC / BC-PPO / BC-SAC / ALOS-PPO / ALOS-SAC`；每条 ALOS-based arm 登记 `ALOS-COMP` 或 `ALOS-NONE` | 默认 ALOS-COMP；ALOS-NONE 为对照；crab 只做 legacy；REDQ/DroQ 另开预注册 |
 | 残差权限 | zero、near、mid、far、near10_2、full、scale 0.5/0.75 | 至少覆盖 mid/far/full |
 
 测评分层：

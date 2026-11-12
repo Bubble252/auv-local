@@ -29,6 +29,38 @@ def test_suite_rejects_pnav_axis_and_open_heldout() -> None:
     assert any("heldout_seeds.status" in error for error in errors)
 
 
+def test_suite_freezes_exactly_two_alos_current_modes() -> None:
+    payload = json.loads(validator.DEFAULT_SUITE.read_text(encoding="utf-8"))
+    modes = {item["id"]: item for item in payload["alos_current_modes"]}
+    assert set(modes) == {"ALOS-NONE", "ALOS-COMP"}
+    assert modes["ALOS-NONE"]["compensate_current"] is False
+    assert modes["ALOS-NONE"]["current_crab_enabled"] is False
+    assert modes["ALOS-COMP"]["compensate_current"] is True
+    assert modes["ALOS-COMP"]["current_crab_enabled"] is False
+    assert modes["ALOS-COMP"]["current_compensation_source"] == "estimated"
+
+    modes["ALOS-CRAB"] = {
+        "id": "ALOS-CRAB",
+        "compensate_current": False,
+        "current_crab_enabled": True,
+        "current_compensation_source": "none",
+    }
+    payload["alos_current_modes"] = list(modes.values())
+    errors = validator.validate(payload)
+    assert any("exactly" in error and "ALOS-NONE" in error for error in errors)
+
+
+def test_suite_requires_t0_comp_and_none_control() -> None:
+    payload = json.loads(validator.DEFAULT_SUITE.read_text(encoding="utf-8"))
+    paradigms = {item["id"]: item for item in payload["paradigms"]}
+    assert paradigms["T0"]["alos_current_mode"] == "ALOS-COMP"
+    assert paradigms["T0-NONE"]["alos_current_mode"] == "ALOS-NONE"
+
+    paradigms["T0"]["alos_current_mode"] = "ALOS-NONE"
+    errors = validator.validate(payload)
+    assert any("T0 must use ALOS-COMP" in error for error in errors)
+
+
 def test_suite_requires_remus_speed_ceiling_in_curriculum_and_eval() -> None:
     payload = json.loads(validator.DEFAULT_SUITE.read_text(encoding="utf-8"))
     assert payload["speed_max_mps"] == 2.5

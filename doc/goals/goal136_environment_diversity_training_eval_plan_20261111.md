@@ -55,6 +55,20 @@ SAC `DIVERSITY_SAFETY_STOP`，PPO `PPO_RESIDUAL_COLLAPSE_NOT_DIVERSITY`；
 Goal138 已检验 near-terminal sample density，Goal139 继续 mixed-horizon 与 PPO
 credit horizon。PPO/SAC 的改进工作不因 Goal136 的一次 null 停止。
 
+### 0.0 ALOS 洋流补偿范式冻结（2026-11-12）
+
+后续所有 ALOS-based 训练/评价只登记两种洋流处理方式，不再把 crab 当成默认：
+
+| 范式 | `compensate_current` | `current_crab_enabled` | 洋流来源 | 角色 |
+|---|---:|---:|---|---|
+| `ALOS-NONE` | `false` | `false` | 无 | 无补偿对照 |
+| `ALOS-COMP` | `true` | `false` | 传感器估计 | 默认主基线 |
+
+`ALOS-COMP` 只能使用 estimated current；true-current feedforward 仍禁止。历史
+`ALOS-CRAB-EST` 结果（含 Goal173）保留原标签，不改写、不混表。canonical 定义见
+`configs/lowlevel/eval/pc_standing_eval_suite_v1.json`，预注册见
+`doc/goals/goal174_alos_current_compensation_paradigm_20261112.md`。
+
 ### 0.1 D-line Phase A1：先做可执行最小闭环
 ### 0.2 C-line 落实状态（2026-11-11 审计）
 

@@ -4,6 +4,10 @@
 **状态**：`SCREEN_CANDIDATE_PASS_NOT_FORMAL / USER_REQUESTED_PAUSE_AFTER_SCREEN / CURRICULUM_LOCKED / FULL_EVAL_MATRIX_LOCKED / HELDOUT_CLOSED`<br>
 **上游**：Goal172 eval-only 归因（全矩阵重跑）；Goal171 单 seed route-health screen；Goal86 PPO/SAC 残差对照
 
+> **后注（2026-11-12）**：本 Goal 的 ALOS 基座是 legacy `ALOS-CRAB-EST`
+> （`compensate_current=false, current_crab_enabled=true`）。新的 canonical 默认是
+> `ALOS-COMP`（estimated-current `compensate_current`）；两者不得混表。
+
 ## Research Contract
 
 ```yaml

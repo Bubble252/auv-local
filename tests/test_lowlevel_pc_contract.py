@@ -112,6 +112,28 @@ def test_pc20_contract_parses_explicitly() -> None:
     assert config.controller.use_current_field is False
 
 
+def test_pc20_accepts_estimated_current_compensation_only() -> None:
+    data = _pc20_raw_config()
+    data["current"]["enabled"] = True
+    data["observation"]["current_contract"] = "hidden"
+    data["observation"]["expose_current"] = False
+    data["observation"]["speed_feedback"] = "ground"
+    data["guidance"].update(
+        {
+            "compensate_current": True,
+            "current_crab_enabled": False,
+            "current_compensation_source": "estimated",
+        }
+    )
+    config = parse_config(data)
+    assert config.guidance.compensate_current is True
+    assert config.guidance.current_compensation_source == "estimated"
+
+    data["guidance"]["current_crab_enabled"] = True
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        parse_config(data)
+
+
 def test_pc_s14_reward_fields_are_opt_in_and_validated() -> None:
     config = parse_config(_pc20_raw_config())
     assert config.reward.w_route_speed_pc == 0.0
@@ -237,7 +259,7 @@ def test_pc_command_speed_range_rejects_sheared_current_and_vehicle_overflow() -
         ),
         (
             lambda data: data["guidance"].update({"compensate_current": True}),
-            "compensate_current=false",
+            "current_compensation_source='estimated'",
         ),
         (
             lambda data: data["observation"].update({"speed_feedback": "water_relative"}),

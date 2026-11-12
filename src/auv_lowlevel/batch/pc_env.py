@@ -21,7 +21,11 @@ from auv_lowlevel.curriculum import (
     CurriculumStageSampler,
     EpisodeManifestWriter,
 )
-from auv_lowlevel.path import generate_curriculum_path, generate_pc_path_bank, resample_reference_path
+from auv_lowlevel.path import (
+    generate_curriculum_path,
+    generate_pc_path_bank,
+    resample_reference_path,
+)
 
 from .actions import BatchedPureActionApplication, BatchedPureActionPipeline
 from .dynamics import BatchedRemus100Dynamics, Remus100BatchState
@@ -1296,11 +1300,21 @@ class BatchedPCLowLevelEnv:
         desired_speed = self._route_speed_floor(projection, cruise_speed, desired_speed)
         estimated_current, current_valid, current_age = self._current_estimate_for_guidance()
         zero_current = torch.zeros_like(position)
+        guidance_current = zero_current
+        if self.guidance.compensate_current:
+            if self.config.guidance.current_compensation_source != "estimated":
+                raise RuntimeError(
+                    "PC ALOS compensation must use the estimated current, not the "
+                    "true-current feedforward"
+                )
+            guidance_current = torch.where(
+                current_valid[:, None], estimated_current, zero_current
+            )
         solution = self.guidance.solve(
             path=self.path,
             projection=projection,
             position_ned_m=position,
-            current_ned_mps=zero_current,
+            current_ned_mps=guidance_current,
             desired_ground_speed_mps=desired_speed,
             estimated_current_ned_mps=estimated_current,
             estimated_current_valid=current_valid,

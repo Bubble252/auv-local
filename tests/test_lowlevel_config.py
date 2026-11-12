@@ -225,6 +225,16 @@ def test_config_rejects_hidden_current_leak_for_non_oracle_arms() -> None:
     clean["base_controller"]["use_current_field"] = False
     assert parse_config(clean).observation.expose_current is False
 
+    estimated = copy.deepcopy(clean)
+    estimated["guidance"]["compensate_current"] = True
+    estimated["guidance"]["current_compensation_source"] = "estimated"
+    config = parse_config(estimated)
+    assert config.guidance.current_compensation_source == "estimated"
+
+    estimated["guidance"]["current_crab_enabled"] = True
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        parse_config(estimated)
+
 
 def test_all_shipped_lowlevel_configs_load() -> None:
     configs = sorted(
