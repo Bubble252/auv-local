@@ -6,9 +6,9 @@ from typing import Any
 
 import gymnasium as gym
 import numpy as np
-from auv_planner.attitude import euler_from_quaternion, quaternion_from_euler
-from auv_planner.contracts import FloatArray, State
-from auv_planner.geometry import HullSpec, hull_clearance_details, hull_from_vehicle
+from auv_core.attitude import euler_from_quaternion, quaternion_from_euler
+from auv_core.contracts import FloatArray, ObstacleMap, State, VehicleSpec
+from auv_core.geometry import HullSpec, hull_clearance_details, hull_from_vehicle
 
 from auv_local.contracts import LocalObservation, SurgeYawAction
 from auv_local.oracle import OracleSensor
@@ -39,6 +39,12 @@ class PlanarEnvConfig:
     sensor_origin_body_m: tuple[float, float, float] = (0.8, 0.0, 0.0)
     sensor_field_of_view_rad: float = 130.0 * pi / 180.0
     local_effective_range_m: float = 20.0
+    reward_obstacle_range_m: float = 20.0
+    reward_step_scale: float = 1.0
+    observation_version: str = "1.0"
+    analytic_observation_source: str = "analytic_13sector"
+    analytic_perception_mode: str = "analytic_13sector_geometry"
+    front_obstacle_cone_rad: float = 30.0 * pi / 180.0
     sensor_id: str = "oceansim-pcl"
     action_max_accel_mps2: float = 0.5
     action_max_yaw_rate_rps: float = 15.0 * pi / 180.0
@@ -65,6 +71,19 @@ class PlanarEnvConfig:
         sensor_range = _positive(self.sensor_max_range_m, "sensor_max_range_m")
         if local_range > sensor_range:
             raise ValueError("local_effective_range_m must not exceed sensor_max_range_m")
+        reward_range = _positive(self.reward_obstacle_range_m, "reward_obstacle_range_m")
+        if reward_range > sensor_range:
+            raise ValueError("reward_obstacle_range_m must not exceed sensor_max_range_m")
+        reward_scale = _positive(self.reward_step_scale, "reward_step_scale")
+        observation_version = self.observation_version.strip()
+        if not observation_version:
+            raise ValueError("observation_version must not be empty")
+        analytic_source = self.analytic_observation_source.strip()
+        if not analytic_source:
+            raise ValueError("analytic_observation_source must not be empty")
+        analytic_mode = self.analytic_perception_mode.strip()
+        if not analytic_mode:
+            raise ValueError("analytic_perception_mode must not be empty")
         sensor_min = _positive(self.sensor_min_range_m, "sensor_min_range_m")
         if sensor_min >= sensor_range:
             raise ValueError("sensor_min_range_m must be smaller than sensor_max_range_m")
@@ -72,6 +91,9 @@ class PlanarEnvConfig:
         fov = _positive(self.sensor_field_of_view_rad, "sensor_field_of_view_rad")
         if fov > 2.0 * pi:
             raise ValueError("sensor_field_of_view_rad must not exceed 2*pi")
+        front_cone = _positive(self.front_obstacle_cone_rad, "front_obstacle_cone_rad")
+        if front_cone > 0.5 * fov:
+            raise ValueError("front_obstacle_cone_rad must fit inside the sensor field of view")
         origin = np.asarray(self.sensor_origin_body_m, dtype=np.float64)
         if origin.shape != (3,) or not np.all(np.isfinite(origin)):
             raise ValueError("sensor_origin_body_m must be a finite shape-(3,) array")
@@ -83,9 +105,15 @@ class PlanarEnvConfig:
         object.__setattr__(self, "integration_step_s", integration_step)
         object.__setattr__(self, "sensor_max_range_m", sensor_range)
         object.__setattr__(self, "local_effective_range_m", local_range)
+        object.__setattr__(self, "reward_obstacle_range_m", reward_range)
+        object.__setattr__(self, "reward_step_scale", reward_scale)
+        object.__setattr__(self, "observation_version", observation_version)
+        object.__setattr__(self, "analytic_observation_source", analytic_source)
+        object.__setattr__(self, "analytic_perception_mode", analytic_mode)
         object.__setattr__(self, "sensor_min_range_m", sensor_min)
         object.__setattr__(self, "sensor_vertical_half_width_m", vertical)
         object.__setattr__(self, "sensor_field_of_view_rad", fov)
+        object.__setattr__(self, "front_obstacle_cone_rad", front_cone)
         object.__setattr__(
             self,
             "sensor_origin_body_m",
@@ -113,6 +141,17 @@ class PlanarEnvConfig:
             object.__setattr__(self, name, float(value))
         if not isinstance(self.reward, PaperRewardConfig):
             raise TypeError("reward must be a PaperRewardConfig")
+
+
+@dataclass(frozen=True)
+class PrivilegedSceneState:
+    """Ground-truth scene data exposed only to the teacher/collector."""
+
+    state: State
+    goal_ned_m: FloatArray
+    goal_radius_m: float
+    obstacle_map: ObstacleMap
+    vehicle: VehicleSpec
 
 
 class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
@@ -163,6 +202,7 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
             max_yaw_rate_rps=first_vehicle.max_yaw_rate_rps,
             action_max_accel_mps2=self.limits.max_accel_mps2,
             action_max_yaw_rate_rps=self.limits.max_yaw_rate_rps,
+            version=self.config.observation_version,
         )
         self.reward_function = PaperReward(self.config.reward)
         self.perception = (
@@ -185,6 +225,8 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
         self._case: PlanarScenarioCase | None = None
         self._state: State | None = None
         self._initial_goal_distance_m = 1.0
+        self._previous_goal_distance_m = 1.0
+        self._previous_clearance_m = float("inf")
         self._episode_steps = 0
         self._episode_path_length_m = 0.0
         self._episode_min_clearance_m = float("inf")
@@ -196,6 +238,8 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
         self._episode_action_saturation_counts = np.zeros(2, dtype=np.int64)
         self._episode_action_abs_sum = np.zeros(2, dtype=np.float64)
         self._episode_action_abs_max = np.zeros(2, dtype=np.float64)
+        self._episode_start_jitter_xy_m = 0.0
+        self._episode_start_jitter_yaw_rad = 0.0
         self._terminated = False
 
         observation_size = self.builder.spec.shape[0]
@@ -238,6 +282,9 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
         seed_value = 0 if seed is None else int(seed)
         self._rng = np.random.default_rng(seed_value)
         selected = None if options is None else options.get("scenario_key")
+        jitter_option = None if options is None else options.get("jitter")
+        if jitter_option is not None and not isinstance(jitter_option, bool):
+            raise TypeError("options['jitter'] must be a bool when provided")
         if selected is None:
             keys = self.config.active_scenario_keys
             selected = keys[int(self._rng.integers(0, len(keys)))]
@@ -247,8 +294,10 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
         scenario = self._case.scenario
         self.perception.reset(scenario=scenario)
         start = scenario.start
-        jitter_xy = self.config.start_jitter_xy_m
-        jitter_yaw = self.config.start_jitter_yaw_rad
+        jitter_xy = self.config.start_jitter_xy_m if jitter_option is not False else 0.0
+        jitter_yaw = self.config.start_jitter_yaw_rad if jitter_option is not False else 0.0
+        self._episode_start_jitter_xy_m = float(jitter_xy)
+        self._episode_start_jitter_yaw_rad = float(jitter_yaw)
         position = start.position_ned_m + np.array(
             [
                 float(self._rng.uniform(-jitter_xy, jitter_xy)) if jitter_xy else 0.0,
@@ -271,6 +320,7 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
             float(np.linalg.norm(scenario.goal_ned_m - position)),
             1e-6,
         )
+        self._previous_goal_distance_m = self._initial_goal_distance_m
         self._episode_steps = 0
         self._episode_path_length_m = 0.0
         clearance = hull_clearance_details(
@@ -279,6 +329,7 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
             self._hulls[self._case.key],
         )
         self._episode_min_clearance_m = clearance.clearance_m
+        self._previous_clearance_m = clearance.clearance_m
         self._previous_action = np.zeros(2, dtype=np.float64)
         self._last_observation_health = {}
         self._episode_action_clip_count = 0
@@ -317,13 +368,20 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
             dtype=np.float64,
         )
         clipped_action = np.clip(action_array, action_low, action_high)
+        previous_action = self._previous_action
+        if previous_action is None:
+            previous_action = np.zeros(2, dtype=np.float64)
+        previous_goal_distance = self._previous_goal_distance_m
+        previous_clearance = self._previous_clearance_m
         self._episode_action_step_count += 1
         clipped_dims = np.abs(clipped_action - action_array) > 1e-12
         self._episode_action_clip_count += int(np.count_nonzero(clipped_dims))
         if bool(np.any(clipped_dims)):
             self._episode_action_clipped_steps += 1
+        action_range = action_high - action_low
+        saturation_tolerance = 1e-3 * action_range
         self._episode_action_saturation_counts += (
-            np.abs(clipped_action) >= (action_high - 1e-9)
+            np.abs(clipped_action) >= (action_high - saturation_tolerance)
         ).astype(np.int64)
         self._episode_action_abs_sum += np.abs(clipped_action)
         self._episode_action_abs_max = np.maximum(
@@ -380,6 +438,15 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
             not self._terminated and self._episode_steps >= self.config.max_episode_steps
         )
         goal_distance = float(np.linalg.norm(state.position_ned_m - scenario.goal_ned_m))
+        action_scale = np.array(
+            [self.limits.max_accel_mps2, self.limits.max_yaw_rate_rps],
+            dtype=np.float64,
+        )
+        reference_speed = (
+            self.config.reward.reference_speed_mps
+            if self.config.reward.reference_speed_mps is not None
+            else float(scenario.start.linear_velocity_body_mps[0])
+        )
         local_observation = self._local_observation()
         observation = self.builder.build(
             local_observation,
@@ -387,16 +454,28 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
             initial_goal_distance_m=self._initial_goal_distance_m,
         )
         scan = local_observation.scans[0]
-        front_range = self.builder.nearest_range(scan, 30.0 * pi / 180.0)
+        front_range = self.builder.nearest_range(scan, self.config.front_obstacle_cone_rad)
         reward_terms = self.reward_function.compute(
             goal_distance_m=goal_distance,
             initial_goal_distance_m=self._initial_goal_distance_m,
             front_obstacle_range_m=front_range,
             sensor_max_range_m=self.config.local_effective_range_m,
+            reward_obstacle_range_m=self.config.reward_obstacle_range_m,
+            reward_step_scale=self.config.reward_step_scale,
             collision=collision,
             out_of_bounds=out_of_bounds,
             goal_reached=goal_reached,
+            truncated=truncated,
+            previous_goal_distance_m=previous_goal_distance,
+            previous_clearance_m=previous_clearance,
+            current_clearance_m=clearance.clearance_m,
+            surge_speed_mps=float(state.linear_velocity_body_mps[0]),
+            normalized_action=clipped_action / action_scale,
+            previous_normalized_action=previous_action / action_scale,
+            reference_speed_mps=reference_speed,
         )
+        self._previous_goal_distance_m = goal_distance
+        self._previous_clearance_m = clearance.clearance_m
         success = bool(goal_reached and not collision and not out_of_bounds and not truncated)
         info = self._info(
             goal_distance_m=goal_distance,
@@ -418,6 +497,19 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
             self._local_observation(),
             self._case.scenario.goal_ned_m,
             initial_goal_distance_m=self._initial_goal_distance_m,
+        )
+
+    def privileged_scene_state(self) -> PrivilegedSceneState:
+        """Return oracle scene data for teacher collection, never for the actor."""
+
+        if self._case is None or self._state is None:
+            raise RuntimeError("reset() must be called before reading privileged state")
+        return PrivilegedSceneState(
+            state=self._state,
+            goal_ned_m=self._case.scenario.goal_ned_m.copy(),
+            goal_radius_m=self._case.scenario.goal_radius_m,
+            obstacle_map=self._case.scenario.world.obstacle_map,
+            vehicle=self._case.scenario.vehicle,
         )
 
     def _local_observation(self) -> LocalObservation:
@@ -494,6 +586,8 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
             "action_yaw_rate_max_abs": float(self._episode_action_abs_max[1]),
             "action_u_dot_mean_abs": float(self._episode_action_abs_sum[0] / steps),
             "action_yaw_rate_mean_abs": float(self._episode_action_abs_sum[1] / steps),
+            "start_jitter_xy_m": self._episode_start_jitter_xy_m,
+            "start_jitter_yaw_rad": self._episode_start_jitter_yaw_rad,
             "observation_source": self.perception.observation_source,
             "perception_mode": self.perception.perception_mode,
             "perception_config_hash": self.perception.config_hash,
@@ -503,11 +597,18 @@ class PlanarAvoidanceEnv(gym.Env[np.ndarray, np.ndarray]):
             "sensor_empty_rays": float(health.get("empty_rays", 0.0)),
             "sensor_frame_age_s": float(health.get("frame_age_s", 0.0)),
             "sensor_scan_returned_false": float(health.get("scan_returned_false", 0.0)),
+            "sensor_pose_write_ms": float(health.get("pose_write_ms", 0.0)),
+            "sensor_render_update_ms": float(health.get("render_update_ms", 0.0)),
+            "sensor_scan_ms": float(health.get("sensor_scan_ms", 0.0)),
+            "sensor_point_transform_ms": float(health.get("point_transform_ms", 0.0)),
             "reward_total": reward_terms.total,
             "reward_distance": reward_terms.distance_reward,
             "reward_obstacle": reward_terms.obstacle_reward,
             "reward_terminal": reward_terms.terminal_reward,
+            "reward_goal_progress": reward_terms.goal_progress_reward,
+            "reward_reference_speed": reward_terms.reference_speed_reward,
+            "reward_action_smoothness": reward_terms.action_smoothness_reward,
         }
 
 
-__all__ = ["PlanarAvoidanceEnv", "PlanarEnvConfig"]
+__all__ = ["PlanarAvoidanceEnv", "PlanarEnvConfig", "PrivilegedSceneState"]

@@ -3,9 +3,9 @@ from __future__ import annotations
 import time
 
 import numpy as np
-from auv_planner.contracts import Trajectory
-from auv_planner.geometry import hull_clearance_details, hull_from_vehicle
-from auv_planner.guidance import ThreeDAlosGuidance
+from auv_core.contracts import Trajectory
+from auv_core.geometry import hull_clearance_details, hull_from_vehicle
+from auv_core.guidance import ThreeDAlosGuidance
 
 from .contracts import LocalPathPlan, LocalPathRequest, LocalPlanStatus
 from .evaluation import M2Replan, M2RunResult, M2Sample, evaluate_run

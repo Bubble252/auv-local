@@ -5,7 +5,7 @@ from math import hypot
 from typing import Any
 
 import numpy as np
-from auv_planner.contracts import (
+from auv_core.contracts import (
     FloatArray,
     Reference,
     Remus100ActuatorCommand,
@@ -13,7 +13,7 @@ from auv_planner.contracts import (
     State,
     Trajectory,
 )
-from auv_planner.geometry import hull_clearance_details, hull_from_vehicle
+from auv_core.geometry import hull_clearance_details, hull_from_vehicle
 
 
 @dataclass(frozen=True)

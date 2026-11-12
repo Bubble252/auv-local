@@ -18,11 +18,29 @@ resolution-markers = [
 ]
 
 [[package]]
+name = "auv-core"
+version = "0.1.0"
+source = { editable = "../settled_共享基础" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
+    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=1.26,<3" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11" },
+]
+provides-extras = ["dev"]
+
+[[package]]
 name = "auv-local"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "auv-planner" },
+    { name = "auv-core" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
     { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
@@ -51,7 +69,7 @@ viz = [
 
 [package.metadata]
 requires-dist = [
-    { name = "auv-planner", editable = "../settled_全局规划器" },
+    { name = "auv-core", editable = "../settled_共享基础" },
     { name = "gymnasium", marker = "extra == 'rl'", specifier = "==0.29.1" },
     { name = "gymnasium", marker = "extra == 'training'", specifier = "==0.29.1" },
     { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.9" },
@@ -65,27 +83,6 @@ requires-dist = [
     { name = "torch", marker = "extra == 'training'", specifier = "==2.7.0" },
 ]
 provides-extras = ["dev", "viz", "rl", "training"]
-
-[[package]]
-name = "auv-planner"
-version = "0.1.0"
-source = { editable = "../settled_全局规划器" }
-dependencies = [
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
-    { name = "numpy", version = "2.5.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10,<2" },
-    { name = "numpy", specifier = ">=1.26,<3" },
-    { name = "plotly", marker = "extra == 'viz'", specifier = ">=6.0" },
-    { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.400" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11" },
-]
-provides-extras = ["dev", "viz"]
 
 [[package]]
 name = "cloudpickle"

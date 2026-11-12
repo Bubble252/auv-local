@@ -6,8 +6,8 @@ from math import atan2, isfinite, pi
 from typing import Any
 
 import numpy as np
-from auv_planner.attitude import euler_from_quaternion
-from auv_planner.contracts import FloatArray
+from auv_core.attitude import euler_from_quaternion
+from auv_core.contracts import FloatArray
 from numpy.typing import NDArray
 
 from auv_local.contracts import LocalObservation, RangeScan
@@ -42,6 +42,7 @@ class ForwardSectorObservationBuilder:
     max_yaw_rate_rps: float = 0.5
     action_max_accel_mps2: float = 0.5
     action_max_yaw_rate_rps: float = 15.0 * pi / 180.0
+    version: str = "1.0"
     normalization: Mapping[str, Any] = field(
         default_factory=lambda: {
             "sector_range_scale_m": 8.0,
@@ -67,6 +68,9 @@ class ForwardSectorObservationBuilder:
         maximum_yaw = _positive(self.max_yaw_rate_rps, "max_yaw_rate_rps")
         action_accel = _positive(self.action_max_accel_mps2, "action_max_accel_mps2")
         action_yaw = _positive(self.action_max_yaw_rate_rps, "action_max_yaw_rate_rps")
+        version = self.version.strip()
+        if not version:
+            raise ValueError("version must not be empty")
         object.__setattr__(self, "max_range_m", maximum)
         object.__setattr__(self, "field_of_view_rad", field_of_view)
         object.__setattr__(self, "min_speed_mps", minimum_speed)
@@ -74,6 +78,7 @@ class ForwardSectorObservationBuilder:
         object.__setattr__(self, "max_yaw_rate_rps", maximum_yaw)
         object.__setattr__(self, "action_max_accel_mps2", action_accel)
         object.__setattr__(self, "action_max_yaw_rate_rps", action_yaw)
+        object.__setattr__(self, "version", version)
         object.__setattr__(
             self,
             "normalization",
@@ -91,7 +96,7 @@ class ForwardSectorObservationBuilder:
     def spec(self) -> ObservationSpec:
         return ObservationSpec(
             name="forward13_target_u_r",
-            version="1.0",
+            version=self.version,
             shape=(self.sector_count + 4,),
             normalization=self.normalization,
         )
@@ -100,7 +105,7 @@ class ForwardSectorObservationBuilder:
     def critic_spec(self) -> ObservationSpec:
         return ObservationSpec(
             name="forward13_target_u_r_previous_action",
-            version="1.0",
+            version=self.version,
             shape=(self.sector_count + 6,),
             normalization={**self.normalization, "previous_action": "physical/max"},
         )
@@ -131,6 +136,39 @@ class ForwardSectorObservationBuilder:
                 )
         return ranges
 
+    def sector_ranges_batch(
+        self,
+        ranges_m: NDArray[np.float64],
+        directions_body: FloatArray,
+    ) -> NDArray[np.float64]:
+        """Aggregate many scans into sectors with the same scalar semantics."""
+
+        ranges = np.asarray(ranges_m, dtype=np.float64)
+        directions = np.asarray(directions_body, dtype=np.float64)
+        if ranges.ndim != 2 or ranges.shape[1] <= 0:
+            raise ValueError("ranges_m must have shape (N, R) with R > 0")
+        if directions.ndim != 2 or directions.shape != (ranges.shape[1], 3):
+            raise ValueError("directions_body must have shape (R, 3) matching ranges_m")
+        if not np.all(np.isfinite(ranges)) or not np.all(np.isfinite(directions)):
+            raise ValueError("ranges_m and directions_body must contain only finite values")
+        angles = np.arctan2(directions[:, 1], directions[:, 0])
+        angles = (angles + pi) % (2.0 * pi) - pi
+        edges = self.sector_edges_rad
+        sectors = np.full((ranges.shape[0], self.sector_count), self.max_range_m, dtype=np.float64)
+        for index in range(self.sector_count):
+            lower = edges[index]
+            upper = edges[index + 1]
+            if index == self.sector_count - 1:
+                mask = (angles >= lower - 1e-12) & (angles <= upper + 1e-12)
+            else:
+                mask = (angles >= lower - 1e-12) & (angles < upper - 1e-12)
+            if np.any(mask):
+                sectors[:, index] = np.minimum(
+                    np.min(ranges[:, mask], axis=1),
+                    self.max_range_m,
+                )
+        return sectors
+
     def nearest_range(self, scan: RangeScan, half_angle_rad: float) -> float:
         if not isinstance(scan, RangeScan):
             raise TypeError("scan must be a RangeScan")
@@ -143,6 +181,30 @@ class ForwardSectorObservationBuilder:
         if not np.any(mask):
             return self.max_range_m
         return min(float(np.min(scan.ranges_m[mask])), self.max_range_m)
+
+    def nearest_range_batch(
+        self,
+        ranges_m: NDArray[np.float64],
+        directions_body: FloatArray,
+        half_angle_rad: float,
+    ) -> NDArray[np.float64]:
+        """Return the minimum range inside a cone for every scan in a batch."""
+
+        ranges = np.asarray(ranges_m, dtype=np.float64)
+        directions = np.asarray(directions_body, dtype=np.float64)
+        if ranges.ndim != 2 or ranges.shape[1] <= 0:
+            raise ValueError("ranges_m must have shape (N, R) with R > 0")
+        if directions.ndim != 2 or directions.shape != (ranges.shape[1], 3):
+            raise ValueError("directions_body must have shape (R, 3) matching ranges_m")
+        half_angle = _positive(half_angle_rad, "half_angle_rad")
+        if half_angle > pi:
+            raise ValueError("half_angle_rad must not exceed pi")
+        angles = np.arctan2(directions[:, 1], directions[:, 0])
+        angles = (angles + pi) % (2.0 * pi) - pi
+        mask = np.abs(angles) <= half_angle + 1e-12
+        if not np.any(mask):
+            return np.full(ranges.shape[0], self.max_range_m, dtype=np.float64)
+        return np.minimum(np.min(ranges[:, mask], axis=1), self.max_range_m)
 
     def build(
         self,
@@ -189,6 +251,67 @@ class ForwardSectorObservationBuilder:
                     ],
                     dtype=np.float64,
                 ),
+            )
+        )
+        return features.astype(np.float32)
+
+    def build_batch(
+        self,
+        sector_ranges_m: NDArray[np.float64],
+        positions_ned_m: NDArray[np.float64],
+        yaws_rad: NDArray[np.float64],
+        surge_mps: NDArray[np.float64],
+        yaw_rate_rps: NDArray[np.float64],
+        goals_ned_m: NDArray[np.float64],
+        initial_goal_distance_m: NDArray[np.float64] | float,
+    ) -> NDArray[np.float32]:
+        """Build a batch of actor observations from physical sector ranges."""
+
+        sectors = np.asarray(sector_ranges_m, dtype=np.float64)
+        positions = np.asarray(positions_ned_m, dtype=np.float64)
+        yaws = np.asarray(yaws_rad, dtype=np.float64)
+        surge = np.asarray(surge_mps, dtype=np.float64)
+        yaw_rate = np.asarray(yaw_rate_rps, dtype=np.float64)
+        goals = np.asarray(goals_ned_m, dtype=np.float64)
+        initial = np.asarray(initial_goal_distance_m, dtype=np.float64)
+        batch_size = sectors.shape[0] if sectors.ndim == 2 else -1
+        if batch_size <= 0 or sectors.shape[1] != self.sector_count:
+            raise ValueError("sector_ranges_m must have shape (N, sector_count)")
+        if positions.shape != (batch_size, 3):
+            raise ValueError("positions_ned_m must have shape (N, 3)")
+        if yaws.shape != (batch_size,) or surge.shape != (batch_size,):
+            raise ValueError("yaws_rad and surge_mps must have shape (N,)")
+        if yaw_rate.shape != (batch_size,) or goals.shape != (batch_size, 3):
+            raise ValueError("yaw_rate_rps must have shape (N,) and goals_ned_m shape (N, 3)")
+        if initial.ndim == 0:
+            initial = np.full(batch_size, float(initial), dtype=np.float64)
+        if initial.shape != (batch_size,):
+            raise ValueError("initial_goal_distance_m must be scalar or shape (N,)")
+        arrays = (sectors, positions, yaws, surge, yaw_rate, goals, initial)
+        if any(not np.all(np.isfinite(array)) for array in arrays):
+            raise ValueError("batch observation inputs must contain only finite values")
+        if np.any(initial <= 0.0):
+            raise ValueError("initial_goal_distance_m values must be positive")
+
+        delta = goals - positions
+        goal_distance = np.linalg.norm(delta, axis=1)
+        horizontal_distance = np.linalg.norm(delta[:, :2], axis=1)
+        bearing = np.zeros(batch_size, dtype=np.float64)
+        nonzero = horizontal_distance > 1e-12
+        bearing[nonzero] = (
+            np.arctan2(delta[nonzero, 1], delta[nonzero, 0]) - yaws[nonzero] + pi
+        ) % (2.0 * pi) - pi
+        features = np.column_stack(
+            (
+                np.clip(sectors / self.max_range_m, 0.0, 1.0),
+                np.clip(goal_distance / initial, 0.0, 1.0),
+                np.clip(bearing / pi, -1.0, 1.0),
+                np.clip(
+                    (surge - self.min_speed_mps) / (self.max_speed_mps - self.min_speed_mps),
+                    0.0,
+                    1.0,
+                ),
+                np.clip(yaw_rate / self.max_yaw_rate_rps, -1.0, 1.0),
             )
         )
         return features.astype(np.float32)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from auv_planner.contracts import FloatArray
+from auv_core.contracts import FloatArray
 
 from .contracts import ActionSpec, ObservationSpec
 

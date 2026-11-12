@@ -12,8 +12,8 @@ from matplotlib.patches import Circle, Rectangle
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from auv_planner.contracts import Obstacle
-from auv_planner.guidance import ThreeDAlosGuidance
+from auv_core.contracts import Obstacle
+from auv_core.guidance import ThreeDAlosGuidance
 
 from auv_local.closed_loop import run_m2_case
 from auv_local.execution import PvsRemus100ReferenceExecutor

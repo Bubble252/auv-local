@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from auv_planner.contracts import ControlProposal, SafeCommand, SafetyContext
+from auv_core.contracts import ControlProposal, SafeCommand, SafetyContext
 
 from .contracts import (
     ControlAuthority,

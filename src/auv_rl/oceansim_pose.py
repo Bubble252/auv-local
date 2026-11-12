@@ -3,8 +3,8 @@ from __future__ import annotations
 from math import cos, sin
 
 import numpy as np
-from auv_planner.attitude import euler_from_quaternion
-from auv_planner.contracts import FloatArray, State
+from auv_core.attitude import euler_from_quaternion
+from auv_core.contracts import FloatArray, State
 
 from .perception import oceansim_camera_rotation_body
 

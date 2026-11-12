@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 import pytest
-from auv_planner.contracts import ScenarioConfig, State
+from auv_core.contracts import Obstacle, ObstacleMap, ScenarioConfig, State
 
 from auv_rl.envs.planar_avoidance import PlanarAvoidanceEnv, PlanarEnvConfig
+from auv_rl.observation import ForwardSectorObservationBuilder
+from auv_rl.oceansim_pose import p1_state_to_oceansim_transform
 from auv_rl.perception import (
+    AnalyticSectorPerceptionBackend,
     OceanSimPointCloudSource,
     PerceptionUnavailableError,
     PointCloudFrame,
@@ -15,6 +18,7 @@ from auv_rl.perception import (
     PointCloudSonarBackend,
     PointCloudSonarConfig,
     StaleObservationError,
+    analytic_ray_ranges,
     oceansim_camera_rotation_body,
     transform_oceansim_points,
 )
@@ -326,6 +330,18 @@ def test_planar_env_uses_injected_backend_and_logs_contract_fields() -> None:
     assert info["sensor_frame_age_s"] == pytest.approx(0.0)
 
 
+def test_planar_env_counts_near_boundary_actions_as_saturated() -> None:
+    env = PlanarAvoidanceEnv(PlanarEnvConfig(active_scenario_keys=("s1",)))
+    env.reset(seed=0, options={"scenario_key": "s1"})
+    near_boundary = np.array(
+        [0.999 * env.limits.max_accel_mps2, 0.999 * env.limits.max_yaw_rate_rps],
+        dtype=np.float64,
+    )
+    _, _, _, _, info = env.step(near_boundary)
+    assert info["action_u_dot_saturation_ratio"] == pytest.approx(1.0)
+    assert info["action_yaw_rate_saturation_ratio"] == pytest.approx(1.0)
+
+
 def test_planar_env_default_oracle_is_explicitly_marked() -> None:
     env = PlanarAvoidanceEnv(PlanarEnvConfig(active_scenario_keys=("s1",)))
     _, info = env.reset(seed=0, options={"scenario_key": "s1"})
@@ -334,10 +350,16 @@ def test_planar_env_default_oracle_is_explicitly_marked() -> None:
 
 
 def test_oceansim_source_uses_injected_sensor_and_pose_writer() -> None:
+    state = make_state(t_s=0.2)
+    sensor_position, camera_rotation = p1_state_to_oceansim_transform(state)
+    world_point = sensor_position + camera_rotation @ np.array([0.0, 0.0, -5.0])
+
     class FakeSensor:
         def __init__(self) -> None:
             self.scan_data = {
-                "pcl": np.array([[0.0, 0.0, -5.0]], dtype=np.float64),
+                "pcl": world_point.reshape(1, 3),
+                # Deliberately stale: the source must use the given state pose
+                # rather than OceanSim's cached viewTransform.
                 "viewTransform": np.eye(4, dtype=np.float64),
             }
             self.closed = False
@@ -357,7 +379,7 @@ def test_oceansim_source_uses_injected_sensor_and_pose_writer() -> None:
         pose_writer=lambda state: poses.append(state.t_s),
     )
     source.reset(scenario=default_planar_scenarios()[0].scenario)
-    frame = source.capture(make_state(t_s=0.2))
+    frame = source.capture(state)
     assert frame.valid
     assert frame.points_body_m == pytest.approx(np.array([[5.8, 0.0, 0.0]]))
     assert poses == [0.0, 0.2]
@@ -504,6 +526,29 @@ def test_oceansim_source_runs_scene_reset_and_tick_callbacks() -> None:
     source.capture(make_state())
     assert ticks[-1] == "tick"
     assert len(ticks) == 4
+
+
+def test_oceansim_source_can_render_multiple_frames_before_scan() -> None:
+    class FakeSensor:
+        scan_data = {
+            "pcl": np.array([[0.0, 0.0, -5.0]], dtype=np.float64),
+            "viewTransform": np.eye(4, dtype=np.float64),
+        }
+
+        def scan(self) -> bool:
+            return True
+
+    ticks: list[str] = []
+    source = OceanSimPointCloudSource(
+        FakeSensor(),
+        pre_scan_tick=lambda: ticks.append("tick"),
+        pre_scan_updates=3,
+    )
+    source.reset(scenario=default_planar_scenarios()[0].scenario)
+    source.capture(make_state())
+    assert ticks == ["tick", "tick", "tick"]
+    with pytest.raises(ValueError, match="pre_scan_updates"):
+        OceanSimPointCloudSource(FakeSensor(), pre_scan_updates=0)
 
 
 def test_planar_env_reports_s2_points_at_reset() -> None:
@@ -683,3 +728,204 @@ def test_p1_oceansim_config_matches_frozen_values() -> None:
     assert payload["training"]["use_gru"] is True
     assert payload["training"]["use_pper"] is True
     assert payload["training"]["history_length"] == 10
+
+
+def test_p1_oceansim_120m50hz_config_matches_goal6_contract() -> None:
+    import json
+    from pathlib import Path
+
+    from auv_rl.training import env_config_from_payload
+
+    payload = json.loads(
+        Path("configs/rl/p1_planar_oceansim_120m50hz.json").read_text(encoding="utf-8")
+    )
+    config, perception = env_config_from_payload(payload)
+
+    assert config.sensor_max_range_m == pytest.approx(120.0)
+    assert config.local_effective_range_m == pytest.approx(120.0)
+    assert config.dt_s == pytest.approx(0.02)
+    assert config.integration_step_s == pytest.approx(0.02)
+    assert config.max_episode_steps == 3000
+    assert config.observation_version == "2.0-120m"
+    assert config.reward_step_scale == pytest.approx(0.1)
+    assert config.reward_obstacle_range_m == pytest.approx(20.0)
+    assert perception["backend"] == "oceansim"
+    assert perception["mode"] == "p1_a_geometry_pcl"
+    assert perception["camera_resolution"] == [1300, 200]
+    assert perception["noise"] is False
+    assert payload["training"]["history_length"] == 16
+
+
+def test_oceansim_runner_accepts_both_frozen_timing_contracts() -> None:
+    import importlib.util
+    import json
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "train_p1_oceansim",
+        Path("scripts/train_p1_oceansim.py"),
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    for path in (
+        Path("configs/rl/p1_planar_oceansim.json"),
+        Path("configs/rl/p1_planar_oceansim_120m50hz.json"),
+    ):
+        module._validate_p1_config(json.loads(path.read_text(encoding="utf-8")))
+
+
+def test_analytic_backend_empty_scene_saturates_at_local_range() -> None:
+    scenario = next(case for case in default_planar_scenarios() if case.key == "s1").scenario
+    backend = AnalyticSectorPerceptionBackend()
+    backend.reset(scenario=scenario)
+    observation = backend.observe(scenario.start)
+    scan = observation.scans[0]
+    assert np.allclose(scan.ranges_m, 120.0)
+    assert scan.confidence is not None
+    assert np.allclose(scan.confidence, 0.0)
+    assert observation.observation_source == "analytic_13sector"
+    builder = ForwardSectorObservationBuilder(max_range_m=20.0)
+    sectors = builder.sector_ranges(scan)
+    assert np.allclose(sectors, 20.0)
+    features = builder.build(
+        observation,
+        scenario.goal_ned_m,
+        initial_goal_distance_m=float(
+            np.linalg.norm(scenario.goal_ned_m - scenario.start.position_ned_m)
+        ),
+    )
+    assert features.shape == (17,)
+    assert features.dtype == np.float32
+    assert np.allclose(features[:13], 1.0)
+
+
+def test_analytic_backend_s2_center_echo_matches_ray_geometry() -> None:
+    scenario = next(case for case in default_planar_scenarios() if case.key == "s2").scenario
+    backend = AnalyticSectorPerceptionBackend()
+    backend.reset(scenario=scenario)
+    observation = backend.observe(scenario.start)
+    scan = observation.scans[0]
+    assert scan.ranges_m[650] == pytest.approx(10.2, abs=0.01)
+    assert scan.confidence is not None
+    assert scan.confidence[650] == pytest.approx(1.0)
+    builder = ForwardSectorObservationBuilder(max_range_m=20.0)
+    sectors = builder.sector_ranges(scan)
+    assert sectors[6] == pytest.approx(10.2, abs=0.01)
+    assert sectors[5] == sectors[7] == pytest.approx(10.989, abs=0.01)
+    assert sectors[0] == pytest.approx(20.0)
+
+
+def test_analytic_backend_left_right_sector_mapping_is_not_mirrored() -> None:
+    scenario = next(case for case in default_planar_scenarios() if case.key == "s2").scenario
+    backend = AnalyticSectorPerceptionBackend()
+    backend.reset(scenario=scenario)
+    builder = ForwardSectorObservationBuilder(max_range_m=20.0)
+    start = scenario.start
+    right_turn = State(
+        t_s=0.0,
+        position_ned_m=start.position_ned_m.copy(),
+        quat_xyzw=np.array(
+            [0.0, 0.0, np.sin(np.deg2rad(15.0)), np.cos(np.deg2rad(15.0))],
+            dtype=np.float64,
+        ),
+        linear_velocity_body_mps=start.linear_velocity_body_mps.copy(),
+        angular_velocity_body_rps=np.zeros(3, dtype=np.float64),
+    )
+    left_turn = replace(
+        right_turn,
+        quat_xyzw=np.array(
+            [0.0, 0.0, -np.sin(np.deg2rad(15.0)), np.cos(np.deg2rad(15.0))],
+            dtype=np.float64,
+        ),
+    )
+    right_sectors = builder.sector_ranges(backend.observe(right_turn).scans[0])
+    left_sectors = builder.sector_ranges(backend.observe(left_turn).scans[0])
+    assert right_sectors[3:6].min() < 20.0
+    assert left_sectors[7:10].min() < 20.0
+    assert right_sectors[10] == pytest.approx(20.0)
+    assert left_sectors[2] == pytest.approx(20.0)
+
+
+def test_analytic_backend_range_clipping_and_two_to_twenty_metres() -> None:
+    scenario = next(case for case in default_planar_scenarios() if case.key == "s2").scenario
+    cylinder = scenario.world.obstacle_map.obstacles[0]
+    backend = AnalyticSectorPerceptionBackend()
+    near_scenario = replace(
+        scenario,
+        world=replace(
+            scenario.world,
+            obstacle_map=ObstacleMap(
+                scenario.world.obstacle_map.bounds_ned_m,
+                (replace(cylinder, center_ned_m=np.array([-2.0, 0.0, -6.0])),),
+            ),
+        ),
+    )
+    backend.reset(scenario=near_scenario)
+    near = backend.observe(near_scenario.start).scans[0].ranges_m[650]
+    assert 2.0 <= near <= 6.8
+
+    far_scenario = replace(
+        scenario,
+        world=replace(
+            scenario.world,
+            obstacle_map=ObstacleMap(
+                scenario.world.obstacle_map.bounds_ned_m,
+                (replace(cylinder, center_ned_m=np.array([200.0, 0.0, -6.0])),),
+            ),
+        ),
+    )
+    backend.reset(scenario=far_scenario)
+    far = backend.observe(far_scenario.start).scans[0]
+    assert np.allclose(far.ranges_m, 120.0)
+    assert far.confidence is not None
+    assert np.allclose(far.confidence, 0.0)
+
+
+def test_analytic_ray_batch_matches_obstacle_sphere_box_and_boundary_exclusion() -> None:
+    scenario = next(case for case in default_planar_scenarios() if case.key == "s2").scenario
+    backend = AnalyticSectorPerceptionBackend()
+    backend.reset(scenario=scenario)
+    directions = backend.directions_body
+    origins = np.array([[-7.2, 0.0, -6.0], [-7.2, 0.0, -6.0]], dtype=np.float64)
+    world_directions = np.stack((directions, directions), axis=0)
+    ranges, confidence = analytic_ray_ranges(
+        origins,
+        world_directions,
+        tuple(scenario.world.obstacle_map.obstacles),
+        backend.config,
+    )
+    assert ranges.shape == (2, 1300)
+    assert confidence.shape == (2, 1300)
+    assert np.allclose(ranges[0], ranges[1])
+    assert ranges[0, 650] == pytest.approx(10.2, abs=0.01)
+
+    outside = np.array([[1.0e6, 0.0, 0.0]], dtype=np.float64)
+    outside_ranges, outside_confidence = analytic_ray_ranges(
+        outside,
+        directions.reshape(1, *directions.shape),
+        (),
+        backend.config,
+    )
+    assert np.allclose(outside_ranges, 120.0)
+    assert np.allclose(outside_confidence, 0.0)
+
+    forward = np.array([[[1.0, 0.0, 0.0]]], dtype=np.float64)
+    sphere = Obstacle(
+        obstacle_id="sphere",
+        kind="sphere",
+        center_ned_m=np.zeros(3, dtype=np.float64),
+        radius_m=1.0,
+    )
+    box = Obstacle(
+        obstacle_id="box",
+        kind="box",
+        center_ned_m=np.zeros(3, dtype=np.float64),
+        half_extents_m=np.ones(3, dtype=np.float64),
+    )
+    origin = np.array([[-5.0, 0.0, 0.0]], dtype=np.float64)
+    sphere_ranges, _ = analytic_ray_ranges(origin, forward, (sphere,), backend.config)
+    box_ranges, _ = analytic_ray_ranges(origin, forward, (box,), backend.config)
+    assert sphere_ranges[0, 0] == pytest.approx(4.0)
+    assert box_ranges[0, 0] == pytest.approx(4.0)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from auv_planner.contracts import (
+from auv_core.contracts import (
     ActuatorCommand,
     CapabilitySet,
     ControlProposal,
@@ -11,7 +11,7 @@ from auv_planner.contracts import (
     SafetyContext,
     State,
 )
-from auv_planner.interfaces import Guidance
+from auv_core.interfaces import Guidance
 
 from .contracts import (
     LocalPathPlan,

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from auv_planner.attitude import quaternion_from_euler
-from auv_planner.contracts import State
+from auv_core.attitude import quaternion_from_euler
+from auv_core.contracts import State
 
 from auv_rl.oceansim_pose import (
     OceanSimPoseWriter,

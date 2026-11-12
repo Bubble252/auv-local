@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from auv_planner.attitude import quaternion_from_euler
-from auv_planner.contracts import State
+from auv_core.attitude import quaternion_from_euler
+from auv_core.contracts import State
 
 from auv_local.contracts import LocalObservation, RangeScan
 from auv_rl.observation import ForwardSectorObservationBuilder
@@ -118,3 +118,36 @@ def test_critic_observation_appends_normalized_previous_action() -> None:
     assert result.shape == (19,)
     assert result[-2] == pytest.approx(0.5)
     assert result[-1] == pytest.approx(0.5)
+
+
+def test_batch_sector_and_feature_build_match_scalar_builder() -> None:
+    builder = ForwardSectorObservationBuilder(max_range_m=8.0)
+    observation = make_observation(yaw_rad=0.2)
+    scan = observation.scans[0]
+    scalar_sectors = builder.sector_ranges(scan)
+    batch_sectors = builder.sector_ranges_batch(
+        np.stack((scan.ranges_m, scan.ranges_m), axis=0),
+        scan.directions_body,
+    )
+    assert np.allclose(batch_sectors[0], scalar_sectors)
+    assert np.allclose(batch_sectors[1], scalar_sectors)
+
+    goal = np.array([[10.0, 0.0, 0.0], [10.0, 0.0, 0.0]], dtype=np.float64)
+    scalar = builder.build(
+        observation,
+        goal[0],
+        initial_goal_distance_m=20.0,
+    )
+    batch = builder.build_batch(
+        batch_sectors,
+        np.zeros((2, 3), dtype=np.float64),
+        np.array([0.2, 0.2], dtype=np.float64),
+        np.array([1.5, 1.5], dtype=np.float64),
+        np.array([0.05, 0.05], dtype=np.float64),
+        goal,
+        np.array([20.0, 20.0], dtype=np.float64),
+    )
+    assert batch.shape == (2, 17)
+    assert batch.dtype == np.float32
+    assert np.allclose(batch[0], scalar)
+    assert np.allclose(batch[1], scalar)

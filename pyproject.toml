@@ -7,7 +7,7 @@ name = "auv-local"
 version = "0.1.0"
 description = "Modular local planning and reactive navigation contracts for underwater vehicles."
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.26,<3", "auv-planner>=0.1.0"]
+dependencies = ["numpy>=1.26,<3", "auv-core>=0.1.0"]
 
 [project.optional-dependencies]
 dev = [
@@ -30,24 +30,26 @@ training = [
 ]
 
 [tool.uv.sources]
-auv-planner = { path = "../settled_全局规划器", editable = true }
+auv-core = { path = "../settled_共享基础", editable = true }
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
 auv_local = ["py.typed"]
+auv_lowlevel = ["py.typed"]
 auv_rl = ["py.typed"]
+auv_isaaclab = ["py.typed"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src", "../settled_全局规划器/src"]
+pythonpath = ["src"]
 testpaths = ["tests"]
 addopts = "-ra"
 
 [tool.mypy]
 python_version = "3.10"
-files = ["src/auv_local", "src/auv_rl", "tests"]
-mypy_path = "src:../settled_全局规划器/src"
+files = ["src/auv_local", "src/auv_lowlevel", "src/auv_rl", "src/auv_isaaclab", "tests"]
+mypy_path = "src"
 ignore_missing_imports = true
 check_untyped_defs = true
 warn_unused_ignores = true
@@ -64,10 +66,10 @@ select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
 "__init__.py" = ["F401"]
 
 [tool.pyright]
-include = ["src/auv_local", "src/auv_rl", "tests"]
+include = ["src/auv_local", "src/auv_lowlevel", "src/auv_rl", "src/auv_isaaclab", "tests"]
 venvPath = ".."
 venv = ".venv"
 pythonVersion = "3.10"
 typeCheckingMode = "basic"
-extraPaths = ["src", "../settled_全局规划器/src"]
+extraPaths = ["src"]
 reportUnsupportedDunderAll = "none"

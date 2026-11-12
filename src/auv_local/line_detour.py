@@ -4,9 +4,9 @@ from math import atan2, ceil, cos, sin
 from typing import cast
 
 import numpy as np
-from auv_planner.attitude import quaternion_from_euler
-from auv_planner.contracts import FloatArray, ObstacleMap, Trajectory, VehicleSpec
-from auv_planner.geometry import trajectory_sweep
+from auv_core.attitude import quaternion_from_euler
+from auv_core.contracts import FloatArray, ObstacleMap, Trajectory, VehicleSpec
+from auv_core.geometry import trajectory_sweep
 
 from .contracts import (
     LocalPathPlan,

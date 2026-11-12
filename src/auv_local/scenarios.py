@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from auv_planner.attitude import forward_quaternion
-from auv_planner.contracts import (
+from auv_core.attitude import forward_quaternion
+from auv_core.contracts import (
     CapabilitySet,
     Obstacle,
     ObstacleMap,
@@ -18,7 +18,7 @@ from auv_planner.contracts import (
     VehicleSpec,
     WorldSnapshot,
 )
-from auv_planner.scenarios import remus100_vehicle
+from auv_core.scenarios import remus100_vehicle
 
 from .contracts import RolloutConfig
 

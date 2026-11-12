@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from auv_planner.contracts import ScenarioConfig
+from auv_core.contracts import ScenarioConfig
 
 from auv_local.scenarios import m2_scenarios
 

@@ -6,7 +6,7 @@ from math import prod
 from typing import Any
 
 import numpy as np
-from auv_planner.contracts import FloatArray
+from auv_core.contracts import FloatArray
 
 
 def _shape(value: tuple[int, ...]) -> tuple[int, ...]:

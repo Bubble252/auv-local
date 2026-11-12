@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from math import pi
 
 import numpy as np
-from auv_planner.contracts import (
+from auv_core.contracts import (
     FloatArray,
     Obstacle,
     ObstacleMap,
@@ -14,7 +14,9 @@ from auv_planner.contracts import (
 from .contracts import LocalObservation, ObstacleTrack, RangeScan
 
 
-def _rotation_body_to_world(quat_xyzw: FloatArray) -> FloatArray:
+def rotation_body_to_world(quat_xyzw: FloatArray) -> FloatArray:
+    """Return the body-FRD to world-NED rotation matrix for a quaternion."""
+
     x, y, z, w = np.asarray(quat_xyzw, dtype=np.float64)
     return np.array(
         [
@@ -129,7 +131,13 @@ def _ray_aabb_exit(origin: FloatArray, direction: FloatArray, bounds: FloatArray
     return t_far if np.isfinite(t_far) else None
 
 
-def _obstacle_range(origin: FloatArray, direction: FloatArray, obstacle: Obstacle) -> float | None:
+def ray_obstacle_range(
+    origin: FloatArray,
+    direction: FloatArray,
+    obstacle: Obstacle,
+) -> float | None:
+    """Return the nearest non-negative intersection distance with one obstacle."""
+
     if obstacle.kind == "sphere":
         return _ray_sphere(origin, direction, obstacle)
     if obstacle.kind == "cylinder":
@@ -180,14 +188,14 @@ class OracleSensor:
             raise TypeError("obstacle_map must be an ObstacleMap")
 
         body_directions = self.directions_body()
-        rotation = _rotation_body_to_world(state.quat_xyzw)
+        rotation = rotation_body_to_world(state.quat_xyzw)
         world_directions = body_directions @ rotation.T
         ranges = np.full(self.ray_count, self.max_range_m, dtype=np.float64)
         origin = state.position_ned_m.copy()
         for ray_index, direction in enumerate(world_directions):
             nearest = self.max_range_m
             for obstacle in obstacle_map.obstacles:
-                hit = _obstacle_range(origin, direction, obstacle)
+                hit = ray_obstacle_range(origin, direction, obstacle)
                 if hit is not None:
                     nearest = min(nearest, hit)
             boundary_hit = _ray_aabb_exit(origin, direction, obstacle_map.bounds_ned_m)
@@ -230,4 +238,4 @@ class OracleSensor:
         )
 
 
-__all__ = ["OracleSensor"]
+__all__ = ["OracleSensor", "ray_obstacle_range", "rotation_body_to_world"]

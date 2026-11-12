@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from math import cos, isfinite, pi, sin
 
 import numpy as np
-from auv_planner.attitude import euler_from_quaternion, quaternion_from_euler
-from auv_planner.contracts import FloatArray, State
+from auv_core.attitude import euler_from_quaternion, quaternion_from_euler
+from auv_core.contracts import FloatArray, State
 
 from auv_local.contracts import SurgeYawAction
 

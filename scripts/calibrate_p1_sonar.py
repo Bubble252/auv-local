@@ -13,8 +13,8 @@ import numpy as np
 
 os.environ.setdefault("OMNI_KIT_ALLOW_ROOT", "1")
 
-from auv_planner.attitude import quaternion_from_euler  # noqa: E402
-from auv_planner.contracts import ScenarioConfig, State  # noqa: E402
+from auv_core.attitude import quaternion_from_euler  # noqa: E402
+from auv_core.contracts import ScenarioConfig, State  # noqa: E402
 
 from auv_rl.observation import ForwardSectorObservationBuilder  # noqa: E402
 from auv_rl.perception import (  # noqa: E402

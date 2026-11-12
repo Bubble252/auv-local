@@ -7,7 +7,7 @@ from math import isfinite
 from typing import Any
 
 import numpy as np
-from auv_planner.contracts import (
+from auv_core.contracts import (
     BODY_FRAME,
     WORLD_FRAME,
     CapabilitySet,

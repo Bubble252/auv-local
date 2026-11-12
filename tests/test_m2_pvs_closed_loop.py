@@ -5,8 +5,8 @@ from dataclasses import replace
 
 import numpy as np
 import pytest
-from auv_planner.contracts import Remus100ActuatorCommand, State
-from auv_planner.guidance import ThreeDAlosGuidance
+from auv_core.contracts import Remus100ActuatorCommand, State
+from auv_core.guidance import ThreeDAlosGuidance
 
 from auv_local.closed_loop import run_m2_case
 from auv_local.execution import (

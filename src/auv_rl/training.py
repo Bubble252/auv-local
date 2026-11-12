@@ -39,6 +39,8 @@ EPISODE_FIELDS: tuple[str, ...] = (
     "action_yaw_rate_max_abs",
     "action_u_dot_mean_abs",
     "action_yaw_rate_mean_abs",
+    "start_jitter_xy_m",
+    "start_jitter_yaw_rad",
     "observation_source",
     "perception_mode",
     "perception_config_hash",
@@ -53,6 +55,9 @@ EPISODE_FIELDS: tuple[str, ...] = (
     "reward_distance",
     "reward_obstacle",
     "reward_terminal",
+    "reward_goal_progress",
+    "reward_reference_speed",
+    "reward_action_smoothness",
 )
 
 

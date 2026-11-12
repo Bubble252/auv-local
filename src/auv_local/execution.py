@@ -5,15 +5,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from auv_planner.contracts import (
+from auv_core.contracts import (
     Reference,
     Remus100ActuatorCommand,
     ScenarioConfig,
     SimulationSnapshot,
     State,
 )
-from auv_planner.control.remus100 import Remus100TrackingController
-from auv_planner.dynamics.remus100 import PvsRemus100Backend
+from auv_core.control.remus100 import Remus100TrackingController
+from auv_core.dynamics.remus100 import PvsRemus100Backend
 
 
 @dataclass(frozen=True)

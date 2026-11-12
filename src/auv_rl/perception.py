@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from math import isfinite, pi
 from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
-from auv_planner.contracts import FloatArray, ObstacleMap, ScenarioConfig, State
+from auv_core.contracts import FloatArray, Obstacle, ObstacleMap, ScenarioConfig, State
+from numpy.typing import NDArray
 
 from auv_local.contracts import LocalObservation, RangeScan
-from auv_local.oracle import OracleSensor
+from auv_local.oracle import OracleSensor, rotation_body_to_world
 
 
 class PerceptionError(RuntimeError):
@@ -124,9 +126,14 @@ class PointCloudSource(Protocol):
 
 @runtime_checkable
 class PerceptionBackend(Protocol):
-    observation_source: str
-    perception_mode: str
-    config_hash: str
+    @property
+    def observation_source(self) -> str: ...
+
+    @property
+    def perception_mode(self) -> str: ...
+
+    @property
+    def config_hash(self) -> str: ...
 
     def reset(self, *, scenario: ScenarioConfig) -> None: ...
 
@@ -306,6 +313,239 @@ class PointCloudSonarAdapter:
             observation_source=self.config.observation_source,
             previous_action=previous_action,
         )
+
+
+def analytic_ray_ranges(
+    origins_ned_m: NDArray[np.float64],
+    directions_ned: NDArray[np.float64],
+    obstacles: tuple[Obstacle, ...],
+    config: PointCloudSonarConfig,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Cast many horizontal rays against analytic obstacles without scene bounds."""
+
+    origins = np.asarray(origins_ned_m, dtype=np.float64)
+    directions = np.asarray(directions_ned, dtype=np.float64)
+    if origins.ndim != 2 or origins.shape[1] != 3:
+        raise ValueError("origins_ned_m must have shape (N, 3)")
+    if directions.ndim != 3 or directions.shape[0] != origins.shape[0] or directions.shape[2] != 3:
+        raise ValueError("directions_ned must have shape (N, R, 3) matching origins_ned_m")
+    if not np.all(np.isfinite(origins)) or not np.all(np.isfinite(directions)):
+        raise ValueError("ray origins and directions must contain only finite values")
+    if not isinstance(config, PointCloudSonarConfig):
+        raise TypeError("config must be a PointCloudSonarConfig")
+
+    sample_count, ray_count = directions.shape[:2]
+    nearest = np.full((sample_count, ray_count), np.inf, dtype=np.float64)
+    ray_origins = origins[:, None, :]
+    for obstacle in obstacles:
+        if obstacle.kind == "sphere":
+            assert obstacle.radius_m is not None
+            center = np.asarray(obstacle.center_ned_m, dtype=np.float64)
+            radius = float(obstacle.radius_m)
+            offset = ray_origins - center.reshape(1, 1, 3)
+            b = np.sum(offset * directions, axis=-1)
+            c = np.sum(offset * offset, axis=-1) - radius * radius
+            discriminant = b * b - c
+            valid = discriminant >= 0.0
+            root = np.sqrt(np.maximum(discriminant, 0.0))
+            first = -b - root
+            second = -b + root
+            candidate = np.asarray(
+                np.where(first >= 0.0, first, np.where(second >= 0.0, second, np.inf)),
+                dtype=np.float64,
+            )
+            np.copyto(nearest, np.where(valid, np.minimum(nearest, candidate), nearest))
+        elif obstacle.kind == "cylinder":
+            assert obstacle.radius_m is not None
+            assert obstacle.height_m is not None
+            center = np.asarray(obstacle.center_ned_m, dtype=np.float64)
+            radius = float(obstacle.radius_m)
+            half_height = 0.5 * float(obstacle.height_m)
+            z_lower = float(center[2]) - half_height
+            z_upper = float(center[2]) + half_height
+            dx = directions[..., 0]
+            dy = directions[..., 1]
+            dz = directions[..., 2]
+            ox = ray_origins[..., 0] - float(center[0])
+            oy = ray_origins[..., 1] - float(center[1])
+            oz = ray_origins[..., 2]
+            a = dx * dx + dy * dy
+            b = 2.0 * (ox * dx + oy * dy)
+            c = ox * ox + oy * oy - radius * radius
+            discriminant = b * b - 4.0 * a * c
+            root = np.sqrt(np.maximum(discriminant, 0.0))
+            safe_a = np.where(a > 1e-15, a, 1.0)
+            first = (-b - root) / (2.0 * safe_a)
+            second = (-b + root) / (2.0 * safe_a)
+            side_valid = (a > 1e-15) & (discriminant >= 0.0)
+            candidate = np.full_like(nearest, np.inf)
+            for root_value in (first, second):
+                z_hit = oz + root_value * dz
+                valid = (
+                    side_valid
+                    & (root_value >= 0.0)
+                    & (z_hit >= z_lower - 1e-12)
+                    & (z_hit <= z_upper + 1e-12)
+                )
+                candidate = np.where(valid, np.minimum(candidate, root_value), candidate)
+            for z_plane in (z_lower, z_upper):
+                cap_t = (z_plane - oz) / np.where(np.abs(dz) > 1e-15, dz, 1.0)
+                cap_x = ray_origins[..., 0] + cap_t * dx - float(center[0])
+                cap_y = ray_origins[..., 1] + cap_t * dy - float(center[1])
+                valid = (
+                    (np.abs(dz) > 1e-15)
+                    & (cap_t >= 0.0)
+                    & (cap_x * cap_x + cap_y * cap_y <= radius * radius + 1e-12)
+                )
+                candidate = np.where(valid, np.minimum(candidate, cap_t), candidate)
+            np.minimum(nearest, candidate, out=nearest)
+        elif obstacle.kind == "box":
+            assert obstacle.half_extents_m is not None
+            center = np.asarray(obstacle.center_ned_m, dtype=np.float64)
+            half_extents = np.asarray(obstacle.half_extents_m, dtype=np.float64)
+            lower = (center - half_extents).reshape(1, 1, 3)
+            upper = (center + half_extents).reshape(1, 1, 3)
+            near: NDArray[np.float64] = np.full_like(nearest, -np.inf)
+            far: NDArray[np.float64] = np.full_like(nearest, np.inf)
+            for axis in range(3):
+                component = directions[..., axis]
+                axis_origin = ray_origins[..., axis]
+                parallel = np.abs(component) <= 1e-15
+                inside = (axis_origin >= lower[..., axis]) & (axis_origin <= upper[..., axis])
+                first = (lower[..., axis] - axis_origin) / np.where(parallel, 1.0, component)
+                second = (upper[..., axis] - axis_origin) / np.where(parallel, 1.0, component)
+                axis_near = np.minimum(first, second)
+                axis_far = np.maximum(first, second)
+                near = np.asarray(
+                    np.where(parallel & inside, near, np.maximum(near, axis_near)),
+                    dtype=np.float64,
+                )
+                far = np.asarray(
+                    np.where(parallel & inside, far, np.minimum(far, axis_far)),
+                    dtype=np.float64,
+                )
+                far = np.asarray(np.where(parallel & ~inside, -np.inf, far), dtype=np.float64)
+            valid = (near <= far) & (far >= 0.0)
+            candidate = np.asarray(np.where(near >= 0.0, near, 0.0), dtype=np.float64)
+            np.copyto(nearest, np.where(valid, np.minimum(nearest, candidate), nearest))
+        else:  # pragma: no cover - contract validation already rejects this
+            raise ValueError(f"unsupported obstacle kind: {obstacle.kind}")
+
+    hit = (
+        np.isfinite(nearest)
+        & (nearest >= config.min_range_m - 1e-12)
+        & (nearest <= config.max_range_m + 1e-12)
+    )
+    ranges = np.where(hit, nearest, config.max_range_m).astype(np.float64)
+    confidence = hit.astype(np.float64)
+    return ranges, confidence
+
+
+@dataclass(frozen=True)
+class AnalyticSectorPerceptionBackend:
+    """P1 analytic 13-sector perception backed by exact scene geometry."""
+
+    config: PointCloudSonarConfig = field(
+        default_factory=lambda: PointCloudSonarConfig(
+            sensor_id="analytic-13sector",
+            observation_source="analytic_13sector",
+            perception_mode="analytic_13sector_geometry",
+        )
+    )
+    observation_source: str = field(init=False)
+    perception_mode: str = field(init=False)
+    config_hash: str = field(init=False)
+    _obstacle_map: ObstacleMap | None = field(default=None, init=False, repr=False, compare=False)
+    _scenario_name: str | None = field(default=None, init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.config, PointCloudSonarConfig):
+            raise TypeError("config must be a PointCloudSonarConfig")
+        if self.config.observation_source not in {
+            "analytic_13sector",
+            "analytic_13sector_120m",
+        }:
+            raise ValueError(
+                "analytic backend observation_source must be 'analytic_13sector' "
+                "or 'analytic_13sector_120m'"
+            )
+        object.__setattr__(self, "observation_source", self.config.observation_source)
+        object.__setattr__(self, "perception_mode", self.config.perception_mode)
+        object.__setattr__(
+            self,
+            "config_hash",
+            _hash_config(
+                {
+                    "backend": "analytic_13sector",
+                    "sonar": self.config.config_hash,
+                }
+            ),
+        )
+
+    @property
+    def directions_body(self) -> FloatArray:
+        return PointCloudSonarAdapter(self.config).directions_body
+
+    def reset(self, *, scenario: ScenarioConfig) -> None:
+        if not isinstance(scenario, ScenarioConfig):
+            raise TypeError("scenario must be a ScenarioConfig")
+        object.__setattr__(self, "_obstacle_map", scenario.world.obstacle_map)
+        object.__setattr__(self, "_scenario_name", scenario.name)
+
+    def observe(
+        self,
+        state: State,
+        *,
+        previous_action: FloatArray | None = None,
+    ) -> LocalObservation:
+        if not isinstance(state, State):
+            raise TypeError("state must be a State")
+        obstacle_map = getattr(self, "_obstacle_map", None)
+        if obstacle_map is None:
+            raise PerceptionUnavailableError(
+                "AnalyticSectorPerceptionBackend.reset() must be called first"
+            )
+        rotation = rotation_body_to_world(state.quat_xyzw)
+        directions_body = self.directions_body
+        origin = state.position_ned_m + rotation @ self.config.origin_array
+        world_directions = directions_body @ rotation.T
+        ranges, confidence = analytic_ray_ranges(
+            origin.reshape(1, 3),
+            world_directions.reshape(1, *world_directions.shape),
+            tuple(obstacle_map.obstacles),
+            self.config,
+        )
+        empty_rays = int(np.count_nonzero(confidence[0] < 0.5))
+        scan = RangeScan(
+            stamp_s=state.t_s,
+            sensor_id=self.config.sensor_id,
+            frame_id="body_frd",
+            origin_body_m=self.config.origin_array,
+            directions_body=directions_body,
+            ranges_m=ranges[0],
+            min_range_m=self.config.min_range_m,
+            max_range_m=self.config.max_range_m,
+            confidence=confidence[0],
+            valid_until_s=state.t_s + self.config.validity_s,
+        )
+        return LocalObservation(
+            stamp_s=state.t_s,
+            state=state,
+            scans=(scan,),
+            health={
+                "scan_valid": 1.0,
+                "points_total": 0.0,
+                "points_used": 0.0,
+                "rays_hit": float(self.config.ray_count - empty_rays),
+                "empty_rays": float(empty_rays),
+                "frame_age_s": 0.0,
+            },
+            observation_source=self.observation_source,
+            previous_action=previous_action,
+        )
+
+    def close(self) -> None:
+        return None
 
 
 @dataclass(frozen=True)
@@ -544,6 +784,7 @@ class OceanSimPointCloudSource:
         on_scan_error: Callable[[], None] | None = None,
         reset_updates: int = 0,
         scan_attempts: int = 4,
+        pre_scan_updates: int = 1,
         sensor_origin_body_m: object = (0.8, 0.0, 0.0),
     ) -> None:
         if sensor is None:
@@ -552,6 +793,8 @@ class OceanSimPointCloudSource:
             raise ValueError("reset_updates must be non-negative")
         if scan_attempts < 1:
             raise ValueError("scan_attempts must be positive")
+        if pre_scan_updates < 1:
+            raise ValueError("pre_scan_updates must be positive")
         self.sensor = sensor
         self.pose_writer = pose_writer
         self.on_reset = on_reset
@@ -559,6 +802,7 @@ class OceanSimPointCloudSource:
         self.on_scan_error = on_scan_error
         self.reset_updates = int(reset_updates)
         self.scan_attempts = int(scan_attempts)
+        self.pre_scan_updates = int(pre_scan_updates)
         self.sensor_origin_body_m = _vector3(sensor_origin_body_m, "sensor_origin_body_m")
         self._scenario: ScenarioConfig | None = None
 
@@ -577,16 +821,23 @@ class OceanSimPointCloudSource:
     def capture(self, state: State) -> PointCloudFrame:
         if not isinstance(state, State):
             raise TypeError("state must be a State")
+        pose_started = time.perf_counter()
         if self.pose_writer is not None:
             self.pose_writer(state)
+        pose_s = time.perf_counter() - pose_started
+        render_started = time.perf_counter()
         if self.pre_scan_tick is not None:
-            self.pre_scan_tick()
+            for _ in range(self.pre_scan_updates):
+                self.pre_scan_tick()
+        render_s = time.perf_counter() - render_started
+        scan_started = time.perf_counter()
         scan_ok = False
         last_error: Exception | None = None
         recovery_used = False
         for attempt in range(self.scan_attempts):
             if attempt and self.pre_scan_tick is not None:
-                self.pre_scan_tick()
+                for _ in range(self.pre_scan_updates):
+                    self.pre_scan_tick()
             try:
                 scan_ok = bool(self.sensor.scan())
             except Exception as error:  # pragma: no cover - requires OceanSim
@@ -609,20 +860,39 @@ class OceanSimPointCloudSource:
                 health={
                     "scan_returned_false": 1.0,
                     "scan_attempts": float(self.scan_attempts),
+                    "pose_write_ms": pose_s * 1000.0,
+                    "render_update_ms": render_s * 1000.0,
+                    "sensor_scan_ms": (time.perf_counter() - scan_started) * 1000.0,
                 },
             )
+        scan_s = time.perf_counter() - scan_started
+        transform_started = time.perf_counter()
         try:
             scan_data = self.sensor.scan_data
             points_world = scan_data["pcl"]
-            view_transform = np.asarray(scan_data["viewTransform"], dtype=np.float64)
             normals_present = 1.0 if "normals" in scan_data else 0.0
         except (AttributeError, KeyError, TypeError, ValueError) as error:
             raise PerceptionUnavailableError("OceanSim scan_data is incomplete") from error
+
+        # OceanSim's pcl is in world coordinates, but its cached viewTransform
+        # can remain at the sensor's initialization pose when set_world_pose()
+        # moves the sonar.  Rebuild the world-to-camera transform from the
+        # authoritative state so moving sensors do not receive stale points.
+        from .oceansim_pose import p1_state_to_oceansim_transform
+
+        sensor_position, camera_rotation = p1_state_to_oceansim_transform(
+            state,
+            sensor_origin_body_m=self.sensor_origin_body_m,
+        )
+        view_transform = np.eye(4, dtype=np.float64)
+        view_transform[:3, :3] = camera_rotation.T
+        view_transform[:3, 3] = -camera_rotation.T @ sensor_position
         points_body = transform_oceansim_points(
             points_world,
             view_transform,
             sensor_origin_body_m=self.sensor_origin_body_m,
         )
+        transform_s = time.perf_counter() - transform_started
         return PointCloudFrame(
             stamp_s=state.t_s,
             points_body_m=points_body,
@@ -631,6 +901,12 @@ class OceanSimPointCloudSource:
                 "scan_returned_false": 0.0,
                 "normals_present": normals_present,
                 "scan_attempts": float(attempt + 1),
+                "pre_scan_updates": float(self.pre_scan_updates),
+                "view_transform_from_state": 1.0,
+                "pose_write_ms": pose_s * 1000.0,
+                "render_update_ms": render_s * 1000.0,
+                "sensor_scan_ms": scan_s * 1000.0,
+                "point_transform_ms": transform_s * 1000.0,
             },
         )
 
@@ -641,6 +917,7 @@ class OceanSimPointCloudSource:
 
 
 __all__ = [
+    "AnalyticSectorPerceptionBackend",
     "OceanSimPointCloudSource",
     "OraclePerceptionBackend",
     "PerceptionBackend",
@@ -652,6 +929,7 @@ __all__ = [
     "PointCloudSonarConfig",
     "PointCloudSource",
     "StaleObservationError",
+    "analytic_ray_ranges",
     "oceansim_camera_rotation_body",
     "transform_oceansim_points",
 ]

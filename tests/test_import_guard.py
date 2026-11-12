@@ -8,10 +8,10 @@ from pathlib import Path
 
 def _run_import_check(code: str) -> subprocess.CompletedProcess[str]:
     project = Path(__file__).resolve().parents[1]
-    root = project.parent
     env = os.environ.copy()
+    existing = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = os.pathsep.join(
-        [str(project / "src"), str(root / "settled_全局规划器" / "src")]
+        part for part in (str(project / "src"), existing) if part
     )
     return subprocess.run(
         [sys.executable, "-c", code],
@@ -34,8 +34,7 @@ def test_local_core_import_does_not_load_rl_simulator_or_global_planners() -> No
         "import sys\n"
         "import auv_local\n"
         "forbidden = {'torch', 'holoocean', 'rclpy', 'python_vehicle_simulator', "
-        "'auv_rl', 'auv_planner.planners', 'auv_planner.guidance', "
-        "'auv_planner.control', 'auv_planner.dynamics', 'auv_local.execution', "
+        "'auv_rl', 'auv_planner', 'auv_local.execution', "
         "'auv_local.closed_loop', 'matplotlib'}\n"
         "loaded = forbidden.intersection(sys.modules)\n"
         "if loaded:\n"
@@ -49,8 +48,7 @@ def test_contract_import_does_not_load_implementations() -> None:
         "import sys\n"
         "import auv_local.contracts\n"
         "forbidden = {'torch', 'holoocean', 'rclpy', 'python_vehicle_simulator', "
-        "'auv_rl', 'auv_planner.planners', 'auv_planner.guidance', "
-        "'auv_planner.control', 'auv_planner.dynamics', 'auv_local.execution', "
+        "'auv_rl', 'auv_planner', 'auv_local.execution', "
         "'auv_local.closed_loop', 'matplotlib'}\n"
         "loaded = forbidden.intersection(sys.modules)\n"
         "if loaded:\n"
@@ -63,8 +61,7 @@ def test_rl_contract_import_does_not_load_local_planner_or_torch() -> None:
     _assert_clean(
         "import sys\n"
         "import auv_rl\n"
-        "forbidden = {'torch', 'holoocean', 'rclpy', 'auv_local', "
-        "'auv_planner.planners', 'auv_planner.guidance'}\n"
+        "forbidden = {'torch', 'holoocean', 'rclpy', 'auv_local', 'auv_planner'}\n"
         "loaded = forbidden.intersection(sys.modules)\n"
         "if loaded:\n"
         "    raise SystemExit(sorted(loaded))\n"
@@ -81,6 +78,6 @@ def test_public_imports_remain_available() -> None:
         "assert RangeScan.__name__ == 'RangeScan'\n"
         "assert ActionSpec.__name__ == 'ActionSpec'\n"
         "assert ObservationSpec.__name__ == 'ObservationSpec'\n"
-        "assert 'auv_planner.planners' not in sys.modules\n"
+        "assert 'auv_planner' not in sys.modules\n"
         "print('ok')\n"
     )
