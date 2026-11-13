@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 
+from .._json import write_json_document
 from .pc_bc import PC_ACTION_ENVELOPE
 from .pc_policy import PC_SCHEMA_VERSION
 
@@ -236,10 +237,7 @@ def merge_pc_demonstration_datasets(
         "current_estimate_body": "current_estimate_body" in (optional_fields_present or set()),
         "actor_path": "actor_path" in (optional_fields_present or set()),
     }
-    manifest_path.write_text(
-        json.dumps(manifest, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    write_json_document(manifest_path, manifest)
     return manifest
 
 

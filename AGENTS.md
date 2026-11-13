@@ -86,3 +86,25 @@ python ../scripts/check_research_ledger.py \
 - 只 add 本次代码、配置、goal/result 文档和 ledger；不提交 `artifacts/`、checkpoint、
   日志、缓存和大型数据。
 - 提交前运行 `git diff --cached --check`；不自动 commit / push，除非用户明确要求。
+
+## 7. 重构交接
+
+代码重构的基线、允许目录、已知失败和 G04 候选以 `doc/refactor/` 为准：
+
+- `BASELINE.md`：环境、测试命令、11 个已知 skip 和 lint/type 欠账；
+- `INVENTORY.md`：重复实现、大文件、G04 自动化和人工批准点；
+- `MODULE_MAP.md`：可修改模块的职责、非职责、公共 API 和测试；
+- `EQUIVALENCE.md`：LOCAL-A1 至 LOCAL-A4 的 before/after 证据。
+
+候选文件验证：
+
+```bash
+export PVS_SOURCE_DIR=/home/bubble/水下机器人/python/PythonVehicleSimulator-master/src
+export MSS_SOURCE_DIR=/home/bubble/水下机器人/simulator/MSS-master
+/home/bubble/水下机器人/settled_局部规划器_反应式/.venv/bin/python -m pytest -q tests
+/home/bubble/水下机器人/settled_局部规划器_反应式/.venv/bin/python -m ruff check <changed-files>
+/home/bubble/水下机器人/settled_局部规划器_反应式/.venv/bin/python -m ruff format --check <changed-files>
+```
+
+训练、评价、reward、termination、success、Goal173 matrix、checkpoint 选择和
+held-out 不属于自动重构范围。

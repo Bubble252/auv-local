@@ -18,6 +18,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
+from auv_lowlevel._paths import resolve_from_root
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ARMS_SCHEMA = "auv_pc_standing_eval_arms.v1"
 SUPPORTED_EVALUATORS = {
@@ -36,8 +38,7 @@ def _load_json(path: Path) -> dict[str, Any]:
 
 
 def _resolve(path: str | Path) -> Path:
-    value = Path(path)
-    return value if value.is_absolute() else REPO_ROOT / value
+    return resolve_from_root(REPO_ROOT, path)
 
 
 def _relative(path: str | Path) -> str:

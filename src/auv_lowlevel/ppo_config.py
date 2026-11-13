@@ -9,6 +9,7 @@ from typing import Any
 
 import numpy as np
 
+from ._json import load_json_value
 from .config import LowLevelConfig
 
 SCHEMA_VERSION = "auv_odarrl_control_ppo.v1"
@@ -1638,10 +1639,9 @@ def _validate_semantics(config: PPOTrainingConfig) -> None:
     elif config.pc is not None:
         raise ValueError("pc configuration is only valid for experiment.arm='PC'")
 
-
 def load_training_config(path: Path | str) -> PPOTrainingConfig:
     source = Path(path)
-    raw = json.loads(source.read_text(encoding="utf-8"))
+    raw = load_json_value(source)
     canonical = json.dumps(raw, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return parse_training_config(
         raw,

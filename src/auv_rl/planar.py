@@ -7,6 +7,7 @@ import numpy as np
 from auv_core.attitude import euler_from_quaternion, quaternion_from_euler
 from auv_core.contracts import FloatArray, State
 
+from auv_local._angles import wrap_angle as _wrap_angle
 from auv_local.contracts import SurgeYawAction
 
 
@@ -14,10 +15,6 @@ def _positive(value: float, name: str) -> float:
     if not isfinite(value) or value <= 0.0:
         raise ValueError(f"{name} must be finite and positive")
     return float(value)
-
-
-def _wrap_angle(angle_rad: float) -> float:
-    return float((angle_rad + pi) % (2.0 * pi) - pi)
 
 
 @dataclass(frozen=True)

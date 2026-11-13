@@ -1,0 +1,77 @@
+version: 1
+status: ref_local_complete
+waivers:
+  - id: REF-LOCAL-001
+    path: src/auv_lowlevel/config.py
+    check: shape
+    reason: >-
+      Legacy module exceeds the 500-line library limit; LOCAL-A2 changes only the
+      JSON read boundary and does not expand the module.
+    expires: META-G03
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-002
+    path: src/auv_lowlevel/ppo_config.py
+    check: shape
+    reason: >-
+      Legacy module exceeds the 500-line library limit; LOCAL-A2 changes only the
+      JSON read boundary and does not expand the module.
+    expires: META-G03
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-003
+    path: src/auv_lowlevel/config.py
+    check: format
+    reason: >-
+      The repository baseline has 220 unformatted files. Formatting this legacy
+      2729-line module would mix mechanical churn with behavior refactoring.
+    expires: META-G03
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-004
+    path: src/auv_lowlevel/ppo_config.py
+    check: format
+    reason: >-
+      The repository baseline has 220 unformatted files. Formatting this legacy
+      1662-line module would mix mechanical churn with behavior refactoring.
+    expires: META-G03
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-005
+    path: src/auv_lowlevel/batch/pc_bc_merge.py
+    check: format
+    reason: >-
+      The repository baseline has 220 unformatted files. LOCAL-A3 changes only
+      the manifest write boundary; whole-file formatting would add unrelated churn.
+    expires: META-G03
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-006
+    path: src/auv_lowlevel/batch/pc_bc_subset.py
+    check: format
+    reason: >-
+      The repository baseline has 220 unformatted files. LOCAL-A3 changes only
+      the manifest write boundary; whole-file formatting would add unrelated churn.
+    expires: META-G03
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-007
+    path: scripts/run_pc_standing_eval_suite.py
+    check: format
+    reason: >-
+      The repository baseline has 220 unformatted files. LOCAL-A4 changes only
+      the path-resolution boundary; whole-file formatting would add unrelated churn.
+    expires: META-G03
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+
+# 存量超大模块由 CODE_SHAPE_BASELINE.json 做 ratchet 抑制；未触碰时不进入新代码
+# 标准。若后续候选触碰这些文件，再为具体检查项新增有到期 Goal 的 waiver，或先拆分
+# 一个完整职责。禁止无路径、无 owner、无到期 Goal 的全局豁免。

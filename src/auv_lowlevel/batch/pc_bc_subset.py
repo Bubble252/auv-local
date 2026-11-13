@@ -10,6 +10,8 @@ from typing import Any
 
 import numpy as np
 
+from .._json import write_json_document
+
 PC_BC_SUBSET_MANIFEST_SCHEMA = "auv_pc_bc_subset_manifest.v1"
 
 
@@ -132,10 +134,7 @@ def subset_pc_demonstration_dataset(
             "selection_rule": "complete seed trajectories; episode ids remapped contiguously",
         },
     }
-    output_manifest.write_text(
-        json.dumps(subset_manifest, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    write_json_document(output_manifest, subset_manifest)
     return subset_manifest
 
 
@@ -230,10 +229,7 @@ def sample_pc_demonstration_dataset(
             "selection_rule": "uniform transitions without replacement; episode ids remapped contiguously",
         },
     }
-    output_manifest.write_text(
-        json.dumps(sampled_manifest, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    write_json_document(output_manifest, sampled_manifest)
     return sampled_manifest
 
 
