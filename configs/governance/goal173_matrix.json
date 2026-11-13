@@ -1,0 +1,123 @@
+{
+  "schema_version": "auv_goal_matrix.v1",
+  "goal_id": "Goal173",
+  "repo": "settled_局部规划器_反应式",
+  "arms": [
+    {
+      "arm": "P_ALL_025",
+      "algorithm": "PPO",
+      "channel_mode": "all",
+      "residual_scale": 0.25
+    },
+    {
+      "arm": "P_ALL_075",
+      "algorithm": "PPO",
+      "channel_mode": "all",
+      "residual_scale": 0.75
+    },
+    {
+      "arm": "P_RUD_025",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_only",
+      "residual_scale": 0.25
+    },
+    {
+      "arm": "P_RUD_075",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_only",
+      "residual_scale": 0.75
+    },
+    {
+      "arm": "S_ALL_025",
+      "algorithm": "SAC",
+      "channel_mode": "all",
+      "residual_scale": 0.25
+    },
+    {
+      "arm": "S_ALL_075",
+      "algorithm": "SAC",
+      "channel_mode": "all",
+      "residual_scale": 0.75
+    },
+    {
+      "arm": "S_RUD_025",
+      "algorithm": "SAC",
+      "channel_mode": "rudder_only",
+      "residual_scale": 0.25
+    },
+    {
+      "arm": "S_RUD_075",
+      "algorithm": "SAC",
+      "channel_mode": "rudder_only",
+      "residual_scale": 0.75
+    }
+  ],
+  "levels": [
+    "nominal",
+    "current07",
+    "current10",
+    "current15"
+  ],
+  "radii": {
+    "default": 2.0,
+    "strict125": 1.25
+  },
+  "seeds": {
+    "start": 20,
+    "count": 40
+  },
+  "checkpoint_seeds": [
+    86201
+  ],
+  "baselines": [
+    "zero_sac50",
+    "zero_bc50",
+    "zero_alos50"
+  ],
+  "baseline_seed": 86201,
+  "expected_cells": {
+    "policy": 64,
+    "zero": 24,
+    "total": 88
+  },
+  "artifacts_root": "artifacts/lowlevel/goal173_rudder_only_residual_20261112",
+  "manifest_path": "manifests/eval_manifest.txt",
+  "metrics": [
+    "path_three_d_rmse_m",
+    "cross_track_p90_m",
+    "vertical_p90_m",
+    "preterminal_0_90_rmse_m",
+    "completion",
+    "success",
+    "timeout",
+    "safety",
+    "speed_max_mps",
+    "overspeed_steps"
+  ],
+  "gates": [
+    {
+      "check": "current10 route RMSE improvement versus zero_bc50",
+      "threshold": ">=5% and >=0.05 m",
+      "failure_label": "GATE173_B_ROUTE"
+    },
+    {
+      "check": "pre-terminal 0-90% route RMSE improvement",
+      "threshold": ">=0.03 m",
+      "failure_label": "TERMINAL_ONLY_SIGNAL"
+    },
+    {
+      "check": "speed envelope",
+      "threshold": "speed_max_mps <= 2.5 and overspeed_steps == 0",
+      "failure_label": "INVALID_SPEED_CONTRACT"
+    },
+    {
+      "check": "timeout and safety regressions",
+      "threshold": "not worse than paired zero baseline",
+      "failure_label": "GATE173_SAFETY"
+    }
+  ],
+  "heldout": {
+    "enabled": false,
+    "seeds": []
+  }
+}
