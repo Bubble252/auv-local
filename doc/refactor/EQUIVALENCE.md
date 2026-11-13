@@ -61,17 +61,24 @@ export MSS_SOURCE_DIR=/home/bubble/水下机器人/simulator/MSS-master
 
 ## 5. 结果
 
-- 通过数：待记录
-- 跳过数：待记录
-- 已知失败：无新增
-- 是否新增失败：待记录
+- 候选 commit：`5d8d0db`；
+- 等价性：`equivalence: PASS`；
+- 受影响测试：`123 passed`；
+- 全量测试：`2032 passed, 11 skipped`；
+- ruff：候选文件和 fixture 全部 PASS；
+- format：候选文件和 fixture `already formatted`；
+- mypy：5 个改动源码文件 `Success: no issues found`；
+- shape：`0 new violations, 1189 suppressed`；
+- dependency checker：`repository dependency boundaries: ok`；
+- 已知失败：无新增；
+- 是否新增失败：`no`；
 - 回滚 commit：`8bf7e68`
-- 结论：`PENDING`
+- 结论：`PASS`
 
 ## 6. 人工检查
 
-- [ ] 公共 API 删除数为 0；
-- [ ] 没有修改 reward、termination、success、seed split 或 held-out；
-- [ ] 没有移动或删除 artifact；
-- [ ] RNG/时钟/全局状态变化有等价证据；
-- [ ] 只改一个仓库、一个候选。
+- [x] 公共 API 删除数为 0（4 个私有导入路径继续可用）；
+- [x] 没有修改 reward、termination、success、seed split 或 held-out；
+- [x] 没有移动或删除 artifact；
+- [x] RNG/时钟/全局状态变化有等价证据（纯函数，无 RNG/状态副作用）；
+- [x] 只改一个仓库、一个候选。
