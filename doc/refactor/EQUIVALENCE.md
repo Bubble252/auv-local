@@ -321,6 +321,83 @@ skill_usage:
 - 回滚 commit：`94ea92b`；
 - 结论：`PASS`
 
+## 13. 候选 G04-BIG3
+
+```yaml
+goal: META-G04-BIG3
+repository: settled_局部规划器_反应式
+base_commit: 19f6c21
+branch: refactor/g04-big3-pc-env-20261113
+files:
+  - src/auv_lowlevel/batch/pc_env/__init__.py
+  - src/auv_lowlevel/batch/pc_env/core.py
+  - src/auv_lowlevel/batch/pc_env/types.py
+  - src/auv_lowlevel/batch/pc_env/state.py
+  - src/auv_lowlevel/batch/pc_env/observation.py
+  - src/auv_lowlevel/batch/pc_env/step.py
+public_api_change: none
+```
+
+G04-BIG3 把 `batch/pc_env.py` 转成同名包，保持
+`from auv_lowlevel.batch.pc_env import BatchedPCLowLevelEnv` 及另外三个公共类型
+不变。类型、row-state、observation 和 step diagnostics 是原方法/定义的机械迁移；
+`BatchedPCLowLevelEnv` 的控制与 `step` 编排仍留在 `core.py`。
+
+| 项目 | 重构前 | 重构后 | 证据 |
+|---|---|---|---|
+| `BatchedPCLowLevelEnv` | 单文件类 | `core.py` 中同类 | AST 定义完全相同 |
+| 三个返回类型 | 单文件 dataclass | `types.py` 同名 dataclass | AST 定义完全相同 |
+| row state helper | 单文件私有函数 | `state.py` 同名私有函数 | AST 定义完全相同 |
+| observation 构造 | 类方法 | `observation.py` 同 body 函数 + 类内委托 | AST body 完全相同 |
+| step info | 类方法 | `step.py` 同 body 函数 + 类内委托 | AST body 完全相同 |
+| public import | `batch.pc_env` | 同名包 re-export | import smoke PASS |
+| trace | 12-step reset/step | SHA256 完全相同 | `tests/test_g04_big3_pc_env_trace.py` |
+| reward/termination/success/seed | 不变 | 不变 | 未改算法、参数或 step 顺序 |
+
+trace 固定 `configs/lowlevel/goal173/env_route_health_train_nu_ground.json`、
+`num_envs=2`、`path_dim=12`、seeds `[31415, 27182]`、horizon 12 和固定正弦动作；
+SHA256 为
+`f33a2ef188460ed68f8557e8ed22ce6f9de9bd84ac08b877652248092eb8a126`。连续运行一致，
+测试覆盖 observation、reward、terminated、truncated、done、info 和关键 shape。
+
+验证命令：
+
+```bash
+cd /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref-g04-big3-pc-env-20261113
+export PYTHONPATH=$PWD/src
+export PVS_SOURCE_DIR=/home/bubble/水下机器人/python/PythonVehicleSimulator-master/src
+export MSS_SOURCE_DIR=/home/bubble/水下机器人/simulator/MSS-master
+/home/bubble/水下机器人/settled_局部规划器_反应式/.venv/bin/python -m pytest -q tests
+```
+
+Preflight 证据：
+
+```yaml
+skill_usage:
+  - skill: auv-refactor-guard
+    phase: preflight
+    outcome: passed
+    repo: /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref-g04-big3-pc-env-20261113
+    module: src/auv_lowlevel/batch/pc_env.py
+```
+
+- 测试 commit：`65dfe19`；包迁移：`d1fc43b`；类型/state：`53e5ed7`；
+  observation：`86b08c2`；step diagnostics：`d88974e`；
+- 针对性测试：`39 passed`；完整测试：`2089 passed, 11 skipped`；
+- trace：SHA256 与拆分前完全一致；固定 seed/动作下连续运行一致；
+- AST：类、dataclass、row-state helper 定义相同；observation/step-info body 相同；
+- ruff：`pc_env/` 全部 PASS；
+- format：新增 `__init__.py`、`types.py`、`state.py`、`observation.py`、`step.py` PASS；
+  `core.py` 保留存量格式欠账，不做整文件格式化；
+- mypy：全仓 `375 errors / 86 files`，低于原基线 `381 / 83`；新增模块无错误；
+- shape：`0 new violations, 1189 suppressed`；新增模块的长函数/复杂度进入 ratchet；
+- dependency checker：`repository dependency boundaries: ok`；
+- linked worktree 的 editable 安装指向主 checkout，因此命令显式设置
+  `PYTHONPATH=$PWD/src`；这不是跨仓库源码注入；
+- 已知失败：无新增；是否新增失败：`no`；
+- 本地 merge / push：未执行，等待用户批准；
+- 结论：`PASS / AWAITING_MERGE`
+
 ## 11. 候选 G04-BIG2
 
 ```yaml
