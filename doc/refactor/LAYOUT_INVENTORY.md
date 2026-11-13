@@ -97,7 +97,7 @@ wrapper，且 wrapper 要 re-export 测试访问的模块级名称（包括下�
 | 批次 | goal 范围 | 文件数 | 状态 |
 |---|---|---:|---|
 | A1: goal28-40 | - | 13 | `migrated` |
-| A2: goal59-85 | - | 29 | `wrapper-needed` |
+| A2: goal59-85 | - | 29 | `migrated` |
 | A3: goal93-116 | - | 23 | `wrapper-needed` |
 | A4: goal117-139 | - | 24 | `wrapper-needed` |
 | A5: goal145-165 | - | 16 | `wrapper-needed` |
@@ -220,6 +220,10 @@ wrapper，且 wrapper 要 re-export 测试访问的模块级名称（包括下�
   `_HERE` 仍指向同目录，加载链保持不变。
 - wrapper 在旧模块命名空间执行新源码，保持模块级 monkeypatch、函数 globals、
   `spec_from_file_location()` 加载和直接执行的一致语义。
+- A2 `goal59-85`（29 个）已迁入 `scripts/analysis/pc_goal/`。batch 内
+  `Path(__file__).with_name("analyze_pc_goal*.py")` 的 sibling 加载随文件一起
+  保持；12 个使用 `parents[1]` 定位仓库根的脚本改为 `parents[3]`，并全部通过
+  旧/新入口 smoke。
 
 ## 4. `scripts/audit_pc_goal*.py`
 

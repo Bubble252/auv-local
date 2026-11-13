@@ -166,3 +166,7 @@ wrapper 会改变 hash 契约。
 历史入口使用与 audit 相同的命名空间 wrapper：旧路径的执行、import、
 monkeypatch 和 sibling-helper 加载保持不变。`_HERE` 相对加载在新目录内继续解析
 同批文件，没有复制或改写算法。
+
+A2 `goal59-85` 的 29 个 analyzer 已按同一规则迁入；其中 12 个用
+`Path(__file__).resolve().parents[1]` 定位仓库根，迁移后改为 `parents[3]`。
+`goal72-79` 的 `Path(__file__).with_name(...)` 加载全部在同批文件内解析。
