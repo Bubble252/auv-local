@@ -170,3 +170,8 @@ monkeypatch 和 sibling-helper 加载保持不变。`_HERE` 相对加载在新�
 A2 `goal59-85` 的 29 个 analyzer 已按同一规则迁入；其中 12 个用
 `Path(__file__).resolve().parents[1]` 定位仓库根，迁移后改为 `parents[3]`。
 `goal72-79` 的 `Path(__file__).with_name(...)` 加载全部在同批文件内解析。
+
+A3 `goal93-116` 的 23 个 analyzer 已迁入。`goal104 -> 105/106/107 -> 109` 和
+`goal110 -> 111/112/113/116 -> 114` 的 sibling import 在新目录内继续解析；
+`goal106` 对未迁移 `run_pc_goal106_near_terminal_rpm_schedule` 的依赖保持原样，
+新入口以 `python -m analysis.pc_goal...` 验证。
