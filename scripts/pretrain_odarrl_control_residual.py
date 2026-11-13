@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 
+from auv_lowlevel._paths import resolve_from_root
 from auv_lowlevel.bc import BCPolicy, split_by_episode
 from auv_lowlevel.config import load_config
 from auv_lowlevel.observation_schema import (
@@ -51,7 +52,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _resolve(path: Path) -> Path:
-    return path if path.is_absolute() else REPO_ROOT / path
+    return resolve_from_root(REPO_ROOT, path)
 
 
 def _sha256(path: Path) -> str:

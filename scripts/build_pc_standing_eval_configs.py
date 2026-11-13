@@ -22,6 +22,8 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
+from auv_lowlevel._paths import resolve_from_root
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SUITE = REPO_ROOT / "configs/lowlevel/eval/pc_standing_eval_suite_v1.json"
 DEFAULT_BASE_ENV = REPO_ROOT / "configs/lowlevel/goal136/curriculum/C1.json"
@@ -46,7 +48,7 @@ def _sha256(path: Path) -> str:
 
 
 def _resolve(path: Path) -> Path:
-    return path if path.is_absolute() else REPO_ROOT / path
+    return resolve_from_root(REPO_ROOT, path)
 
 
 def _relative(path: Path) -> str:

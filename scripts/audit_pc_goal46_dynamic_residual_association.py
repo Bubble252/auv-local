@@ -14,6 +14,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from auv_lowlevel._paths import resolve_from_root
 from auv_lowlevel.batch.sensors import SyntheticSensorSuite
 from auv_lowlevel.config import load_config
 
@@ -193,7 +194,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _resolve(path: Path) -> Path:
-    return path if path.is_absolute() else REPO_ROOT / path
+    return resolve_from_root(REPO_ROOT, path)
 
 
 def _sha256(path: Path) -> str:
