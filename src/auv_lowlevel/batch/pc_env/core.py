@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable
-from dataclasses import dataclass, fields, is_dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -27,26 +27,22 @@ from auv_lowlevel.path import (
     resample_reference_path,
 )
 
-from .actions import BatchedPureActionApplication, BatchedPureActionPipeline
-from .dynamics import BatchedRemus100Dynamics, Remus100BatchState
-from .geometry import (
+from ..actions import BatchedPureActionApplication, BatchedPureActionPipeline
+from ..dynamics import BatchedRemus100Dynamics, Remus100BatchState
+from ..geometry import (
     body_to_world,
-    ground_velocity_body,
-    legacy_ground_velocity_body,
     quaternion_from_direction,
     quaternion_from_euler,
-    water_velocity_body,
-    world_to_body,
     wrap_angle,
 )
-from .guidance import BatchedAlosSolution, BatchedThreeDAlosGuidance
-from .path import (
+from ..guidance import BatchedAlosSolution, BatchedThreeDAlosGuidance
+from ..path import (
     BatchedPathProjection,
     BatchedReferencePath,
     BatchedReferencePathBank,
     BatchedReferencePathSet,
 )
-from .pc import (
+from ..pc import (
     BatchedCommandHoldTracker,
     BatchedPCRewardComputer,
     BatchedPCTerminationManager,
@@ -54,125 +50,30 @@ from .pc import (
     PCTerminalKind,
     PCTerminationDecision,
     pc_route_health_terms,
-    pc_terminal_kind_name,
 )
-from .pc_path import (
+from ..pc_path import (
     PC_PATH_DEFAULT_BLOCKS,
     PC_PATH_DIMS,
     PC_PATH_ENDPOINT_BLOCKS,
-    build_pc_path_features,
     path_block_column_mask,
     validate_path_blocks,
 )
-from .plant_randomization import sample_plant_scale_factors
-from .randomization import (
+from ..plant_randomization import sample_plant_scale_factors
+from ..randomization import (
     BatchedEpisodeRandomization,
     TorchEpisodeRandomizer,
     TrainingSeedCursor,
     sample_episode_randomizations,
 )
-from .sensors import SyntheticSensorOutput, SyntheticSensorSuite, pc_critic_state
-
-
-@dataclass(frozen=True)
-class PCCommand:
-    heading_rad: Tensor
-    pitch_rad: Tensor
-    speed_mps: Tensor
-
-    def normalized(self) -> Tensor:
-        return torch.stack(
-            [
-                wrap_angle(self.heading_rad) / math.pi,
-                self.pitch_rad / (math.pi / 2.0),
-                self.speed_mps / 2.5,
-            ],
-            dim=1,
-        )
-
-
-@dataclass(frozen=True)
-class BatchedPCObservation:
-    actor_state: Tensor
-    actor_path: Tensor | None
-    critic_state: Tensor
-    command: PCCommand
-    actor_current_body: Tensor
-    critic_current_ned: Tensor
-    ground_velocity_body_mps: Tensor
-    water_velocity_body_mps: Tensor
-    sensor: SyntheticSensorOutput
-    projection: BatchedPathProjection | None
-    solution: BatchedAlosSolution | None
-
-
-@dataclass(frozen=True)
-class BatchedPCLowLevelStep:
-    observation: BatchedPCObservation
-    reward: PCRewardBreakdown
-    terminated: Tensor
-    truncated: Tensor
-    info: dict[str, Any]
-
-    @property
-    def done(self) -> Tensor:
-        return self.terminated | self.truncated
-
-
-_MISSING_ROW_STATE = object()
-
-
-def _clone_row_state(value: Any, count: int) -> Any:
-    """Clone row-aligned tensors from a nested dataclass/dict state tree."""
-
-    if isinstance(value, Tensor):
-        if value.ndim >= 1 and value.shape[0] == count:
-            return value.clone()
-        return _MISSING_ROW_STATE
-    if is_dataclass(value) and not isinstance(value, type):
-        cloned: dict[str, Any] = {}
-        for field in fields(value):
-            state = _clone_row_state(getattr(value, field.name), count)
-            if state is not _MISSING_ROW_STATE:
-                cloned[field.name] = state
-        if cloned:
-            return ("dataclass", type(value), cloned)
-        return _MISSING_ROW_STATE
-    if isinstance(value, dict):
-        cloned = {}
-        for key, item in value.items():
-            state = _clone_row_state(item, count)
-            if state is not _MISSING_ROW_STATE:
-                cloned[key] = state
-        return cloned if cloned else _MISSING_ROW_STATE
-    return _MISSING_ROW_STATE
-
-
-def _merge_row_state(old: Any, new: Any, active_mask: Tensor) -> Any:
-    """Keep ``old`` rows where ``active_mask`` is false and ``new`` elsewhere."""
-
-    if isinstance(old, Tensor):
-        if not isinstance(new, Tensor) or old.shape != new.shape:
-            return new
-        view = (active_mask.shape[0],) + (1,) * (old.ndim - 1)
-        return torch.where(active_mask.view(view), new, old)
-    if isinstance(old, tuple) and len(old) == 3 and old[0] == "dataclass":
-        _, value_type, old_fields = old
-        if not isinstance(new, value_type):
-            return new
-        merged = {
-            name: _merge_row_state(value, getattr(new, name), active_mask)
-            for name, value in old_fields.items()
-        }
-        return replace(new, **merged)
-    if isinstance(old, dict):
-        if not isinstance(new, dict):
-            return new
-        merged_dict = dict(new)
-        for name, value in old.items():
-            merged_dict[name] = _merge_row_state(value, new.get(name), active_mask)
-        return merged_dict
-    return new
+from ..sensors import SyntheticSensorOutput, SyntheticSensorSuite
+from .observation import build_observation
+from .state import _clone_row_state, _merge_row_state
+from .step import build_step_info
+from .types import (
+    BatchedPCLowLevelStep,
+    BatchedPCObservation,
+    PCCommand,
+)
 
 
 class BatchedPCLowLevelEnv:
@@ -1725,159 +1626,7 @@ class BatchedPCLowLevelEnv:
         return path.project(eta[:, :3]).segment_index
 
     def _build_observation(self) -> BatchedPCObservation:
-        if (
-            self.eta is None
-            or self.nu is None
-            or self.sensor_output is None
-            or self.current_ned_mps is None
-        ):
-            raise RuntimeError("environment state must be initialized")
-        if self.curriculum_sampler is not None:
-            if self.pc_control_mode.startswith("path_"):
-                command, projection = self._path_command()
-                solution = None
-            else:
-                command, projection, solution = self._alos_command()
-            direct_rows = self._curriculum_direct_rows()
-            if direct_rows is not None and bool(direct_rows.any()):
-                command = PCCommand(
-                    heading_rad=torch.where(
-                        direct_rows,
-                        self._direct_command.heading_rad,
-                        command.heading_rad,
-                    ),
-                    pitch_rad=torch.where(
-                        direct_rows,
-                        self._direct_command.pitch_rad,
-                        command.pitch_rad,
-                    ),
-                    speed_mps=torch.where(
-                        direct_rows,
-                        self._direct_command.speed_mps,
-                        command.speed_mps,
-                    ),
-                )
-                if bool(direct_rows.all()):
-                    solution = None
-        elif self.direct_commands:
-            command = self._direct_command
-            projection = None
-            solution = None
-            if self.actor_path_dim:
-                projection = self.path.project(
-                    self.sensor_output.p_nav,
-                    segment_hint=self._projection_hint,
-                    search_radius=self.reset_projection_search_radius,
-                )
-                self._projection_hint = projection.segment_index
-        elif self.pc_control_mode.startswith("path_"):
-            command, projection = self._path_command()
-            solution = None
-        else:
-            command, projection, solution = self._alos_command()
-        ideal_actor_observations = bool(
-            self.config.observation.ideal_actor_observations
-        )
-        actor_position_ned_m = (
-            self.eta[:, :3] if ideal_actor_observations else self.sensor_output.p_nav
-        )
-        actor_attitude = (
-            self.eta[:, 3:6]
-            if ideal_actor_observations
-            else self.sensor_output.attitude
-        )
-        actor_projection = projection
-        if ideal_actor_observations and self.actor_path_dim:
-            actor_projection = self.path.project(
-                actor_position_ned_m,
-                segment_hint=self._projection_hint,
-                search_radius=self.reset_projection_search_radius,
-            )
-        actor_path = (
-            build_pc_path_features(
-                actor_projection,
-                attitude=actor_attitude,
-                path=self.path,
-                position_ned_m=actor_position_ned_m,
-                path_blocks=self.path_blocks,
-                endpoint_enter_m=self.endpoint_enter_m,
-                endpoint_full_m=self.endpoint_full_m,
-            )
-            if self.actor_path_dim
-            else None
-        )
-        heading_error = wrap_angle(command.heading_rad - self.eta[:, 5])
-        pitch_error = command.pitch_rad - self.eta[:, 4]
-        if self.config.plant.velocity_contract == "nu_ground":
-            ground_velocity = ground_velocity_body(self.eta, self.nu, self.current_ned_mps)
-            water_velocity = water_velocity_body(self.eta, self.nu, self.current_ned_mps)
-        elif self.config.plant.velocity_contract == "legacy_water_nu":
-            ground_velocity = legacy_ground_velocity_body(
-                self.eta, self.nu, self.current_ned_mps
-            )
-            water_velocity = self.nu[:, :3]
-        else:
-            raise ValueError(
-                "unsupported plant.velocity_contract="
-                f"{self.config.plant.velocity_contract!r}"
-            )
-        speed_feedback = self.config.observation.speed_feedback
-        if speed_feedback == "ground":
-            feedback_velocity = ground_velocity
-        elif speed_feedback == "water_relative":
-            feedback_velocity = water_velocity
-        else:
-            raise ValueError(f"unsupported observation.speed_feedback={speed_feedback!r}")
-        privileged_surge = (
-            water_velocity[:, 0]
-            if self.config.plant.velocity_contract == "nu_ground"
-            else ground_velocity[:, 0]
-        )
-        speed_error = command.speed_mps - privileged_surge
-        if ideal_actor_observations:
-            actor_state = torch.cat(
-                [
-                    actor_position_ned_m,
-                    actor_attitude,
-                    self.nu[:, 3:6],
-                    feedback_velocity,
-                ],
-                dim=1,
-            )
-            actor_current_body = world_to_body(
-                self.current_ned_mps,
-                quaternion_from_euler(
-                    self.eta[:, 3],
-                    self.eta[:, 4],
-                    self.eta[:, 5],
-                ),
-            )
-        else:
-            actor_state = self.sensor_output.actor_state(speed_feedback)
-            actor_current_body = self.sensor_output.current_estimate_body
-        critic_state = pc_critic_state(
-            eta=self.eta,
-            nu=self.nu,
-            heading_error_rad=heading_error,
-            pitch_error_rad=pitch_error,
-            speed_error_mps=speed_error,
-        )
-        self.observation_value = BatchedPCObservation(
-            actor_state=actor_state,
-            actor_path=actor_path,
-            critic_state=critic_state,
-            command=command,
-            actor_current_body=actor_current_body,
-            critic_current_ned=self.current_ned_mps,
-            ground_velocity_body_mps=ground_velocity,
-            water_velocity_body_mps=water_velocity,
-            sensor=self.sensor_output,
-            projection=projection,
-            solution=solution,
-        )
-        if projection is not None:
-            self._previous_path_progress_m = projection.progress_m.to(self.dtype)
-        return self.observation_value
+        return build_observation(self)
 
     def _set_curriculum_stage_rows(
         self,
@@ -2633,226 +2382,14 @@ class BatchedPCLowLevelEnv:
         goal_distance_m: Tensor,
         route_ground_speed_mps: Tensor | None = None,
     ) -> dict[str, Any]:
-        assert self.eta is not None and self.nu is not None and self.actuator is not None
-        assert (
-            self.t_s is not None and self.step_count is not None and self.episode_seed is not None
+        return build_step_info(
+            self,
+            action=action,
+            decision=decision,
+            observation=observation,
+            goal_distance_m=goal_distance_m,
+            route_ground_speed_mps=route_ground_speed_mps,
         )
-        assert self.sensor_output is not None and self.current_ned_mps is not None
-        command_direction = torch.stack(
-            (
-                torch.cos(observation.command.pitch_rad)
-                * torch.cos(observation.command.heading_rad),
-                torch.cos(observation.command.pitch_rad)
-                * torch.sin(observation.command.heading_rad),
-                -torch.sin(observation.command.pitch_rad),
-            ),
-            dim=1,
-        )
-        command_water_relative = (
-            observation.command.speed_mps[:, None] * command_direction - self.current_ned_mps
-        )
-        command_water_speed = torch.linalg.norm(command_water_relative, dim=1)
-        command_reachability_feasible = command_water_speed <= (
-            float(self.vehicle.max_speed_mps) + 1e-9
-        )
-        guidance_current_valid = self._guidance_diagnostics.get(
-            "current_valid", torch.zeros_like(self.t_s)
-        )
-        guidance_current_age = self._guidance_diagnostics.get(
-            "current_age_s", self.sensor_output.current_estimate_age_s
-        )
-        guidance_crab_angle = self._guidance_diagnostics.get(
-            "crab_angle_rad", torch.zeros_like(self.t_s)
-        )
-        guidance_speed_scale = self._guidance_diagnostics.get(
-            "speed_scale", torch.ones_like(self.t_s)
-        )
-        guidance_terminal_phase = self._guidance_diagnostics.get(
-            "terminal_phase", torch.zeros_like(self.t_s, dtype=torch.bool)
-        )
-        guidance_terminal_speed_ratio = self._guidance_diagnostics.get(
-            "terminal_speed_ratio", torch.ones_like(self.t_s)
-        )
-        guidance_saturation_ema = self._guidance_diagnostics.get(
-            "saturation_ema", self._material_saturation_ema
-        )
-        guidance_saturation_emergency = self._guidance_diagnostics.get(
-            "saturation_emergency",
-            torch.zeros_like(self.t_s, dtype=torch.bool),
-        )
-        guidance_route_floor_active = self._guidance_diagnostics.get(
-            "route_speed_floor_active",
-            torch.zeros_like(self.t_s, dtype=torch.bool),
-        )
-        guidance_route_floor_launch_active = self._guidance_diagnostics.get(
-            "route_speed_floor_launch_active",
-            torch.zeros_like(self.t_s, dtype=torch.bool),
-        )
-        guidance_route_floor_valid = self._guidance_diagnostics.get(
-            "route_speed_floor_valid",
-            torch.zeros_like(self.t_s, dtype=torch.bool),
-        )
-        guidance_route_floor_measured = self._guidance_diagnostics.get(
-            "route_speed_floor_measured_mps", torch.zeros_like(self.t_s)
-        )
-        guidance_route_floor_filtered = self._guidance_diagnostics.get(
-            "route_speed_floor_filtered_mps", self._route_speed_floor_filtered_mps
-        )
-        guidance_route_floor_boost = self._guidance_diagnostics.get(
-            "route_speed_floor_boost_mps", self._route_speed_floor_boost_mps
-        )
-        guidance_route_floor_target = self._guidance_diagnostics.get(
-            "route_speed_floor_target_mps", self._episode_command_speed_mps
-        )
-        guidance_route_floor_ratio = self._guidance_diagnostics.get(
-            "route_speed_floor_ratio", torch.ones_like(self.t_s)
-        )
-        guidance_target_heading = self._guidance_diagnostics.get(
-            "target_heading_rad", observation.command.heading_rad
-        )
-        guidance_target_pitch = self._guidance_diagnostics.get(
-            "target_pitch_rad", observation.command.pitch_rad
-        )
-        guidance_target_speed = self._guidance_diagnostics.get(
-            "target_speed_mps", observation.command.speed_mps
-        )
-        guidance_limited_heading = self._guidance_diagnostics.get(
-            "limited_heading_rad", observation.command.heading_rad
-        )
-        guidance_limited_pitch = self._guidance_diagnostics.get(
-            "limited_pitch_rad", observation.command.pitch_rad
-        )
-        guidance_limited_speed = self._guidance_diagnostics.get(
-            "limited_speed_mps", observation.command.speed_mps
-        )
-        guidance_heading_rate_clipped = self._guidance_diagnostics.get(
-            "heading_rate_clipped", torch.zeros_like(self.t_s, dtype=torch.bool)
-        )
-        guidance_pitch_rate_clipped = self._guidance_diagnostics.get(
-            "pitch_rate_clipped", torch.zeros_like(self.t_s, dtype=torch.bool)
-        )
-        guidance_speed_rate_clipped = self._guidance_diagnostics.get(
-            "speed_rate_clipped", torch.zeros_like(self.t_s, dtype=torch.bool)
-        )
-        goal = self.path.goal_ned_m_for(self.num_envs)
-        goal_tangent = self.path.goal_tangent_ned_for(self.num_envs)
-        termination_position_ned_m = self._termination_position_ned()
-        signed_goal_tangent_offset_m = torch.sum(
-            (termination_position_ned_m - goal) * goal_tangent, dim=1
-        )
-        return {
-            "seed": self.episode_seed,
-            "plant_scale_factors": self.plant_scales,
-            "plant_drag_scale": self.plant_scales[:, 0],
-            "plant_thrust_scale": self.plant_scales[:, 1],
-            "plant_fin_scale": self.plant_scales[:, 2],
-            "plant_added_mass_scale": self.plant_scales[:, 3],
-            "plant_actuator_time_scale": self.plant_scales[:, 4],
-            "step": self.step_count,
-            "time_s": self.t_s,
-            "actor_state": observation.actor_state,
-            "critic_state": observation.critic_state,
-            "command_normalized": observation.command.normalized(),
-            "command_physical": torch.stack(
-                [
-                    observation.command.heading_rad,
-                    observation.command.pitch_rad,
-                    observation.command.speed_mps,
-                ],
-                dim=1,
-            ),
-            "episode_command_speed_mps": self._episode_command_speed_mps,
-            "episode_initial_speed_ratio": self._episode_initial_speed_ratio,
-            "episode_initial_propeller_rpm_ratio": self._episode_initial_propeller_rpm_ratio,
-            "command_speed_filtered_below_range": self._command_speed_filtered_below_range,
-            "command_water_relative_speed_mps": command_water_speed,
-            "command_reachability_feasible": command_reachability_feasible,
-            "guidance_current_valid": guidance_current_valid,
-            "guidance_current_age_s": guidance_current_age,
-            "guidance_crab_angle_rad": guidance_crab_angle,
-            "guidance_speed_scale": guidance_speed_scale,
-            "guidance_terminal_phase": guidance_terminal_phase,
-            "guidance_terminal_speed_ratio": guidance_terminal_speed_ratio,
-            "guidance_saturation_ema": guidance_saturation_ema,
-            "guidance_saturation_emergency": guidance_saturation_emergency,
-            "guidance_route_speed_floor_active": guidance_route_floor_active,
-            "guidance_route_speed_floor_launch_active": guidance_route_floor_launch_active,
-            "guidance_route_speed_floor_valid": guidance_route_floor_valid,
-            "guidance_route_speed_floor_measured_mps": guidance_route_floor_measured,
-            "guidance_route_speed_floor_filtered_mps": guidance_route_floor_filtered,
-            "guidance_route_speed_floor_boost_mps": guidance_route_floor_boost,
-            "guidance_route_speed_floor_target_mps": guidance_route_floor_target,
-            "guidance_route_speed_floor_ratio": guidance_route_floor_ratio,
-            "guidance_target_heading_rad": guidance_target_heading,
-            "guidance_target_pitch_rad": guidance_target_pitch,
-            "guidance_target_speed_mps": guidance_target_speed,
-            "guidance_limited_heading_rad": guidance_limited_heading,
-            "guidance_limited_pitch_rad": guidance_limited_pitch,
-            "guidance_limited_speed_mps": guidance_limited_speed,
-            "guidance_heading_rate_clipped": guidance_heading_rate_clipped,
-            "guidance_pitch_rate_clipped": guidance_pitch_rate_clipped,
-            "guidance_speed_rate_clipped": guidance_speed_rate_clipped,
-            "actor_current_body": observation.actor_current_body,
-            "critic_current_ned": observation.critic_current_ned,
-            "ground_velocity_body_mps": observation.ground_velocity_body_mps,
-            "water_velocity_body_mps": observation.water_velocity_body_mps,
-            "velocity_contract_code": torch.full_like(
-                self.t_s,
-                1.0 if self.config.plant.velocity_contract == "nu_ground" else 0.0,
-            ),
-            "ground_surge_mps": observation.ground_velocity_body_mps[:, 0],
-            "ground_route_speed_mps": (
-                torch.zeros_like(self.t_s)
-                if route_ground_speed_mps is None
-                else route_ground_speed_mps
-            ),
-            "ground_route_speed_ratio": (
-                torch.zeros_like(self.t_s)
-                if route_ground_speed_mps is None
-                else route_ground_speed_mps / torch.clamp(self._episode_command_speed_mps, min=1e-9)
-            ),
-            "requested_action": action.requested_total,
-            "limited_action": action.total,
-            "actual_actuator": self.actuator,
-            "magnitude_clipped": action.magnitude_clipped,
-            "rate_clipped": action.rate_clipped,
-            "constraint_violation_count": action.constraint_violation_count,
-            "saturated": action.saturated,
-            "material_saturated": action.material_saturated,
-            "material_magnitude_clipped": action.material_magnitude_clipped,
-            "material_rate_clipped": action.material_rate_clipped,
-            "terminal_kind": decision.kind,
-            "terminal_reason": pc_terminal_kind_name(int(decision.kind[0].item()))
-            if self.num_envs == 1
-            else None,
-            "safety_event": decision.safety_event,
-            "goal_distance_m": goal_distance_m,
-            "signed_goal_tangent_offset_m": signed_goal_tangent_offset_m,
-            "goal_tangent_ned": goal_tangent,
-            "termination_position_ned_m": termination_position_ned_m,
-            "endpoint_stop_enabled": bool(
-                self.config.termination.pc_goal_plane_miss_termination_enabled
-            ),
-            "goal_plane_miss": decision.kind == int(PCTerminalKind.GOAL_PLANE_MISS),
-            "roll_exceed_time_s": decision.roll_exceed_time_s,
-            "roll_rate_exceed_time_s": decision.roll_rate_exceed_time_s,
-            "p_nav": self.sensor_output.p_nav,
-            "position_ned_m": self.eta[:, :3],
-            "current_ned_mps": self.current_ned_mps,
-            "dvl_bottom_valid": self.sensor_output.bottom_lock_valid,
-            "dvl_water_valid": self.sensor_output.water_track_valid,
-            "current_estimate_valid": self.sensor_output.current_estimate_valid,
-            "usbl_valid": self.sensor_output.usbl_valid,
-            "usbl_outlier": self.sensor_output.usbl_outlier,
-            "nav_age_s": self.sensor_output.nav_age_s,
-            "dvl_bottom_age_s": self.sensor_output.dvl_bottom_age_s,
-            "dvl_water_age_s": self.sensor_output.dvl_water_age_s,
-            "usbl_age_s": self.sensor_output.usbl_age_s,
-            "current_estimate_age_s": self.sensor_output.current_estimate_age_s,
-            "projection": observation.projection,
-            "solution": observation.solution,
-            "hold_fraction": self.hold_fraction,
-        }
 
 
 __all__ = [

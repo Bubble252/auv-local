@@ -61,3 +61,26 @@ export MSS_SOURCE_DIR=/home/bubble/水下机器人/simulator/MSS-master
 - 基线 commit：`8bf7e68`；
 - 候选失败时使用 `git revert <candidate-commit>`，不在主干上 `reset --hard`；
 - 回滚后重新运行本页全部命令，并确认没有任何新失败。
+
+## 6. META-G04-BIG3 worktree 基线
+
+BIG3 从 BIG2 feature tip `19f6c21` 建立堆叠 worktree
+`.worktrees/ref-g04-big3-pc-env-20261113`，拆分前测试基线为：
+
+```text
+2089 passed, 11 skipped in 88.39s
+```
+
+linked worktree 没有自己的 `.venv`，仓库 `.venv` 的 editable 安装仍指向主 checkout。
+因此 worktree 内运行测试必须显式把当前 worktree 的 `src/` 放在导入路径首位：
+
+```bash
+cd /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref-g04-big3-pc-env-20261113
+export PYTHONPATH=$PWD/src
+export PVS_SOURCE_DIR=/home/bubble/水下机器人/python/PythonVehicleSimulator-master/src
+export MSS_SOURCE_DIR=/home/bubble/水下机器人/simulator/MSS-master
+/home/bubble/水下机器人/settled_局部规划器_反应式/.venv/bin/python -m pytest -q tests
+```
+
+`PYTHONPATH=$PWD/src` 只用于让 linked worktree 测试自己的源码，不是跨仓库源码注入；
+合入主 checkout 后恢复 editable 安装解析。

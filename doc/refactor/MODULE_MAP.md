@@ -32,7 +32,12 @@
 | `src/auv_lowlevel/ppo_config.py` | PPO 配置族与校验 | 不实现 PPO 算法 | `__all__` | `tests/test_lowlevel_ppo_config.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/batch/pc_bc_merge.py` | 合并 PC BC 数据集和 manifest | 不训练网络、不改数据字段 | `merge_pc_demonstration_datasets` | `tests/test_lowlevel_pc_bc_merge.py` | lowlevel | 历史 format 欠账 |
 | `src/auv_lowlevel/batch/pc_bc_subset.py` | 按 seed 生成 PC BC 子集和 manifest | 不训练网络、不改输入数据 | `subset_pc_demonstration_dataset` | `tests/test_pc_bc_subset.py` | lowlevel | 历史 format 欠账 |
-| `src/auv_lowlevel/batch/pc_env.py` | PC batch 环境和 episode 记录 | 不承载重构期的新职责 | `__all__` | PC 环境测试 | lowlevel | 存量文件长度 |
+| `src/auv_lowlevel/batch/pc_env/__init__.py` | PC batch 环境稳定导入入口 | 不复制实现 | 原 `__all__` | `tests/test_g04_big3_pc_env_trace.py` | lowlevel | 无 |
+| `src/auv_lowlevel/batch/pc_env/types.py` | `PCCommand`、observation 和 step 返回类型 | 不实现环境逻辑 | 4 个原公共类型 | `tests/test_g04_big3_pc_env_trace.py` | lowlevel | 无 |
+| `src/auv_lowlevel/batch/pc_env/state.py` | row-aligned state 克隆与合并 | 不执行 reset/step | 两个内部 helper | `tests/test_lowlevel_pc_env.py` | lowlevel | 复杂度 ratchet |
+| `src/auv_lowlevel/batch/pc_env/observation.py` | observation 拼装与投影/速度字段构造 | 不改变 reward、termination 或 RNG 顺序 | `build_observation` | PC 环境/路径观测测试 | lowlevel | 函数长度 ratchet |
+| `src/auv_lowlevel/batch/pc_env/step.py` | step diagnostics/info 字典构造 | 不推进环境、不改变 step 顺序 | `build_step_info` | PC 环境/route reward/velocity 测试 | lowlevel | 函数长度 ratchet |
+| `src/auv_lowlevel/batch/pc_env/core.py` | `BatchedPCLowLevelEnv` 状态、reset、控制和 step 编排 | 不承载类型、observation 或 diagnostics 的重复实现 | `BatchedPCLowLevelEnv` | PC 环境全量契约测试 | lowlevel | 存量文件/函数长度 ratchet |
 | `src/auv_lowlevel/batch/pc_bc.py` | PC BC 数据、训练和 manifest | 不复制训练脚本入口 | `__all__` | `tests/test_lowlevel_pc_bc.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/batch/metrics.py` | rollout 指标聚合 | 不写 artifact | `__all__` | `tests/test_batch_metrics.py` | lowlevel | 无 |
 | `scripts/train_batch_lowlevel_ppo.py` | PPO 训练 CLI 调度 | 不承载核心训练算法 | `main` | `tests/test_training_curriculum_guard.py` | training | 存量文件长度 |
