@@ -124,3 +124,33 @@ JSON schema、默认值、配置哈希、异常类型或文件编码。
 - 是否新增失败：`no`；
 - 回滚 commit：`ae20d65`；
 - 结论：`PASS`
+
+## 8. 候选 LOCAL-A3
+
+```yaml
+goal: META-G03
+candidate: LOCAL-A3
+repository: settled_局部规划器_反应式
+base_commit: d2b0dbd
+branch: refactor/local-20261113
+files:
+  - src/auv_lowlevel/_json.py
+  - src/auv_lowlevel/batch/pc_bc_merge.py
+  - src/auv_lowlevel/batch/pc_bc_subset.py
+public_api_change: none
+```
+
+LOCAL-A3 把两个 BC 数据工具的 manifest 写出统一为
+`json.dumps(..., indent=2, sort_keys=True) + "\n"` 的内部 helper。它不创建父目录、
+不改变文件名、字段、排序、缩进、末尾换行或异常行为。
+
+验证命令：
+
+```bash
+cd /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref-local-20261113
+/home/bubble/水下机器人/settled_局部规划器_反应式/.venv/bin/python \
+  -m pytest -q tests/test_lowlevel_json_io.py tests/test_pc_bc_subset.py \
+  tests/test_lowlevel_pc_bc_merge.py
+```
+
+- 结果：`PENDING`
