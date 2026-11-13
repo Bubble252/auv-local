@@ -112,3 +112,75 @@ P1b 组保留原实现，不进入本轮源码迁移：
 
 `scripts/run_pc_goal105_channel_interaction.py` 有存量 F401，本轮不改动该文件，
 避免把无关 import 清理混入 CLI 迁移。
+
+## 6. META-G04-LAYOUT audit pilot
+
+已迁移到 `scripts/audit/pc_goal/` 的 19 个独立 audit：
+
+`goal85_unbiased_nav`、`goal86_pa_residual_labels`、`goal125_checkpoint_parity`、
+`goal153_phase0`、`goal38_path_provenance`、`goal41_terminal_nav_bias`、
+`goal42_estimator_calibration_nav_age`、`goal42_replay`、`goal43_nav_age_semantics`、
+`goal44_terminal_bias_persistence`、`goal45_fixed_calibration_residual`、
+`goal46_dynamic_residual_association`、`goal47_estimator_state`、
+`goal48_strict125_sigma_residual`、`goal49_controller_feedback`、
+`goal50_guidance_timing`、`goal51_unrecorded_state`、
+`goal52_sigma_outcome_relevance`、`goal53_recorded_feature_outcome`。
+
+首批四个试点：
+
+| 新实现 | 历史入口 | 公共 API / 测试访问名 |
+|---|---|---|
+| `scripts/audit/pc_goal/goal85_unbiased_nav.py` | `scripts/audit_pc_goal85_unbiased_nav.py` | `run_audit`、`_profile_audit`、`SCHEMA_VERSION`、`main` |
+| `scripts/audit/pc_goal/goal86_pa_residual_labels.py` | `scripts/audit_pc_goal86_pa_residual_labels.py` | `REPO_ROOT`、`_base_actuator`、`_stats`、`main` |
+| `scripts/audit/pc_goal/goal125_checkpoint_parity.py` | `scripts/audit_pc_goal125_checkpoint_parity.py` | `ARCHITECTURE_METADATA_KEYS`、`_load`、`main` |
+| `scripts/audit/pc_goal/goal153_phase0.py` | `scripts/audit_pc_goal153_phase0.py` | `REPO_ROOT`、`CHECKPOINTS`、`_trace_bins`、`main` |
+
+历史入口保留为薄 wrapper：在旧模块命名空间中执行新源码，使模块级 monkeypatch、
+函数 globals、旧 import 和 `main()` 语义保持一致；wrapper 不复制算法、I/O 或参数
+定义。迁移文件的 `REPO_ROOT` 已按新目录深度改为 `parents[3]`，并有 import smoke
+覆盖。存量复杂度/长度和 format 债务继续由 `CODE_SHAPE_BASELINE.json` 按新路径
+抑制，没有扩大 ratchet。
+
+显式不迁移：
+
+- `scripts/audit_pc_goal54_preterminal_outcome.py`
+- `scripts/audit_pc_goal55_preterminal_replication.py`
+- `scripts/audit_pc_goal56_preterminal_fixed_cutoff_replication.py`
+- `scripts/audit_pc_goal57_heading_error_replication.py`
+
+原因：goal55 读取 goal54、goal56 读取 goal55、goal57 读取 goal56，并逐级校验 SHA；
+wrapper 会改变 hash 契约。
+
+## 7. META-G04-LAYOUT analysis batch A1
+
+`scripts/analysis/pc_goal/` 首批迁入 goal28-40 的 13 个 analyzer，保留原文件名：
+
+- `analyze_pc_goal28_terminal.py`、`analyze_pc_goal28_traces.py`
+- `analyze_pc_goal30_failure.py`、`analyze_pc_goal30_traces.py`
+- `analyze_pc_goal31_gate.py`、`analyze_pc_goal31_h2h3.py`
+- `analyze_pc_goal32_terminal_entry.py`、`analyze_pc_goal33_terminal_authority.py`
+- `analyze_pc_goal34_global_vertical.py`、`analyze_pc_goal35_early_vertical.py`
+- `analyze_pc_goal36_initial_geometry.py`、`analyze_pc_goal37_local_path_frame.py`
+- `analyze_pc_goal40_terminal_components.py`
+
+历史入口使用与 audit 相同的命名空间 wrapper：旧路径的执行、import、
+monkeypatch 和 sibling-helper 加载保持不变。`_HERE` 相对加载在新目录内继续解析
+同批文件，没有复制或改写算法。
+
+A2 `goal59-85` 的 29 个 analyzer 已按同一规则迁入；其中 12 个用
+`Path(__file__).resolve().parents[1]` 定位仓库根，迁移后改为 `parents[3]`。
+`goal72-79` 的 `Path(__file__).with_name(...)` 加载全部在同批文件内解析。
+
+A3 `goal93-116` 的 23 个 analyzer 已迁入。`goal104 -> 105/106/107 -> 109` 和
+`goal110 -> 111/112/113/116 -> 114` 的 sibling import 在新目录内继续解析；
+`goal106` 对未迁移 `run_pc_goal106_near_terminal_rpm_schedule` 的依赖保持原样，
+新入口以 `python -m analysis.pc_goal...` 验证。
+
+A4 `goal117-139` 的 24 个 analyzer 已迁入。`goal128 -> 129/130/131/132/133`
+的 sibling import 保持不变；`goal136_dline_ppo` 仍通过仓库根的
+`scripts.analyze_pc_goal136_dline` 导入，旧/新入口都用 `python -m scripts...`
+验证。
+
+A5 `goal145-165` 的 16 个 analyzer 已迁入。`goal160 -> 161_eval/161_phaseA`
+保持 sibling import；4 个 `REPO_ROOT = parents[1]` 改为 `parents[3]`。analyze
+组 105 个脚本已全部迁移完成。
