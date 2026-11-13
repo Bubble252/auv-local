@@ -1,0 +1,7 @@
+version: 1
+status: ref_local_inventory
+waivers: []
+
+# 存量超大模块由 CODE_SHAPE_BASELINE.json 做 ratchet 抑制；未触碰时不进入新代码
+# 标准。若后续候选触碰这些文件，再为具体检查项新增有到期 Goal 的 waiver，或先拆分
+# 一个完整职责。禁止无路径、无 owner、无到期 Goal 的全局豁免。
