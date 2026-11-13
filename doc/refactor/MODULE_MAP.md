@@ -17,6 +17,17 @@
 | `src/auv_lowlevel/_json.py` | 内部 JSON 文本读取与稳定文档写出 | 不校验 schema、不创建父目录 | 无（下划线内部模块） | `tests/test_lowlevel_json_io.py` | lowlevel | 无 |
 | `src/auv_lowlevel/_paths.py` | 显式 root 的相对路径拼接 | 不检查存在性、不解析 symlink、不读取 CWD | 无（下划线内部模块） | `tests/test_lowlevel_paths.py` | lowlevel | 无 |
 | `src/auv_lowlevel/_cli.py` | 共享 argparse 参数组 | 不定义命令、不解析业务参数、不改变帮助文本 | `add_seed_range_arguments` | `tests/test_lowlevel_cli.py` | lowlevel | 无 |
+| `src/auv_lowlevel/cli/evaluate_pc_ppo/__init__.py` | 评价器稳定兼容入口 | 不复制实现 | 原 private/public 名称 | `tests/test_g04_evaluate_pc_ppo_cli_contract.py` | evaluation | 无 |
+| `src/auv_lowlevel/cli/evaluate_pc_ppo/args.py` | 评价 CLI 参数定义与解析 | 不运行环境、不写 artifact | `_parse_args` | `tests/test_g04_evaluate_pc_ppo_cli_contract.py` | evaluation | 历史函数长度 ratchet |
+| `src/auv_lowlevel/cli/evaluate_pc_ppo/validation.py` | 覆盖项、trace 开关和残差调度校验 | 不改变阈值或默认值 | 私有校验函数 | `tests/test_lowlevel_pc_eval_contract.py` | evaluation | 历史函数长度 ratchet |
+| `src/auv_lowlevel/cli/evaluate_pc_ppo/metrics.py` | episode 指标缓冲与序列 helper | 不写 artifact | 私有 metrics helper | `tests/test_lowlevel_pc_eval_contract.py` | evaluation | 历史函数长度 ratchet |
+| `src/auv_lowlevel/cli/evaluate_pc_ppo/summary.py` | 汇总指标构造 | 不运行环境 | `_summary` | `tests/test_pc_goal84_outcome_contract.py` | evaluation | 历史函数长度 ratchet |
+| `src/auv_lowlevel/cli/evaluate_pc_ppo/episodes.py` | 逐 episode 记录构造 | 不改变字段语义 | `_episode_records` | `tests/test_pc_goal84_outcome_contract.py` | evaluation | 历史函数长度 ratchet |
+| `src/auv_lowlevel/cli/evaluate_pc_ppo/policy.py` | policy、checkpoint 和 curriculum 构建 | 不改变构造顺序 | 私有构建函数 | `tests/test_lowlevel_pc_eval_contract.py` | evaluation | 历史函数长度 ratchet |
+| `src/auv_lowlevel/cli/evaluate_pc_ppo/runner.py` | closed-loop 评价编排 | 不改变 step/RNG 顺序 | `_run` | PC 评价契约测试 | evaluation | 历史函数长度/复杂度 ratchet |
+| `src/auv_lowlevel/cli/evaluate_pc_ppo/main.py` | CLI 入口和 summary 写出 | 不定义算法 | `main` | `tests/test_g04_evaluate_pc_ppo_cli_contract.py` | evaluation | 历史函数长度 ratchet |
+| `src/auv_lowlevel/cli/evaluate_pc_ppo/output.py` | summary 值格式化 | 不改变 JSON 缩进或排序 | `_format_summary_value` | CLI/output 契约测试 | evaluation | 无 |
+| `src/auv_lowlevel/cli/evaluate_pc_ppo/common.py` | 评价器仓库根、常量和路径解析 | 不读取 CWD | `_resolve` | `tests/test_script_path_helpers.py` | evaluation | 无 |
 | `src/auv_lowlevel/config.py` | 低层配置 schema 与解析 | 不执行训练或评价 | `LowLevelConfig`, `load_config` | `tests/test_lowlevel_ppo_config.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/ppo_config.py` | PPO 配置族与校验 | 不实现 PPO 算法 | `__all__` | `tests/test_lowlevel_ppo_config.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/batch/pc_bc_merge.py` | 合并 PC BC 数据集和 manifest | 不训练网络、不改数据字段 | `merge_pc_demonstration_datasets` | `tests/test_lowlevel_pc_bc_merge.py` | lowlevel | 历史 format 欠账 |
@@ -25,7 +36,7 @@
 | `src/auv_lowlevel/batch/pc_bc.py` | PC BC 数据、训练和 manifest | 不复制训练脚本入口 | `__all__` | `tests/test_lowlevel_pc_bc.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/batch/metrics.py` | rollout 指标聚合 | 不写 artifact | `__all__` | `tests/test_batch_metrics.py` | lowlevel | 无 |
 | `scripts/train_batch_lowlevel_ppo.py` | PPO 训练 CLI 调度 | 不承载核心训练算法 | `main` | `tests/test_training_curriculum_guard.py` | training | 存量文件长度 |
-| `scripts/evaluate_pc_ppo.py` | PC PPO 评价 CLI 与产物写出 | 不定义成功判定或 matrix | `main` | `tests/test_pc_server_eval_summary.py` | evaluation | 存量文件长度 |
+| `scripts/evaluate_pc_ppo.py` | PC PPO 评价薄入口，转发到 `auv_lowlevel.cli.evaluate_pc_ppo` | 不定义评价、reward 或 matrix | `main` | `tests/test_g04_evaluate_pc_ppo_cli_contract.py` | evaluation | 无 |
 | `scripts/check_goal173_protocol.py` | Goal173 预注册协议检查 | 不改 Gate 阈值或 split | `main` | `tests/test_goal173_protocol.py` | protocol | 无 |
 | `scripts/audit_goal173_artifacts.py` | Goal173 artifact 审计 | 不清理或重写 artifact | `main` | `tests/test_goal173_artifact_audit.py` | protocol | 无 |
 | `scripts/run_pc_standing_eval_suite.py` | standing evaluation matrix 调度；相对路径统一走显式 root helper | 不修改评价 cell 定义 | `main` | `tests/test_pc_standing_eval_runner.py` | evaluation | 存量文件长度 |

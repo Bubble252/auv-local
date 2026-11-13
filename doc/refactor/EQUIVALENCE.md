@@ -321,7 +321,73 @@ skill_usage:
 - 回滚 commit：`94ea92b`；
 - 结论：`PASS`
 
-## 11. 候选 G04-CLI
+## 11. 候选 G04-BIG2
+
+```yaml
+goal: META-G04-BIG2
+repository: settled_局部规划器_反应式
+base_commit: 1711003
+branch: refactor/g04-big2-evalppo-20261113
+files:
+  - scripts/evaluate_pc_ppo.py
+  - src/auv_lowlevel/cli/evaluate_pc_ppo/
+public_api_change: none
+```
+
+G04-BIG2 把原 3920 行脚本按职责迁移到
+`auv_lowlevel.cli.evaluate_pc_ppo`。所有 37 个原顶层函数均保留原名；AST 对比显示
+没有缺失函数，也没有函数体差异。旧脚本保留为薄入口，并继续 re-export 测试和调用方
+使用的 private 名称。
+
+| 项目 | 重构前 | 重构后 | 证据 |
+|---|---|---|---|
+| 顶层函数 | 37 | 37 | AST `FunctionDef` 对比，`missing=[]`, `mismatched=[]` |
+| `--help` | 旧脚本文本 | 包入口转发 | SHA256 `944559f9...e11dd4` 一致 |
+| 默认 argparse namespace | 旧对象 | 相同 key/value | CLI 契约测试 |
+| 评价 metrics | 145 keys | 145 keys | 服务器 golden 完全相同 |
+| episode records | 1 条 | 1 条 | 服务器 golden 完全相同 |
+| summary.json / summary.md | 旧输出 | 归一化后相同 | 仅工作区路径字段不同 |
+| reward/termination/success/seed | 不变 | 不变 | 未改算法和参数 |
+
+服务器 golden 使用只读 checkpoint
+`/data/yhx/underwater-robotics/runs/auv-local/ops-g01/20261113-ops-g01-57fc237/minimal-run/final.pt`，
+固定 `seed=20`、`--curriculum-stage C3`、`--success-frame both`。新代码运行目录为
+`/data/yhx/underwater-robotics/runs/auv-local/g04-big2/20261113-big2-golden/eval2`。
+`metrics` 与 `episodes` 的 JSON SHA256 均为
+`30028ad9d2492a46f4f89a9278ca608875b5b929d2b5bd516a156a9ec5a9480a`；归一化
+`summary.json` 的 SHA256 在新旧两侧均为
+`786aaa22cdc1f4de434f3da21068ba7b7a6c8cd36cdf3a19d2990ae8209e4d6b`。
+
+验证命令：
+
+```bash
+cd /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref-g04-big2-evalppo-20261113
+export PVS_SOURCE_DIR=/home/bubble/水下机器人/python/PythonVehicleSimulator-master/src
+export MSS_SOURCE_DIR=/home/bubble/水下机器人/simulator/MSS-master
+/home/bubble/水下机器人/settled_局部规划器_反应式/.venv/bin/python -m pytest -q tests
+```
+
+Preflight 证据：
+
+```yaml
+skill_usage:
+  - skill: auv-refactor-guard
+    phase: preflight
+    outcome: passed
+    repo: /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref-g04-big2-evalppo-20261113
+    module: scripts/evaluate_pc_ppo.py
+```
+
+- 测试 commit：`41a9a7e`；结构迁移 commit：`7038072`；
+- 全量测试：`2088 passed, 11 skipped`（worktree 无未跟踪 artifact，额外 skip）；
+- ruff / format：新包、wrapper 和 CLI 契约测试全部 PASS；
+- mypy：全仓 `381 errors / 86 files`，错误总数与基线一致；文件数是拆分后的分布；
+- shape：`0 new violations, 1189 suppressed`；`_run` 等历史长函数随迁移保留 ratchet；
+- dependency checker：`repository dependency boundaries: ok`；
+- 回滚 commit：`1711003`；
+- 结论：`PASS`
+
+## 12. 候选 G04-CLI
 
 ```yaml
 goal: META-G04-CLI
