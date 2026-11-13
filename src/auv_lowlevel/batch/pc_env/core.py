@@ -27,9 +27,9 @@ from auv_lowlevel.path import (
     resample_reference_path,
 )
 
-from .actions import BatchedPureActionApplication, BatchedPureActionPipeline
-from .dynamics import BatchedRemus100Dynamics, Remus100BatchState
-from .geometry import (
+from ..actions import BatchedPureActionApplication, BatchedPureActionPipeline
+from ..dynamics import BatchedRemus100Dynamics, Remus100BatchState
+from ..geometry import (
     body_to_world,
     ground_velocity_body,
     legacy_ground_velocity_body,
@@ -39,14 +39,14 @@ from .geometry import (
     world_to_body,
     wrap_angle,
 )
-from .guidance import BatchedAlosSolution, BatchedThreeDAlosGuidance
-from .path import (
+from ..guidance import BatchedAlosSolution, BatchedThreeDAlosGuidance
+from ..path import (
     BatchedPathProjection,
     BatchedReferencePath,
     BatchedReferencePathBank,
     BatchedReferencePathSet,
 )
-from .pc import (
+from ..pc import (
     BatchedCommandHoldTracker,
     BatchedPCRewardComputer,
     BatchedPCTerminationManager,
@@ -56,7 +56,7 @@ from .pc import (
     pc_route_health_terms,
     pc_terminal_kind_name,
 )
-from .pc_path import (
+from ..pc_path import (
     PC_PATH_DEFAULT_BLOCKS,
     PC_PATH_DIMS,
     PC_PATH_ENDPOINT_BLOCKS,
@@ -64,14 +64,14 @@ from .pc_path import (
     path_block_column_mask,
     validate_path_blocks,
 )
-from .plant_randomization import sample_plant_scale_factors
-from .randomization import (
+from ..plant_randomization import sample_plant_scale_factors
+from ..randomization import (
     BatchedEpisodeRandomization,
     TorchEpisodeRandomizer,
     TrainingSeedCursor,
     sample_episode_randomizations,
 )
-from .sensors import SyntheticSensorOutput, SyntheticSensorSuite, pc_critic_state
+from ..sensors import SyntheticSensorOutput, SyntheticSensorSuite, pc_critic_state
 
 
 @dataclass(frozen=True)
