@@ -180,3 +180,7 @@ A4 `goal117-139` 的 24 个 analyzer 已迁入。`goal128 -> 129/130/131/132/133
 的 sibling import 保持不变；`goal136_dline_ppo` 仍通过仓库根的
 `scripts.analyze_pc_goal136_dline` 导入，旧/新入口都用 `python -m scripts...`
 验证。
+
+A5 `goal145-165` 的 16 个 analyzer 已迁入。`goal160 -> 161_eval/161_phaseA`
+保持 sibling import；4 个 `REPO_ROOT = parents[1]` 改为 `parents[3]`。analyze
+组 105 个脚本已全部迁移完成。
