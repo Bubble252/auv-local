@@ -10,6 +10,8 @@ from typing import Any
 import numpy as np
 from auv_core.contracts import FloatArray
 
+from ._json import load_json_value
+
 SCHEMA_VERSION = "auv_odarrl_control.v1"
 
 DEFAULT_MAX_RUDDER_ANGLE_DEG = 15.0
@@ -2691,11 +2693,9 @@ def _validate_current_visibility(config: LowLevelConfig) -> None:
             f"still used by {', '.join(leaks)}; set them to false or expose current explicitly"
         )
 
-
 def load_config(path: Path | str) -> LowLevelConfig:
     source = Path(path)
-    raw_text = source.read_text(encoding="utf-8")
-    data = json.loads(raw_text)
+    data = load_json_value(source)
     canonical = json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return parse_config(data, config_sha256=hashlib.sha256(canonical).hexdigest())
 
