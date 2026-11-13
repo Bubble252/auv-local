@@ -4,180 +4,180 @@
 
 | Goal | Repo | Phase | Status | Plan | Result | Report | Matrix |
 |---|---|---|---|---:|---:|---:|---|
-| Goal1 | settled_局部规划器_反应式 | UNCLASSIFIED | superseded (SUPERSEDED（2026-10-28）) | 1 | 0 | 0 | - |
-| Goal2 | settled_局部规划器_反应式 | UNCLASSIFIED | running (ACTIVE) | 1 | 0 | 0 | - |
-| Goal3 | settled_局部规划器_反应式 | UNCLASSIFIED | superseded (SUPERSEDED（2026-10-28）) | 1 | 0 | 0 | - |
-| Goal4 | settled_局部规划器_反应式 | UNCLASSIFIED | running (PARTIAL（2026-10-28 执行后：配对完成，`max` 门未通过）) | 1 | 0 | 0 | - |
-| Goal5 | settled_局部规划器_反应式 | UNCLASSIFIED | running (PARTIAL（已执行至 P7；P4 未筛出通过候选，P5/P6 学习门未通过）) | 1 | 0 | 0 | - |
-| Goal6 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal7 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (B2 门通过（E5，200k）；B3/B4/B5 尚未启动) | 1 | 0 | 0 | - |
-| Goal8 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (G1–G6 PASS；G7 解析最终评估 PASS；G7 OceanSim 50Hz 稳定性 FAIL（仅保留评估用途）；最终总状态 FAIL；G8 阻塞) | 1 | 0 | 0 | - |
-| Goal9 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 28 | 2 | 7 | - |
-| Goal10 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (P0–P4 全部完成。) | 1 | 0 | 1 | - |
-| Goal11 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (提案，未开始实现。) | 1 | 0 | 0 | - |
-| Goal12 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal13 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal14 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (已完成，整体门禁 fail。) | 1 | 0 | 0 | - |
-| Goal15 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal16 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (阶段 0–3 已执行；两个纯限速教师均未通过门禁；按预注册停止。) | 1 | 0 | 1 | - |
-| Goal17 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (已收口（负结果）。) | 1 | 0 | 1 | - |
-| Goal18 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (已执行并收口。判定 `FAIL_RMSE`，停止，不进入残差 PPO。) | 1 | 0 | 1 | - |
-| Goal19 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (已执行并收口。判定 `FAIL_RMSE`。) | 1 | 0 | 1 | - |
-| Goal20 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 1 | - |
-| Goal21 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (已实现；待用户验收) | 1 | 0 | 0 | - |
-| Goal22 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (已执行；Goal22 预注册门禁 FAIL（2026-11-07），未进入 P3/P5/理想臂) | 1 | 0 | 1 | - |
-| Goal23 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (已于 Goal22 门禁停止；N12 未通过 default 门禁，P3/P5/理想臂均未启动) | 1 | 0 | 0 | - |
-| Goal24 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (提示词已就绪，待执行；默认不自动启动训练) | 2 | 0 | 4 | configs/lowlevel/eval/pc_v1_nominal_eval_matrix_20261108.json |
-| Goal25 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (已完成并 FAIL 收口：D3 pre-goal 门禁失败；stress 诊断与 PPO 均未启动) | 4 | 0 | 2 | configs/lowlevel/eval/pc_v1_nominal_eval_matrix_teacher_fixed_20261108.json |
-| Goal26 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 4 | 1 | 0 | configs/lowlevel/eval/pc_v1_nominal_eval_matrix_goal25_d3_20261108.json |
-| Goal27 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 5 | 2 | 0 | - |
-| Goal28 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
-| Goal29 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
-| Goal30 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 2 | 0 | - |
-| Goal31 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 2 | 2 | 0 | - |
-| Goal32 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
-| Goal33 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
-| Goal34 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
-| Goal35 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
-| Goal36 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
-| Goal37 | settled_局部规划器_反应式 | UNCLASSIFIED | invalid (RESULT_COMPLETE / INVALID_DIAGNOSTIC) | 1 | 1 | 0 | - |
-| Goal38 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / H1_FALSIFIED) | 1 | 1 | 0 | - |
-| Goal39 | settled_局部规划器_反应式 | UNCLASSIFIED | invalid (RESULT_COMPLETE / INVALID_DIAGNOSTIC) | 1 | 1 | 0 | - |
-| Goal40 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / PROTOCOL_ETA_DISCORDANCE_SUPPORTED) | 1 | 1 | 0 | - |
-| Goal41 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / NAV_BIAS_MECHANISM_SUPPORTED) | 1 | 1 | 0 | - |
-| Goal42 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / RESIDUAL_CALIBRATION_BIAS_SUPPORTED) | 1 | 1 | 0 | - |
-| Goal43 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / TRUE_BIAS_WITH_INFLATED_AGE) | 1 | 1 | 0 | - |
-| Goal44 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / PERSISTENT_LATE_BIAS) | 1 | 1 | 0 | - |
-| Goal45 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / DYNAMIC_RESIDUAL_DOMINANT) | 1 | 1 | 0 | - |
-| Goal46 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / DYNAMIC_PERSISTENT_WITH_OU_ASSOCIATION) | 1 | 1 | 0 | - |
-| Goal47 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / REALIZED_OU_DOMINANT) | 1 | 1 | 0 | - |
-| Goal48 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / SIGMA_ASSOCIATION_UNEXPLAINED) | 1 | 1 | 0 | - |
-| Goal49 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / INSUFFICIENT_FEATURE_VARIATION) | 1 | 1 | 0 | - |
-| Goal50 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / RECORDED_FEATURES_INSUFFICIENT) | 1 | 1 | 0 | - |
-| Goal51 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / UNRECORDED_STATE_PROXIES_INSUFFICIENT) | 2 | 1 | 0 | - |
-| Goal52 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / STRICT125_SIGMA_NOT_OUTCOME_RELEVANT) | 1 | 1 | 0 | - |
-| Goal53 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / STRICT125_RECORDED_FEATURE_OUTCOME_RELEVANT) | 1 | 1 | 0 | - |
-| Goal54 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / PRETERMINAL_FEATURES_NOT_OUTCOME_RELEVANT) | 1 | 1 | 0 | - |
-| Goal55 | settled_局部规划器_反应式 | UNCLASSIFIED | invalid (RESULT_COMPLETE / INVALID_INPUT / SMOKE_PRECHECK_FAIL) | 1 | 1 | 0 | - |
-| Goal56 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / PRETERMINAL_FEATURES_INDEPENDENTLY_REPLICATED / CONTINUE) | 1 | 1 | 0 | - |
-| Goal57 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / HEADING_ERROR_PRIMARY_ONLY / PIVOT) | 1 | 1 | 0 | - |
-| Goal58 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (OFFPOLICY_RESIDUAL_FAIL_PIVOT) | 1 | 1 | 0 | - |
-| Goal59 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 2 | 0 | - |
-| Goal60 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
-| Goal61 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
-| Goal62 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
-| Goal63 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
-| Goal64 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (GEOMETRY_SUPPORTED) | 1 | 1 | 0 | - |
-| Goal65 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (DWELL_NOT_SUFFICIENT) | 1 | 1 | 0 | - |
-| Goal66 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (TERMINAL_GEOMETRY_UNRESOLVED) | 1 | 1 | 0 | - |
-| Goal67 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (TERMINAL_AUTHORITY_LIMITED) | 1 | 1 | 0 | - |
-| Goal68 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (PRECROSSING_TRACKING_LAG) | 1 | 1 | 0 | - |
-| Goal69 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (PRECROSSING_MULTICHANNEL_TRACKING_LAG) | 1 | 1 | 0 | - |
-| Goal70 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMMAND_RATE_INFEASIBLE) | 1 | 1 | 0 | - |
-| Goal71 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (TRACKING_IMPROVES_OUTCOME_UNCHANGED) | 1 | 1 | 0 | - |
-| Goal72 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (LIMITER_GEOMETRY_TRADEOFF) | 1 | 1 | 0 | - |
-| Goal73 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMMAND_DEMAND_NOT_SUPPORTED) | 1 | 1 | 0 | - |
-| Goal74 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (MARGIN_UNUSABLE_BIAS_SUPPORTED) | 1 | 1 | 0 | - |
-| Goal75 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (PARTIAL_SUPPORT) | 1 | 1 | 0 | - |
-| Goal76 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (LABEL_CONFLATION_CONFIRMED_BUT_DEADBAND_FAIL) | 1 | 1 | 0 | - |
-| Goal77 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (GEOMETRY_GATE_NOT_SUPPORTED) | 1 | 1 | 0 | - |
-| Goal78 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (FULL_VECTOR_DEADBAND_SUPPORTED) | 1 | 1 | 0 | - |
-| Goal79 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (OBSERVABLE_FULL_VECTOR_PREDICTOR_NOT_SUPPORTED) | 1 | 1 | 0 | - |
-| Goal80 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (TERMINAL_REFERENCE_HURTS) | 1 | 1 | 0 | - |
-| Goal81 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (MIXED_ACROSS_SCENARIOS) | 1 | 1 | 0 | - |
-| Goal82 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (CHANNEL_GAIN_WITHOUT_OUTCOME) | 1 | 1 | 0 | - |
-| Goal83 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (CAPTURE_FRAME_AMBIGUITY) | 1 | 1 | 0 | - |
-| Goal84 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (FRAME_ACCOUNTED) | 1 | 1 | 0 | - |
-| Goal85 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (B1_IMPLEMENTATION_PASS / MISMATCH_TOO_SMALL / B2_NOT_TRIGGERED / B3_IMPLEMENTED) | 2 | 2 | 0 | - |
-| Goal86 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (T2_3SEED_POSITIVE_BUT_PATH_TRADEOFF / NO_FORMAL / HELDOUT_CLOSED) | 3 | 3 | 0 | - |
-| Goal87 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_RECORDED / TERMINAL_CAPTURE_MILLIMETER_ONLY) | 3 | 1 | 0 | - |
-| Goal88 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (PARTIAL_FORMAL / SUCCESS_PASS_PATH_GUARDRAIL_FAIL / NOT_A_GATE) | 2 | 1 | 0 | - |
-| Goal89 | settled_局部规划器_反应式 | UNCLASSIFIED | invalid (INVALID_GATE_SCOPE / NETWORK_PARITY_OK / PIVOT_TO_GOAL90) | 2 | 1 | 0 | - |
-| Goal90 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (PASS_RL_GAIN_WEAK / PG10_3_PREFERRED / NOT_FORMAL) | 1 | 1 | 0 | - |
-| Goal91 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (NOISE_NOT_PRIMARY_BOTTLENECK / SCREEN_ONLY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal92 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (FAIL_NO_UPDATE_SCHEDULE_EFFECT / NO_PROMOTION / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal93 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_RECORDED / ACTION_PARAMETERIZATION_CLIPPING / NO_SAC / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal94 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (PHASE1_RECORDED / THRESHOLD_NOT_MET / RELATIVE_GAIN_PRESENT / NO_ALGORITHM_SWITCH) | 1 | 2 | 0 | - |
-| Goal95 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (SCREEN_FAILED / SUPERVISED_PRIOR_INSTALLED / PATH_INDEPENDENCE_NEGATIVE / NO_SEED_EXPANSION / NO_SAC) | 1 | 1 | 0 | - |
-| Goal96 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (DIRECTION_NOT_SUPPORTED / AUTHORITY_SUFFICIENT / REWARD_CREDIT_MISALIGNED_FORMAL / PPO_DEGRADES_PRIOR / NO_SAC) | 1 | 1 | 0 | - |
-| Goal97 | settled_局部规划器_反应式 | UNCLASSIFIED | invalid (INVALID_SCALE_ANCHOR / NO_GATE_RECORD) | 1 | 1 | 0 | - |
-| Goal98 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (SCALE_PARTIAL / TERMINAL_DIRECTION_REMAINS_BOTTLENECK / NO_SAC) | 1 | 1 | 0 | - |
-| Goal99 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (SCHEDULE_NOT_SUPPORTED / TERMINAL_DEGRADATION_PRECEDES_2M / NO_SAC) | 1 | 1 | 0 | - |
-| Goal100 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (BC_SCALE_ONLY_SUPPORTED / PPO_INCREMENT_HARMFUL / NO_SAC) | 1 | 1 | 0 | - |
-| Goal101 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (BC_PRIOR_BEATS_ALOS / EVAL_ONLY / NO_TRAINING) | 1 | 1 | 0 | - |
-| Goal102 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (PPO_DOSE_HARM / EVAL_ONLY / NO_TRAINING) | 1 | 1 | 0 | - |
-| Goal103 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (CONTROL_AUTHORITY_LIMITED_LABEL / PARAMETERIZATION_NOT_CAUSALLY_ISOLATED / NETWORK_PARITY_OK / EVAL_ONLY / NO_TRAINING) | 1 | 1 | 0 | - |
-| Goal104 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (CHANNEL_SIGNAL_WEAK / EVAL_ONLY / NO_TRAINING / NETWORK_PARITY_OK / NO_SAC) | 1 | 1 | 0 | - |
-| Goal105 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RPM_ONLY_SIGNAL / INTERACTION_NOT_SUPPORTED / EVAL_ONLY / NO_TRAINING / NO_SAC) | 1 | 1 | 0 | - |
-| Goal106 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_NO_SIGNAL / EVAL_ONLY / NO_TRAINING / NO_SAC) | 1 | 1 | 0 | - |
-| Goal107 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_AUDIT_ONLY / CREDIT_OR_OPTIMIZATION_LIMITED / NO_TRAINING / NO_SAC) | 1 | 1 | 0 | - |
-| Goal108 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED / NO_PRIOR_OPTIMIZER_GAIN / SAC_RESIDUAL_EXPLOSION / HELDOUT_CLOSED) | 2 | 1 | 0 | - |
-| Goal109 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_AUDIT_ONLY / NO_DIRECTION_SIGNAL / DIRECTION_ONLY_SIGNAL_OBSERVED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal110 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_AUDIT_ONLY / INSUFFICIENT_EVENTS / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal111 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_AUDIT_ONLY / PREENTRY_GEOMETRY_BAD_MAJORITY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal112 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_AUDIT_ONLY / TRACKING_LIMITED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal113 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_AUDIT_ONLY / PITCH_TRACKING_AMBIGUOUS / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal114 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_AUDIT_ONLY / MIXED_PITCH_HANDOFF / NO_SAC / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal115 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_AUDIT_ONLY / REFERENCE_FILTER_LIMITED / NO_SAC / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal116 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / FILTER_NONCAUSAL / NO_SAC / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal117 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_AUDIT_ONLY / MIXED_TERMINAL_MECHANISM / NO_TRAINING / NO_SAC / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal118 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_AUDIT_ONLY / MIXED_REACHABILITY / NO_TRAINING / NO_SAC / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal119 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_SCREEN / NO_SCREEN_MOVEMENT / PPO_OPTIMIZATION_LIMITED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal120 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_SCREEN / PPO_OPTIMIZATION_LIMITED / RESIDUAL_CLOSED_LOOP_INERT / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal121 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (AUTHORITY_PRESENT / PPO_RESIDUAL_NEAR_ZERO / EVAL_ONLY / NO_TRAINING) | 1 | 1 | 0 | - |
-| Goal122 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (GAIN_HARM / GAIN_AUTHORITY_WITHOUT_CAPTURE / EVAL_ONLY / NO_TRAINING) | 1 | 1 | 0 | - |
-| Goal123 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (BIAS_IMPROVES_CAPTURE / EVAL_ONLY / NO_TRAINING / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal124 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (BIAS_GUARDRAIL_PASS / EVAL_ONLY / NO_TRAINING / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal125 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_SCREEN / PPO_BIAS_MIXED / PPO_BIAS_CEILING / NETWORK_PARITY_OK / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal126 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_SCREEN / SAC_PA_HARM / NETWORK_PARITY_OK / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal127 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / SAC_PA_SCALE_INSUFFICIENT / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal128 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / ACTION_PARAMETERIZATION / GEOMETRY_LIMITED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal129 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / ACTION_PARAM_NO_EFFECT / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal130 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / ACTION_PARAM_NO_EFFECT / PARAMETERIZATION_CEILING / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal131 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_READ_ONLY / GEOMETRY_DISCRIMINATOR_FOUND / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal132 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / GEO_NO_EFFECT / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal133 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / GEO_SAFE_PARITY / EVAL_BIAS_FAMILY_STOPPED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal134 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / SINGLE_SEED_ONLY / AUTHORITY_DOMINANT / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal135 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (AUTHORITY_SAC_HARM / NO_FORMAL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal136 | settled_局部规划器_反应式 | UNCLASSIFIED | paused (DIVERSITY_SAFETY_STOP / PPO_RESIDUAL_COLLAPSE / NO_FORMAL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal137 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (DIAGNOSTIC_COMPLETE / LATENT_RETAINED / BC_HEAD_RESPONSIVE / LAST_LAYER_NOT_PRIMARY / P_D3_UNAVAILABLE) | 1 | 1 | 0 | - |
-| Goal138 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (TERMINAL_CURRICULUM_TRADEOFF / PPO_NO_TERMINAL_DENSITY_EFFECT / NO_FORMAL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal139 | settled_局部规划器_反应式 | UNCLASSIFIED | paused (MIXED_SINGLE_SEED_ONLY / MIXED_SAFETY_STOP / PPO_NO_CREDIT_HORIZON_EFFECT / NO_FORMAL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal140 | settled_局部规划器_反应式 | UNCLASSIFIED | paused (STANDBY / K4_CONTROLLER_BOTTLENECK_CONFIRMED / REWARD_PILOT_NOT_TRIGGERED / NO_WEIGHT_SWEEP / HELDOUT_CLOSED) | 1 | 0 | 0 | - |
-| Goal141 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (AUDIT_COMPLETE / PRIORITY_GAP_NOT_OBSERVED / SUCCESS_ENVELOPE_WEAK_VERTICAL / FAILURE_ALREADY_GEOMETRY_BAD / P_D3_UNAVAILABLE) | 1 | 1 | 0 | - |
-| Goal142 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (AUDIT_COMPLETE / P_D3_REPRODUCES_PROXY / SELECTOR_HEADROOM_INSUFFICIENT / B20_GAIN_BOUNDARY_FLIPS / PIVOT_C_LINE) | 1 | 1 | 0 | - |
-| Goal143 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (C0_GATE_FAILED / FROZEN_BC_RESIDUAL_BOTTLENECK / TERMINAL_CAPTURE_NEAR_RADIUS / PIVOT_TO_GOAL144 / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal144 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (PPO_1M_COMPLETED / CURRICULUM_GATE_STRICTLY_ENFORCED / C0_PROMOTED / C1_ROLLBACK / PPO_RESIDUAL_COLLAPSE / SAC_600K_EARLY_STOPPED / RESIDUAL_ACTION_PARAMETERIZATION_HARM / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal145 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / T2_HORIZONTAL_PATH_TRADEOFF / C1_TERMINAL_VERTICAL_DOMINANCE / C1_RESIDUAL_NO_CLOSED_LOOP_EFFECT / GOAL140_TRIGGER_DIAGNOSED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal146 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (COMPLETED_EVAL_ONLY / NO_SUCCESS_CONVERSION / PITCH_RATE_NOT_BINDING / SPEED_RATE_NOT_BINDING / FAILURE_STERN_SATURATION / POLICY_ZERO_PARITY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal147 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / K4_PASS / K4_400K_GUARD_PASS / CONTROLLER_PITCH_GAIN_BOTTLENECK / POLICY_ZERO_PARITY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal148 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / NOMINAL_K4_PASS / PLANT20_K4_39OF40 / CURRENT_COLLAPSE / POLICY_ZERO_PARITY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal149 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / BAND_FOUND_CURRENT07 / K4_36OF40 / POLICY_ZERO_PARITY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal150 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (COMPLETED / SCREEN_FAIL / PPO_NO_GAIN / SAC_RESIDUAL_HARMFUL / VERTICAL_REWARD_NOT_TRIGGERED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal151 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED / GATE_PASS_READY_FOR_TRAINING_PREREG / EVAL_ONLY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal152 | settled_局部规划器_反应式 | UNCLASSIFIED | draft (PREREGISTERED / FROZEN_BEFORE_MEASUREMENT / TRAIN_SCREEN / HELDOUT_CLOSED) | 1 | 0 | 0 | - |
-| Goal153 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_READ_ONLY / NO_TRAINING) | 3 | 2 | 0 | - |
-| Goal154 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED / EVAL_ONLY / DEV40 / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal155 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED / CAPTURE_TRADEOFF / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal156 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (COMPLETED / GATE_FAIL / CAPTURE_TRADEOFF / HELDOUT_CLOSED) | 3 | 1 | 0 | - |
-| Goal157 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (COMPLETED_EVAL_ONLY / H3_CANDIDATE / H4_SATURATION_GUARD_FAIL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal158 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (COMPLETED_EVAL_ONLY / MIXED_TRANSFER / CURRENT07_PARTIAL / CURRENT10_15_NULL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal159 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (COMPLETED / GATE_FAIL / RESIDUAL_ACTIVE_NO_CLOSED_LOOP_GAIN / HELDOUT_CLOSED) | 2 | 2 | 0 | - |
-| Goal160 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (GATE_FAIL / COMMAND_RESIDUAL_HARM / ACTION_PARAMETERIZATION_NOT_BOTTLENECK / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal161 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (COMPLETED / GATE_FAIL / COMMAND_RESIDUAL_PARAMETERIZATION_EXHAUSTED) | 1 | 2 | 0 | - |
-| Goal162 | settled_局部规划器_反应式 | UNCLASSIFIED | invalid (INVALID_SPEED_CONTRACT / DIAGNOSTIC_PARTIAL_SIGNAL / NO_FORMAL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal163 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (AUDIT_COMPLETE / H163-C_SUPPORTED / H163-A_PARTIAL / H163-B_WEAK / PIVOT_TO_GOAL164 / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal164 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (GATE164_B_FAIL / ACTION_FEEDBACK_BUG_FOUND / PIVOT_TO_GOAL165 / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal165 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (GATE165_C_FAIL_NO_TERMINAL_TRAINING / SPEED_ENVELOPE_PASS / HELDOUT_CLOSED / NO_FORMAL) | 1 | 1 | 0 | - |
-| Goal166 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (GATE166_A_PASS / GATE166_B_FAIL_ACTION_AUTHORITY_NULL / HELDOUT_CLOSED / NO_FORMAL) | 1 | 1 | 0 | - |
-| Goal167 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (GATE167_B_FAIL_TERMINAL_HORIZONTAL_CAPTURE / ACTION_AUTHORITY_PRESENT_BUT_NET_TERMINAL_EFFECT_NULL / NO_ALGORITHM_CHANGE / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal168 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (AUDIT_COMPLETE / TERMINAL_HEADING_LAG_DOMINANT / NO_TRAINING / NO_CONTRACT_CHANGE / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal169 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (SCREEN_PASS / TERMINAL_HOMING_50M_SELECTED / NOT_FORMAL / NO_RL_TRAINING / NO_CONTRACT_CHANGE / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal170 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (GATE170_B_FAIL / ROUTE_HEALTH_TRANSFER_NO_NET_GAIN / PPO_SPEED_GUARD_FAIL / NO_TRAINING / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal171 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (PHASE1_SCREEN_COMPLETE / SCREEN_NO_CANDIDATE / FORMAL_GATE_NOT_RUN / HELD_OUT_CLOSED) | 1 | 1 | 0 | - |
-| Goal172 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (FULL_MATRIX_COMPLETE / DIAGNOSTIC_NOT_GATE / HELDOUT_CLOSED / NO_TRAINING) | 1 | 1 | 0 | - |
-| Goal173 | settled_局部规划器_反应式 | UNCLASSIFIED | paused (SCREEN_CANDIDATE_PASS_NOT_FORMAL / USER_REQUESTED_PAUSE_AFTER_SCREEN / HELDOUT_CLOSED) | 2 | 1 | 0 | - |
-| Goal174 | settled_局部规划器_反应式 | UNCLASSIFIED | draft (PROTOCOL_IMPLEMENTED_NOT_RUN / HELDOUT_CLOSED) | 1 | 0 | 0 | - |
+| Goal1 | settled_局部规划器_反应式 | P1 | superseded (SUPERSEDED（2026-10-28）) | 1 | 0 | 0 | - |
+| Goal2 | settled_局部规划器_反应式 | P1 | running (ACTIVE) | 1 | 0 | 0 | - |
+| Goal3 | settled_局部规划器_反应式 | P1 | superseded (SUPERSEDED（2026-10-28）) | 1 | 0 | 0 | - |
+| Goal4 | settled_局部规划器_反应式 | P1 | running (PARTIAL（2026-10-28 执行后：配对完成，`max` 门未通过）) | 1 | 0 | 0 | - |
+| Goal5 | settled_局部规划器_反应式 | P1 | running (PARTIAL（已执行至 P7；P4 未筛出通过候选，P5/P6 学习门未通过）) | 1 | 0 | 0 | - |
+| Goal6 | settled_局部规划器_反应式 | P1 | unknown (unknown) | 1 | 0 | 0 | - |
+| Goal7 | settled_局部规划器_反应式 | P1 | unknown (B2 门通过（E5，200k）；B3/B4/B5 尚未启动) | 1 | 0 | 0 | - |
+| Goal8 | settled_局部规划器_反应式 | P1 | failed (G1–G6 PASS；G7 解析最终评估 PASS；G7 OceanSim 50Hz 稳定性 FAIL（仅保留评估用途）；最终总状态 FAIL；G8 阻塞) | 1 | 0 | 0 | - |
+| Goal9 | settled_局部规划器_反应式 | P1 | unknown (unknown) | 28 | 2 | 7 | - |
+| Goal10 | settled_局部规划器_反应式 | P1 | unknown (P0–P4 全部完成。) | 1 | 0 | 1 | - |
+| Goal11 | settled_局部规划器_反应式 | P1 | unknown (提案，未开始实现。) | 1 | 0 | 0 | - |
+| Goal12 | settled_局部规划器_反应式 | P1 | unknown (unknown) | 1 | 0 | 0 | - |
+| Goal13 | settled_局部规划器_反应式 | P1 | unknown (unknown) | 1 | 0 | 0 | - |
+| Goal14 | settled_局部规划器_反应式 | P1 | failed (已完成，整体门禁 fail。) | 1 | 0 | 0 | - |
+| Goal15 | settled_局部规划器_反应式 | P1 | unknown (unknown) | 1 | 0 | 0 | - |
+| Goal16 | settled_局部规划器_反应式 | P1 | unknown (阶段 0–3 已执行；两个纯限速教师均未通过门禁；按预注册停止。) | 1 | 0 | 1 | - |
+| Goal17 | settled_局部规划器_反应式 | P1 | unknown (已收口（负结果）。) | 1 | 0 | 1 | - |
+| Goal18 | settled_局部规划器_反应式 | P1 | failed (已执行并收口。判定 `FAIL_RMSE`，停止，不进入残差 PPO。) | 1 | 0 | 1 | - |
+| Goal19 | settled_局部规划器_反应式 | P1 | failed (已执行并收口。判定 `FAIL_RMSE`。) | 1 | 0 | 1 | - |
+| Goal20 | settled_局部规划器_反应式 | P1 | unknown (unknown) | 1 | 0 | 1 | - |
+| Goal21 | settled_局部规划器_反应式 | P1 | unknown (已实现；待用户验收) | 1 | 0 | 0 | - |
+| Goal22 | settled_局部规划器_反应式 | P1 | failed (已执行；Goal22 预注册门禁 FAIL（2026-11-07），未进入 P3/P5/理想臂) | 1 | 0 | 1 | - |
+| Goal23 | settled_局部规划器_反应式 | P1 | unknown (已于 Goal22 门禁停止；N12 未通过 default 门禁，P3/P5/理想臂均未启动) | 1 | 0 | 0 | - |
+| Goal24 | settled_局部规划器_反应式 | P1 | unknown (提示词已就绪，待执行；默认不自动启动训练) | 2 | 0 | 4 | configs/lowlevel/eval/pc_v1_nominal_eval_matrix_20261108.json |
+| Goal25 | settled_局部规划器_反应式 | P1 | failed (已完成并 FAIL 收口：D3 pre-goal 门禁失败；stress 诊断与 PPO 均未启动) | 4 | 0 | 2 | configs/lowlevel/eval/pc_v1_nominal_eval_matrix_teacher_fixed_20261108.json |
+| Goal26 | settled_局部规划器_反应式 | P1 | unknown (unknown) | 4 | 1 | 0 | configs/lowlevel/eval/pc_v1_nominal_eval_matrix_goal25_d3_20261108.json |
+| Goal27 | settled_局部规划器_反应式 | P2 | unknown (unknown) | 5 | 2 | 0 | - |
+| Goal28 | settled_局部规划器_反应式 | P2 | unknown (unknown) | 1 | 1 | 0 | - |
+| Goal29 | settled_局部规划器_反应式 | P2 | unknown (unknown) | 1 | 1 | 0 | - |
+| Goal30 | settled_局部规划器_反应式 | P2 | unknown (unknown) | 1 | 2 | 0 | - |
+| Goal31 | settled_局部规划器_反应式 | P2 | unknown (unknown) | 2 | 2 | 0 | - |
+| Goal32 | settled_局部规划器_反应式 | P2 | unknown (unknown) | 1 | 1 | 0 | - |
+| Goal33 | settled_局部规划器_反应式 | P2 | unknown (unknown) | 1 | 1 | 0 | - |
+| Goal34 | settled_局部规划器_反应式 | P2 | unknown (unknown) | 1 | 1 | 0 | - |
+| Goal35 | settled_局部规划器_反应式 | P2 | unknown (unknown) | 1 | 1 | 0 | - |
+| Goal36 | settled_局部规划器_反应式 | P2 | unknown (unknown) | 1 | 1 | 0 | - |
+| Goal37 | settled_局部规划器_反应式 | P2 | invalid (RESULT_COMPLETE / INVALID_DIAGNOSTIC) | 1 | 1 | 0 | - |
+| Goal38 | settled_局部规划器_反应式 | P2 | landed (RESULT_COMPLETE / H1_FALSIFIED) | 1 | 1 | 0 | - |
+| Goal39 | settled_局部规划器_反应式 | P2 | invalid (RESULT_COMPLETE / INVALID_DIAGNOSTIC) | 1 | 1 | 0 | - |
+| Goal40 | settled_局部规划器_反应式 | P2 | landed (RESULT_COMPLETE / PROTOCOL_ETA_DISCORDANCE_SUPPORTED) | 1 | 1 | 0 | - |
+| Goal41 | settled_局部规划器_反应式 | P2 | landed (RESULT_COMPLETE / NAV_BIAS_MECHANISM_SUPPORTED) | 1 | 1 | 0 | - |
+| Goal42 | settled_局部规划器_反应式 | P2 | landed (RESULT_COMPLETE / RESIDUAL_CALIBRATION_BIAS_SUPPORTED) | 1 | 1 | 0 | - |
+| Goal43 | settled_局部规划器_反应式 | P2 | landed (RESULT_COMPLETE / TRUE_BIAS_WITH_INFLATED_AGE) | 1 | 1 | 0 | - |
+| Goal44 | settled_局部规划器_反应式 | P2 | landed (RESULT_COMPLETE / PERSISTENT_LATE_BIAS) | 1 | 1 | 0 | - |
+| Goal45 | settled_局部规划器_反应式 | P2 | landed (RESULT_COMPLETE / DYNAMIC_RESIDUAL_DOMINANT) | 1 | 1 | 0 | - |
+| Goal46 | settled_局部规划器_反应式 | P2 | landed (RESULT_COMPLETE / DYNAMIC_PERSISTENT_WITH_OU_ASSOCIATION) | 1 | 1 | 0 | - |
+| Goal47 | settled_局部规划器_反应式 | P2 | landed (RESULT_COMPLETE / REALIZED_OU_DOMINANT) | 1 | 1 | 0 | - |
+| Goal48 | settled_局部规划器_反应式 | P2 | landed (RESULT_COMPLETE / SIGMA_ASSOCIATION_UNEXPLAINED) | 1 | 1 | 0 | - |
+| Goal49 | settled_局部规划器_反应式 | P2 | landed (RESULT_COMPLETE / INSUFFICIENT_FEATURE_VARIATION) | 1 | 1 | 0 | - |
+| Goal50 | settled_局部规划器_反应式 | P2 | landed (RESULT_COMPLETE / RECORDED_FEATURES_INSUFFICIENT) | 1 | 1 | 0 | - |
+| Goal51 | settled_局部规划器_反应式 | P3 | landed (RESULT_COMPLETE / UNRECORDED_STATE_PROXIES_INSUFFICIENT) | 2 | 1 | 0 | - |
+| Goal52 | settled_局部规划器_反应式 | P3 | landed (RESULT_COMPLETE / STRICT125_SIGMA_NOT_OUTCOME_RELEVANT) | 1 | 1 | 0 | - |
+| Goal53 | settled_局部规划器_反应式 | P3 | landed (RESULT_COMPLETE / STRICT125_RECORDED_FEATURE_OUTCOME_RELEVANT) | 1 | 1 | 0 | - |
+| Goal54 | settled_局部规划器_反应式 | P3 | landed (RESULT_COMPLETE / PRETERMINAL_FEATURES_NOT_OUTCOME_RELEVANT) | 1 | 1 | 0 | - |
+| Goal55 | settled_局部规划器_反应式 | P3 | invalid (RESULT_COMPLETE / INVALID_INPUT / SMOKE_PRECHECK_FAIL) | 1 | 1 | 0 | - |
+| Goal56 | settled_局部规划器_反应式 | P3 | landed (RESULT_COMPLETE / PRETERMINAL_FEATURES_INDEPENDENTLY_REPLICATED / CONTINUE) | 1 | 1 | 0 | - |
+| Goal57 | settled_局部规划器_反应式 | P3 | landed (RESULT_COMPLETE / HEADING_ERROR_PRIMARY_ONLY / PIVOT) | 1 | 1 | 0 | - |
+| Goal58 | settled_局部规划器_反应式 | P3 | failed (OFFPOLICY_RESIDUAL_FAIL_PIVOT) | 1 | 1 | 0 | - |
+| Goal59 | settled_局部规划器_反应式 | P3 | unknown (unknown) | 1 | 2 | 0 | - |
+| Goal60 | settled_局部规划器_反应式 | P3 | unknown (unknown) | 1 | 1 | 0 | - |
+| Goal61 | settled_局部规划器_反应式 | P3 | unknown (unknown) | 1 | 1 | 0 | - |
+| Goal62 | settled_局部规划器_反应式 | P3 | unknown (unknown) | 1 | 1 | 0 | - |
+| Goal63 | settled_局部规划器_反应式 | P3 | unknown (unknown) | 1 | 1 | 0 | - |
+| Goal64 | settled_局部规划器_反应式 | P3 | landed (GEOMETRY_SUPPORTED) | 1 | 1 | 0 | - |
+| Goal65 | settled_局部规划器_反应式 | P3 | landed (DWELL_NOT_SUFFICIENT) | 1 | 1 | 0 | - |
+| Goal66 | settled_局部规划器_反应式 | P3 | landed (TERMINAL_GEOMETRY_UNRESOLVED) | 1 | 1 | 0 | - |
+| Goal67 | settled_局部规划器_反应式 | P3 | landed (TERMINAL_AUTHORITY_LIMITED) | 1 | 1 | 0 | - |
+| Goal68 | settled_局部规划器_反应式 | P3 | landed (PRECROSSING_TRACKING_LAG) | 1 | 1 | 0 | - |
+| Goal69 | settled_局部规划器_反应式 | P3 | landed (PRECROSSING_MULTICHANNEL_TRACKING_LAG) | 1 | 1 | 0 | - |
+| Goal70 | settled_局部规划器_反应式 | P3 | landed (COMMAND_RATE_INFEASIBLE) | 1 | 1 | 0 | - |
+| Goal71 | settled_局部规划器_反应式 | P3 | landed (TRACKING_IMPROVES_OUTCOME_UNCHANGED) | 1 | 1 | 0 | - |
+| Goal72 | settled_局部规划器_反应式 | P3 | landed (LIMITER_GEOMETRY_TRADEOFF) | 1 | 1 | 0 | - |
+| Goal73 | settled_局部规划器_反应式 | P3 | landed (COMMAND_DEMAND_NOT_SUPPORTED) | 1 | 1 | 0 | - |
+| Goal74 | settled_局部规划器_反应式 | P3 | landed (MARGIN_UNUSABLE_BIAS_SUPPORTED) | 1 | 1 | 0 | - |
+| Goal75 | settled_局部规划器_反应式 | P3 | running (PARTIAL_SUPPORT) | 1 | 1 | 0 | - |
+| Goal76 | settled_局部规划器_反应式 | P3 | failed (LABEL_CONFLATION_CONFIRMED_BUT_DEADBAND_FAIL) | 1 | 1 | 0 | - |
+| Goal77 | settled_局部规划器_反应式 | P3 | landed (GEOMETRY_GATE_NOT_SUPPORTED) | 1 | 1 | 0 | - |
+| Goal78 | settled_局部规划器_反应式 | P3 | landed (FULL_VECTOR_DEADBAND_SUPPORTED) | 1 | 1 | 0 | - |
+| Goal79 | settled_局部规划器_反应式 | P3 | landed (OBSERVABLE_FULL_VECTOR_PREDICTOR_NOT_SUPPORTED) | 1 | 1 | 0 | - |
+| Goal80 | settled_局部规划器_反应式 | P3 | landed (TERMINAL_REFERENCE_HURTS) | 1 | 1 | 0 | - |
+| Goal81 | settled_局部规划器_反应式 | P3 | landed (MIXED_ACROSS_SCENARIOS) | 1 | 1 | 0 | - |
+| Goal82 | settled_局部规划器_反应式 | P3 | landed (CHANNEL_GAIN_WITHOUT_OUTCOME) | 1 | 1 | 0 | - |
+| Goal83 | settled_局部规划器_反应式 | P3 | landed (CAPTURE_FRAME_AMBIGUITY) | 1 | 1 | 0 | - |
+| Goal84 | settled_局部规划器_反应式 | P3 | landed (FRAME_ACCOUNTED) | 1 | 1 | 0 | - |
+| Goal85 | settled_局部规划器_反应式 | P3 | landed (B1_IMPLEMENTATION_PASS / MISMATCH_TOO_SMALL / B2_NOT_TRIGGERED / B3_IMPLEMENTED) | 2 | 2 | 0 | - |
+| Goal86 | settled_局部规划器_反应式 | P3 | landed (T2_3SEED_POSITIVE_BUT_PATH_TRADEOFF / NO_FORMAL / HELDOUT_CLOSED) | 3 | 3 | 0 | - |
+| Goal87 | settled_局部规划器_反应式 | P3 | landed (RESULT_RECORDED / TERMINAL_CAPTURE_MILLIMETER_ONLY) | 3 | 1 | 0 | - |
+| Goal88 | settled_局部规划器_反应式 | P3 | failed (PARTIAL_FORMAL / SUCCESS_PASS_PATH_GUARDRAIL_FAIL / NOT_A_GATE) | 2 | 1 | 0 | - |
+| Goal89 | settled_局部规划器_反应式 | P3 | invalid (INVALID_GATE_SCOPE / NETWORK_PARITY_OK / PIVOT_TO_GOAL90) | 2 | 1 | 0 | - |
+| Goal90 | settled_局部规划器_反应式 | P4 | landed (PASS_RL_GAIN_WEAK / PG10_3_PREFERRED / NOT_FORMAL) | 1 | 1 | 0 | - |
+| Goal91 | settled_局部规划器_反应式 | P4 | landed (NOISE_NOT_PRIMARY_BOTTLENECK / SCREEN_ONLY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal92 | settled_局部规划器_反应式 | P4 | failed (FAIL_NO_UPDATE_SCHEDULE_EFFECT / NO_PROMOTION / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal93 | settled_局部规划器_反应式 | P4 | landed (RESULT_RECORDED / ACTION_PARAMETERIZATION_CLIPPING / NO_SAC / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal94 | settled_局部规划器_反应式 | P4 | landed (PHASE1_RECORDED / THRESHOLD_NOT_MET / RELATIVE_GAIN_PRESENT / NO_ALGORITHM_SWITCH) | 1 | 2 | 0 | - |
+| Goal95 | settled_局部规划器_反应式 | P4 | failed (SCREEN_FAILED / SUPERVISED_PRIOR_INSTALLED / PATH_INDEPENDENCE_NEGATIVE / NO_SEED_EXPANSION / NO_SAC) | 1 | 1 | 0 | - |
+| Goal96 | settled_局部规划器_反应式 | P4 | landed (DIRECTION_NOT_SUPPORTED / AUTHORITY_SUFFICIENT / REWARD_CREDIT_MISALIGNED_FORMAL / PPO_DEGRADES_PRIOR / NO_SAC) | 1 | 1 | 0 | - |
+| Goal97 | settled_局部规划器_反应式 | P4 | invalid (INVALID_SCALE_ANCHOR / NO_GATE_RECORD) | 1 | 1 | 0 | - |
+| Goal98 | settled_局部规划器_反应式 | P4 | landed (SCALE_PARTIAL / TERMINAL_DIRECTION_REMAINS_BOTTLENECK / NO_SAC) | 1 | 1 | 0 | - |
+| Goal99 | settled_局部规划器_反应式 | P4 | landed (SCHEDULE_NOT_SUPPORTED / TERMINAL_DEGRADATION_PRECEDES_2M / NO_SAC) | 1 | 1 | 0 | - |
+| Goal100 | settled_局部规划器_反应式 | P4 | landed (BC_SCALE_ONLY_SUPPORTED / PPO_INCREMENT_HARMFUL / NO_SAC) | 1 | 1 | 0 | - |
+| Goal101 | settled_局部规划器_反应式 | P4 | landed (BC_PRIOR_BEATS_ALOS / EVAL_ONLY / NO_TRAINING) | 1 | 1 | 0 | - |
+| Goal102 | settled_局部规划器_反应式 | P4 | landed (PPO_DOSE_HARM / EVAL_ONLY / NO_TRAINING) | 1 | 1 | 0 | - |
+| Goal103 | settled_局部规划器_反应式 | P4 | landed (CONTROL_AUTHORITY_LIMITED_LABEL / PARAMETERIZATION_NOT_CAUSALLY_ISOLATED / NETWORK_PARITY_OK / EVAL_ONLY / NO_TRAINING) | 1 | 1 | 0 | - |
+| Goal104 | settled_局部规划器_反应式 | P4 | landed (CHANNEL_SIGNAL_WEAK / EVAL_ONLY / NO_TRAINING / NETWORK_PARITY_OK / NO_SAC) | 1 | 1 | 0 | - |
+| Goal105 | settled_局部规划器_反应式 | P4 | landed (RPM_ONLY_SIGNAL / INTERACTION_NOT_SUPPORTED / EVAL_ONLY / NO_TRAINING / NO_SAC) | 1 | 1 | 0 | - |
+| Goal106 | settled_局部规划器_反应式 | P4 | landed (COMPLETED_NO_SIGNAL / EVAL_ONLY / NO_TRAINING / NO_SAC) | 1 | 1 | 0 | - |
+| Goal107 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_AUDIT_ONLY / CREDIT_OR_OPTIMIZATION_LIMITED / NO_TRAINING / NO_SAC) | 1 | 1 | 0 | - |
+| Goal108 | settled_局部规划器_反应式 | P5 | landed (COMPLETED / NO_PRIOR_OPTIMIZER_GAIN / SAC_RESIDUAL_EXPLOSION / HELDOUT_CLOSED) | 2 | 1 | 0 | - |
+| Goal109 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_AUDIT_ONLY / NO_DIRECTION_SIGNAL / DIRECTION_ONLY_SIGNAL_OBSERVED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal110 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_AUDIT_ONLY / INSUFFICIENT_EVENTS / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal111 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_AUDIT_ONLY / PREENTRY_GEOMETRY_BAD_MAJORITY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal112 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_AUDIT_ONLY / TRACKING_LIMITED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal113 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_AUDIT_ONLY / PITCH_TRACKING_AMBIGUOUS / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal114 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_AUDIT_ONLY / MIXED_PITCH_HANDOFF / NO_SAC / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal115 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_AUDIT_ONLY / REFERENCE_FILTER_LIMITED / NO_SAC / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal116 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_EVAL_ONLY / FILTER_NONCAUSAL / NO_SAC / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal117 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_AUDIT_ONLY / MIXED_TERMINAL_MECHANISM / NO_TRAINING / NO_SAC / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal118 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_AUDIT_ONLY / MIXED_REACHABILITY / NO_TRAINING / NO_SAC / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal119 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_SCREEN / NO_SCREEN_MOVEMENT / PPO_OPTIMIZATION_LIMITED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal120 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_SCREEN / PPO_OPTIMIZATION_LIMITED / RESIDUAL_CLOSED_LOOP_INERT / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal121 | settled_局部规划器_反应式 | P5 | landed (AUTHORITY_PRESENT / PPO_RESIDUAL_NEAR_ZERO / EVAL_ONLY / NO_TRAINING) | 1 | 1 | 0 | - |
+| Goal122 | settled_局部规划器_反应式 | P5 | landed (GAIN_HARM / GAIN_AUTHORITY_WITHOUT_CAPTURE / EVAL_ONLY / NO_TRAINING) | 1 | 1 | 0 | - |
+| Goal123 | settled_局部规划器_反应式 | P5 | landed (BIAS_IMPROVES_CAPTURE / EVAL_ONLY / NO_TRAINING / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal124 | settled_局部规划器_反应式 | P5 | landed (BIAS_GUARDRAIL_PASS / EVAL_ONLY / NO_TRAINING / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal125 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_SCREEN / PPO_BIAS_MIXED / PPO_BIAS_CEILING / NETWORK_PARITY_OK / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal126 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_SCREEN / SAC_PA_HARM / NETWORK_PARITY_OK / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal127 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_EVAL_ONLY / SAC_PA_SCALE_INSUFFICIENT / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal128 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_EVAL_ONLY / ACTION_PARAMETERIZATION / GEOMETRY_LIMITED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal129 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_EVAL_ONLY / ACTION_PARAM_NO_EFFECT / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal130 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_EVAL_ONLY / ACTION_PARAM_NO_EFFECT / PARAMETERIZATION_CEILING / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal131 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_READ_ONLY / GEOMETRY_DISCRIMINATOR_FOUND / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal132 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_EVAL_ONLY / GEO_NO_EFFECT / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal133 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_EVAL_ONLY / GEO_SAFE_PARITY / EVAL_BIAS_FAMILY_STOPPED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal134 | settled_局部规划器_反应式 | P5 | landed (COMPLETED_EVAL_ONLY / SINGLE_SEED_ONLY / AUTHORITY_DOMINANT / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal135 | settled_局部规划器_反应式 | P5 | landed (AUTHORITY_SAC_HARM / NO_FORMAL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal136 | settled_局部规划器_反应式 | P5 | paused (DIVERSITY_SAFETY_STOP / PPO_RESIDUAL_COLLAPSE / NO_FORMAL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal137 | settled_局部规划器_反应式 | P5 | landed (DIAGNOSTIC_COMPLETE / LATENT_RETAINED / BC_HEAD_RESPONSIVE / LAST_LAYER_NOT_PRIMARY / P_D3_UNAVAILABLE) | 1 | 1 | 0 | - |
+| Goal138 | settled_局部规划器_反应式 | P5 | landed (TERMINAL_CURRICULUM_TRADEOFF / PPO_NO_TERMINAL_DENSITY_EFFECT / NO_FORMAL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal139 | settled_局部规划器_反应式 | P5 | paused (MIXED_SINGLE_SEED_ONLY / MIXED_SAFETY_STOP / PPO_NO_CREDIT_HORIZON_EFFECT / NO_FORMAL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal140 | settled_局部规划器_反应式 | P5 | paused (STANDBY / K4_CONTROLLER_BOTTLENECK_CONFIRMED / REWARD_PILOT_NOT_TRIGGERED / NO_WEIGHT_SWEEP / HELDOUT_CLOSED) | 1 | 0 | 0 | - |
+| Goal141 | settled_局部规划器_反应式 | P5 | failed (AUDIT_COMPLETE / PRIORITY_GAP_NOT_OBSERVED / SUCCESS_ENVELOPE_WEAK_VERTICAL / FAILURE_ALREADY_GEOMETRY_BAD / P_D3_UNAVAILABLE) | 1 | 1 | 0 | - |
+| Goal142 | settled_局部规划器_反应式 | P5 | landed (AUDIT_COMPLETE / P_D3_REPRODUCES_PROXY / SELECTOR_HEADROOM_INSUFFICIENT / B20_GAIN_BOUNDARY_FLIPS / PIVOT_C_LINE) | 1 | 1 | 0 | - |
+| Goal143 | settled_局部规划器_反应式 | P5 | failed (C0_GATE_FAILED / FROZEN_BC_RESIDUAL_BOTTLENECK / TERMINAL_CAPTURE_NEAR_RADIUS / PIVOT_TO_GOAL144 / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal144 | settled_局部规划器_反应式 | P6 | landed (PPO_1M_COMPLETED / CURRICULUM_GATE_STRICTLY_ENFORCED / C0_PROMOTED / C1_ROLLBACK / PPO_RESIDUAL_COLLAPSE / SAC_600K_EARLY_STOPPED / RESIDUAL_ACTION_PARAMETERIZATION_HARM / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal145 | settled_局部规划器_反应式 | P6 | landed (COMPLETED_EVAL_ONLY / T2_HORIZONTAL_PATH_TRADEOFF / C1_TERMINAL_VERTICAL_DOMINANCE / C1_RESIDUAL_NO_CLOSED_LOOP_EFFECT / GOAL140_TRIGGER_DIAGNOSED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal146 | settled_局部规划器_反应式 | P6 | failed (COMPLETED_EVAL_ONLY / NO_SUCCESS_CONVERSION / PITCH_RATE_NOT_BINDING / SPEED_RATE_NOT_BINDING / FAILURE_STERN_SATURATION / POLICY_ZERO_PARITY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal147 | settled_局部规划器_反应式 | P6 | landed (COMPLETED_EVAL_ONLY / K4_PASS / K4_400K_GUARD_PASS / CONTROLLER_PITCH_GAIN_BOTTLENECK / POLICY_ZERO_PARITY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal148 | settled_局部规划器_反应式 | P6 | landed (COMPLETED_EVAL_ONLY / NOMINAL_K4_PASS / PLANT20_K4_39OF40 / CURRENT_COLLAPSE / POLICY_ZERO_PARITY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal149 | settled_局部规划器_反应式 | P6 | landed (COMPLETED_EVAL_ONLY / BAND_FOUND_CURRENT07 / K4_36OF40 / POLICY_ZERO_PARITY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal150 | settled_局部规划器_反应式 | P6 | failed (COMPLETED / SCREEN_FAIL / PPO_NO_GAIN / SAC_RESIDUAL_HARMFUL / VERTICAL_REWARD_NOT_TRIGGERED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal151 | settled_局部规划器_反应式 | P6 | landed (COMPLETED / GATE_PASS_READY_FOR_TRAINING_PREREG / EVAL_ONLY / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal152 | settled_局部规划器_反应式 | P6 | draft (PREREGISTERED / FROZEN_BEFORE_MEASUREMENT / TRAIN_SCREEN / HELDOUT_CLOSED) | 1 | 0 | 0 | - |
+| Goal153 | settled_局部规划器_反应式 | P6 | landed (COMPLETED_READ_ONLY / NO_TRAINING) | 3 | 2 | 0 | - |
+| Goal154 | settled_局部规划器_反应式 | P6 | landed (COMPLETED / EVAL_ONLY / DEV40 / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal155 | settled_局部规划器_反应式 | P6 | landed (COMPLETED / CAPTURE_TRADEOFF / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal156 | settled_局部规划器_反应式 | P6 | failed (COMPLETED / GATE_FAIL / CAPTURE_TRADEOFF / HELDOUT_CLOSED) | 3 | 1 | 0 | - |
+| Goal157 | settled_局部规划器_反应式 | P6 | failed (COMPLETED_EVAL_ONLY / H3_CANDIDATE / H4_SATURATION_GUARD_FAIL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal158 | settled_局部规划器_反应式 | P6 | landed (COMPLETED_EVAL_ONLY / MIXED_TRANSFER / CURRENT07_PARTIAL / CURRENT10_15_NULL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal159 | settled_局部规划器_反应式 | P6 | failed (COMPLETED / GATE_FAIL / RESIDUAL_ACTIVE_NO_CLOSED_LOOP_GAIN / HELDOUT_CLOSED) | 2 | 2 | 0 | - |
+| Goal160 | settled_局部规划器_反应式 | P6 | failed (GATE_FAIL / COMMAND_RESIDUAL_HARM / ACTION_PARAMETERIZATION_NOT_BOTTLENECK / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal161 | settled_局部规划器_反应式 | P6 | failed (COMPLETED / GATE_FAIL / COMMAND_RESIDUAL_PARAMETERIZATION_EXHAUSTED) | 1 | 2 | 0 | - |
+| Goal162 | settled_局部规划器_反应式 | P6 | invalid (INVALID_SPEED_CONTRACT / DIAGNOSTIC_PARTIAL_SIGNAL / NO_FORMAL / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal163 | settled_局部规划器_反应式 | P6 | landed (AUDIT_COMPLETE / H163-C_SUPPORTED / H163-A_PARTIAL / H163-B_WEAK / PIVOT_TO_GOAL164 / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal164 | settled_局部规划器_反应式 | P6 | failed (GATE164_B_FAIL / ACTION_FEEDBACK_BUG_FOUND / PIVOT_TO_GOAL165 / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal165 | settled_局部规划器_反应式 | P6 | failed (GATE165_C_FAIL_NO_TERMINAL_TRAINING / SPEED_ENVELOPE_PASS / HELDOUT_CLOSED / NO_FORMAL) | 1 | 1 | 0 | - |
+| Goal166 | settled_局部规划器_反应式 | P6 | failed (GATE166_A_PASS / GATE166_B_FAIL_ACTION_AUTHORITY_NULL / HELDOUT_CLOSED / NO_FORMAL) | 1 | 1 | 0 | - |
+| Goal167 | settled_局部规划器_反应式 | P6 | failed (GATE167_B_FAIL_TERMINAL_HORIZONTAL_CAPTURE / ACTION_AUTHORITY_PRESENT_BUT_NET_TERMINAL_EFFECT_NULL / NO_ALGORITHM_CHANGE / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal168 | settled_局部规划器_反应式 | P6 | landed (AUDIT_COMPLETE / TERMINAL_HEADING_LAG_DOMINANT / NO_TRAINING / NO_CONTRACT_CHANGE / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal169 | settled_局部规划器_反应式 | P6 | landed (SCREEN_PASS / TERMINAL_HOMING_50M_SELECTED / NOT_FORMAL / NO_RL_TRAINING / NO_CONTRACT_CHANGE / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal170 | settled_局部规划器_反应式 | P6 | failed (GATE170_B_FAIL / ROUTE_HEALTH_TRANSFER_NO_NET_GAIN / PPO_SPEED_GUARD_FAIL / NO_TRAINING / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal171 | settled_局部规划器_反应式 | P6 | landed (PHASE1_SCREEN_COMPLETE / SCREEN_NO_CANDIDATE / FORMAL_GATE_NOT_RUN / HELD_OUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal172 | settled_局部规划器_反应式 | P6 | landed (FULL_MATRIX_COMPLETE / DIAGNOSTIC_NOT_GATE / HELDOUT_CLOSED / NO_TRAINING) | 1 | 1 | 0 | - |
+| Goal173 | settled_局部规划器_反应式 | P6 | paused (SCREEN_CANDIDATE_PASS_NOT_FORMAL / USER_REQUESTED_PAUSE_AFTER_SCREEN / HELDOUT_CLOSED) | 2 | 1 | 0 | - |
+| Goal174 | settled_局部规划器_反应式 | P6 | draft (PROTOCOL_IMPLEMENTED_NOT_RUN / HELDOUT_CLOSED) | 1 | 0 | 0 | - |
 
 ## Documents
 
