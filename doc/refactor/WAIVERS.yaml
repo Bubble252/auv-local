@@ -72,6 +72,186 @@ waivers:
     approved_by: user
     created: 2026-11-13
 
+  - id: REF-LOCAL-PATH-001
+    path: scripts/audit_goal86_rl_backends.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-002
+    path: scripts/audit_pc_goal45_fixed_calibration_residual.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-003
+    path: scripts/audit_pc_goal46_dynamic_residual_association.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-004
+    path: scripts/audit_pc_goal47_estimator_state.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-005
+    path: scripts/audit_pc_goal48_strict125_sigma_residual.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-006
+    path: scripts/audit_pc_goal49_controller_feedback.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-007
+    path: scripts/audit_pc_goal50_guidance_timing.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-008
+    path: scripts/audit_pc_goal51_unrecorded_state.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-009
+    path: scripts/audit_pc_goal52_sigma_outcome_relevance.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-010
+    path: scripts/audit_pc_goal53_recorded_feature_outcome.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-011
+    path: scripts/audit_pc_goal57_heading_error_replication.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-012
+    path: scripts/audit_pc_terminal_contract.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-013
+    path: scripts/build_pc_goal95_residual_supervision.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-014
+    path: scripts/build_pc_standing_eval_configs.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-015
+    path: scripts/evaluate_pc_ppo.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-016
+    path: scripts/evaluate_pc_sac.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-017
+    path: scripts/pretrain_odarrl_control_residual.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-PATH-018
+    path: scripts/pretrain_pc_goal86_pa_residual.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy script. META-G04-PATH changes only the
+      resolver import/wrapper body; whole-file formatting would add unrelated churn.
+    expires: META-G04-PATH
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
 # 存量超大模块由 CODE_SHAPE_BASELINE.json 做 ratchet 抑制；未触碰时不进入新代码
 # 标准。若后续候选触碰这些文件，再为具体检查项新增有到期 Goal 的 waiver，或先拆分
 # 一个完整职责。禁止无路径、无 owner、无到期 Goal 的全局豁免。

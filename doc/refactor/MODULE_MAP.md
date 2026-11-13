@@ -49,10 +49,9 @@
 
 ## 4. G04-PATH resolver group
 
-`META-G04-PATH` 的 P1 组包含以下脚本；它们都保留原 `_resolve` wrapper，只把实现
-收敛到 `auv_lowlevel._paths.resolve_from_root(REPO_ROOT, path)`：
+`META-G04-PATH` 的 P1a 组包含以下 20 个脚本；它们都保留原 `_resolve` wrapper，
+只把实现收敛到 `auv_lowlevel._paths.resolve_from_root(REPO_ROOT, path)`：
 
-- `scripts/audit_goal86_bc_interfaces.py`
 - `scripts/audit_goal86_rl_backends.py`
 - `scripts/audit_pc_goal45_fixed_calibration_residual.py`
 - `scripts/audit_pc_goal46_dynamic_residual_association.py`
@@ -63,18 +62,18 @@
 - `scripts/audit_pc_goal51_unrecorded_state.py`
 - `scripts/audit_pc_goal52_sigma_outcome_relevance.py`
 - `scripts/audit_pc_goal53_recorded_feature_outcome.py`
-- `scripts/audit_pc_goal54_preterminal_outcome.py`
-- `scripts/audit_pc_goal55_preterminal_replication.py`
-- `scripts/audit_pc_goal56_preterminal_fixed_cutoff_replication.py`
 - `scripts/audit_pc_goal57_heading_error_replication.py`
 - `scripts/audit_pc_goal86_pa_residual_labels.py`
 - `scripts/audit_pc_terminal_contract.py`
 - `scripts/build_pc_goal95_residual_supervision.py`
 - `scripts/build_pc_standing_eval_configs.py`
 - `scripts/diagnose_pc_dade_history.py`
-- `scripts/evaluate_pc_bc_residual.py`
 - `scripts/evaluate_pc_ppo.py`
 - `scripts/evaluate_pc_sac.py`
 - `scripts/pretrain_odarrl_control_residual.py`
 - `scripts/pretrain_pc_goal86_pa_residual.py`
-- `scripts/train_pc_command_residual_sac.py`
+
+P1b 组保留原实现，不进入本轮源码迁移：
+
+- `scripts/audit_goal86_bc_interfaces.py`（存量 F401/I001）
+- `scripts/train_pc_command_residual_sac.py`（存量 lint 欠账）
