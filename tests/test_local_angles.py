@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 
 import pytest
-from auv_local._angles import wrap_angle
 
+from auv_local._angles import wrap_angle
 from auv_local.line_detour import _wrap_angle as line_detour_wrap_angle
 from auv_rl.bc.teacher import _wrap_angle as teacher_wrap_angle
 from auv_rl.observation import _wrap_angle as observation_wrap_angle
 from auv_rl.planar import _wrap_angle as planar_wrap_angle
 
-LEGACY_WRAPPERS = (
+LEGACY_WRAPPERS: tuple[Callable[[float], float], ...] = (
     line_detour_wrap_angle,
     planar_wrap_angle,
     observation_wrap_angle,
@@ -32,7 +33,7 @@ def test_wrap_angle_matches_legacy_modulo(angle: float) -> None:
 @pytest.mark.parametrize("legacy_wrapper", LEGACY_WRAPPERS)
 @pytest.mark.parametrize("angle", FINITE_ANGLES)
 def test_legacy_wrappers_remain_importable_and_equivalent(
-    legacy_wrapper: object, angle: float
+    legacy_wrapper: Callable[[float], float], angle: float
 ) -> None:
     """Existing private imports keep their behavior after extraction."""
     assert legacy_wrapper(angle) == wrap_angle(angle)
