@@ -7,11 +7,9 @@ import numpy as np
 from auv_core.attitude import euler_from_quaternion
 from auv_core.contracts import Obstacle
 
+from auv_local._angles import wrap_angle as _wrap_angle
+
 from ..envs.planar_avoidance import PrivilegedSceneState
-
-
-def _wrap_angle(angle_rad: float) -> float:
-    return float((angle_rad + pi) % (2.0 * pi) - pi)
 
 
 @dataclass(frozen=True)

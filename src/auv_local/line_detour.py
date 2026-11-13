@@ -8,16 +8,13 @@ from auv_core.attitude import quaternion_from_euler
 from auv_core.contracts import FloatArray, ObstacleMap, Trajectory, VehicleSpec
 from auv_core.geometry import trajectory_sweep
 
+from ._angles import wrap_angle as _wrap_angle
 from .contracts import (
     LocalPathPlan,
     LocalPathRequest,
     LocalPlanStatus,
     RolloutConfig,
 )
-
-
-def _wrap_angle(angle_rad: float) -> float:
-    return float((angle_rad + np.pi) % (2.0 * np.pi) - np.pi)
 
 
 class LineDetourPlanner:
