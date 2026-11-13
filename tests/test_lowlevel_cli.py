@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import pytest
+
 from auv_lowlevel._cli import add_seed_range_arguments
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -20,7 +21,6 @@ SEED_RANGE_SCRIPTS = (
     "run_pc_goal101_alos_pairing.py",
     "run_pc_goal102_ppo_dose_response.py",
     "run_pc_goal104_channel_parameterization.py",
-    "run_pc_goal105_channel_interaction.py",
     "run_pc_goal106_near_terminal_rpm_schedule.py",
     "run_pc_goal107_terminal_reward_credit.py",
 )
@@ -32,7 +32,6 @@ HELP_GOLDEN_SHA256 = {
     "run_pc_goal101_alos_pairing.py": "f62b7a59dcea94af42c8a07e70edcdfe5a6eee4483b54d0aef72656b5057feee",
     "run_pc_goal102_ppo_dose_response.py": "f1714de6f9c9726df1317f258e7388049ca761cc0c2b8d19ca59219dfeeb3897",
     "run_pc_goal104_channel_parameterization.py": "b1f9096e3fff1fec4021a7463e8630df1dbb48dfd7a2c8afa377310eef9db457",
-    "run_pc_goal105_channel_interaction.py": "84f4726c259b8d88ddbd80c45d5cab216d916adee6c8234192dde6118b05c19f",
     "run_pc_goal106_near_terminal_rpm_schedule.py": "e9067276ca4e1f6f0f2d3cc04216dd648c5ac0a287685699a0857e7a942d55b8",
     "run_pc_goal107_terminal_reward_credit.py": "5d30fe3eb1eda2568420b0776aab054a5bf4c5845902e400160434d1aff3c8b7",
 }

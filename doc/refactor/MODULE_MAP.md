@@ -50,7 +50,7 @@
 
 ## 4. G04-CLI seed-range group
 
-`META-G04-CLI` 的 seed-range 组包含以下 10 个脚本；它们使用完全相同的
+`META-G04-CLI` 的 seed-range 组包含以下 9 个脚本；它们使用完全相同的
 `--seed-start` 与 `--seed-count` 定义，并保留各自 `parse_args`、其他参数和入口：
 
 - `scripts/run_pc_goal97_scale_sweep.py`
@@ -60,6 +60,8 @@
 - `scripts/run_pc_goal101_alos_pairing.py`
 - `scripts/run_pc_goal102_ppo_dose_response.py`
 - `scripts/run_pc_goal104_channel_parameterization.py`
-- `scripts/run_pc_goal105_channel_interaction.py`
 - `scripts/run_pc_goal106_near_terminal_rpm_schedule.py`
 - `scripts/run_pc_goal107_terminal_reward_credit.py`
+
+`scripts/run_pc_goal105_channel_interaction.py` 有存量 F401，本轮不改动该文件，
+避免把无关 import 清理混入 CLI 迁移。
