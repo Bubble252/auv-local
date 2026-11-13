@@ -21,6 +21,8 @@ from run_pc_goal104_channel_parameterization import (
     read_training_scale,
 )
 
+from auv_lowlevel._cli import add_seed_range_arguments
+
 SCENARIOS = ("default", "strict125")
 PROFILES: dict[str, tuple[float, float, float]] = {
     "C0": (1.00, 1.00, 1.00),
@@ -51,8 +53,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=Path("artifacts/lowlevel/goal107_terminal_reward_credit_20261111"),
     )
     parser.add_argument("--workers", type=int, default=4)
-    parser.add_argument("--seed-start", type=int, default=20)
-    parser.add_argument("--seed-count", type=int, default=40)
+    add_seed_range_arguments(parser)
     parser.add_argument("--python", default=sys.executable)
     return parser.parse_args(argv)
 

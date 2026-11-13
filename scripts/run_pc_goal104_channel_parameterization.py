@@ -13,6 +13,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
+from auv_lowlevel._cli import add_seed_range_arguments
+
 ARM = "P_D3"
 SCENARIOS = ("default", "strict125")
 PROFILES: dict[str, tuple[float, float, float]] = {
@@ -60,8 +62,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=Path("artifacts/lowlevel/goal104_channel_parameterization_20261111"),
     )
     parser.add_argument("--workers", type=int, default=8)
-    parser.add_argument("--seed-start", type=int, default=20)
-    parser.add_argument("--seed-count", type=int, default=40)
+    add_seed_range_arguments(parser)
     parser.add_argument(
         "--trace-mode", choices=("none", "full"), default="full"
     )

@@ -13,6 +13,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
+from auv_lowlevel._cli import add_seed_range_arguments
+
 SCALES = (0.75, 1.00, 1.25, 1.50, 1.75, 2.00)
 TRAINING_SCALE = 1.50
 ARMS = ("P_D3", "P_BC15")
@@ -42,8 +44,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=Path("artifacts/lowlevel/goal98_residual_scale_grid_20261111"),
     )
     parser.add_argument("--workers", type=int, default=8)
-    parser.add_argument("--seed-start", type=int, default=20)
-    parser.add_argument("--seed-count", type=int, default=40)
+    add_seed_range_arguments(parser)
     parser.add_argument(
         "--trace-mode",
         choices=("none", "full"),
