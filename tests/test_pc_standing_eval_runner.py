@@ -13,6 +13,13 @@ runner = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(runner)
 
 
+def test_resolve_keeps_absolute_path_and_uses_repo_root(tmp_path: Path) -> None:
+    absolute = tmp_path / "run.json"
+
+    assert runner._resolve(absolute) == absolute
+    assert runner._resolve("configs/run.json") == runner.REPO_ROOT / "configs/run.json"
+
+
 def _manifest(tmp_path: Path) -> dict:
     scenario_a = tmp_path / "a.json"
     scenario_b = tmp_path / "b.json"
