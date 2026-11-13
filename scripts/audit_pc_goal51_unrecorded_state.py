@@ -13,6 +13,8 @@ from typing import Any
 
 import numpy as np
 
+from auv_lowlevel._paths import resolve_from_root
+
 SCHEMA_VERSION = "auv_pc_goal51_unrecorded_state.v1"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GOAL49_PATH = REPO_ROOT / "scripts" / "audit_pc_goal49_controller_feedback.py"
@@ -812,7 +814,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _resolve(path: Path) -> Path:
-    return path if path.is_absolute() else REPO_ROOT / path
+    return resolve_from_root(REPO_ROOT, path)
 
 
 def _fmt_or_dash(value: Any) -> str:

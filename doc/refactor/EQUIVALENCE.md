@@ -239,3 +239,84 @@ skill_usage:
 - 是否新增失败：`no`；
 - 回滚 commit：`8ca3daa`；
 - 结论：`PASS`
+
+## 10. 候选 G04-PATH
+
+```yaml
+goal: META-G04-PATH
+repository: settled_局部规划器_反应式
+base_commit: 94ea92b
+branch: refactor/g04-path-20261113
+files:
+  - src/auv_lowlevel/_paths.py
+  - tests/test_script_path_helpers.py
+  - scripts/audit_goal86_rl_backends.py
+  - scripts/audit_pc_goal45_fixed_calibration_residual.py
+  - scripts/audit_pc_goal46_dynamic_residual_association.py
+  - scripts/audit_pc_goal47_estimator_state.py
+  - scripts/audit_pc_goal48_strict125_sigma_residual.py
+  - scripts/audit_pc_goal49_controller_feedback.py
+  - scripts/audit_pc_goal50_guidance_timing.py
+  - scripts/audit_pc_goal51_unrecorded_state.py
+  - scripts/audit_pc_goal52_sigma_outcome_relevance.py
+  - scripts/audit_pc_goal53_recorded_feature_outcome.py
+  - scripts/audit_pc_goal57_heading_error_replication.py
+  - scripts/audit_pc_goal86_pa_residual_labels.py
+  - scripts/audit_pc_terminal_contract.py
+  - scripts/build_pc_goal95_residual_supervision.py
+  - scripts/build_pc_standing_eval_configs.py
+  - scripts/diagnose_pc_dade_history.py
+  - scripts/evaluate_pc_ppo.py
+  - scripts/evaluate_pc_sac.py
+  - scripts/pretrain_odarrl_control_residual.py
+  - scripts/pretrain_pc_goal86_pa_residual.py
+public_api_change: none
+```
+
+G04-PATH 把 20 个同构的脚本私有 `_resolve` 委托给已有的
+`resolve_from_root(REPO_ROOT, path)`。函数名、参数、调用点、`REPO_ROOT`、异常和
+返回值保持不变；helper 仍不检查存在性、不创建父目录、不调用 `resolve()`。
+
+| 项目 | 重构前 | 重构后 | 证据 |
+|---|---|---|---|
+| 绝对路径 | 原样返回 | 原样返回 | wrapper 测试 |
+| 相对路径 | `REPO_ROOT / value` | `resolve_from_root(REPO_ROOT, value)` | wrapper 测试 |
+| 缺失路径 | 原样拼接 | 相同 | helper 测试 |
+| symlink | 不解析 | 不解析 | helper 测试 |
+| `str` / `Path` 输入 | 均可 | 均可 | helper 测试 |
+| CWD | 不读取 | 不读取 | helper 测试 |
+| RNG / 全局状态 | 不消耗/不修改 | 不变 | 纯函数检查 |
+
+验证命令：
+
+```bash
+cd /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref-g04-path-20261113
+/home/bubble/水下机器人/settled_局部规划器_反应式/.venv/bin/python \
+  -m pytest -q tests/test_script_path_helpers.py
+```
+
+Preflight 证据：
+
+```yaml
+skill_usage:
+  - skill: auv-refactor-guard
+    phase: preflight
+    outcome: passed
+    repo: /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref-g04-path-20261113
+    module: scripts/evaluate_pc_ppo.py
+```
+
+- 迁移 commit：`ea914d9`、`1f92092`、`0aef2e3`、`3230b9c`、`6ff0eaf`；
+- 针对性测试：`23 passed`；
+- 全量测试：`2067 passed, 11 skipped`；
+- ruff：20 个迁移脚本和测试全部 PASS；
+- format：测试 PASS；18 个迁移脚本按 `WAIVERS.yaml` 的
+  `REF-LOCAL-PATH-001` 至 `018` 保留存量格式欠账；
+- mypy：全仓 `381 errors / 83 files`，与基线一致，无新增类型错误；
+- shape：`0 new violations, 1189 suppressed`；
+- dependency checker：`repository dependency boundaries: ok`；
+- 未迁移：P1b 的 2 个脚本、`evaluate_pc_bc_residual.py` 和 Goal54/55/56 的 SHA 冻结链；
+- 已知失败：无新增；
+- 是否新增失败：`no`；
+- 回滚 commit：`94ea92b`；
+- 结论：`PASS`

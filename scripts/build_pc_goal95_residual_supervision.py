@@ -32,6 +32,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from auv_lowlevel._paths import resolve_from_root
 from auv_lowlevel.batch.pc_bc import PCBCPolicy, pc_action_full_scale
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -52,7 +53,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _resolve(path: Path) -> Path:
-    return path if path.is_absolute() else REPO_ROOT / path
+    return resolve_from_root(REPO_ROOT, path)
 
 
 def _sha256(path: Path) -> str:

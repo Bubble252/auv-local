@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from auv_lowlevel._paths import resolve_from_root
 from auv_lowlevel.base_controller import sha256_file
 from auv_lowlevel.batch.checkpoint import validate_pc_checkpoint_metadata
 from auv_lowlevel.batch.geometry import (
@@ -430,7 +431,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def _resolve(path: Path) -> Path:
-    return path if path.is_absolute() else REPO_ROOT / path
+    return resolve_from_root(REPO_ROOT, path)
 
 
 def _validate_trace_sensor_ages(
