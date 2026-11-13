@@ -82,3 +82,32 @@ export MSS_SOURCE_DIR=/home/bubble/水下机器人/simulator/MSS-master
 - [x] 没有移动或删除 artifact；
 - [x] RNG/时钟/全局状态变化有等价证据（纯函数，无 RNG/状态副作用）；
 - [x] 只改一个仓库、一个候选。
+
+## 7. 候选 LOCAL-A2
+
+```yaml
+goal: META-G03
+candidate: LOCAL-A2
+repository: settled_局部规划器_反应式
+base_commit: ae20d65
+branch: refactor/local-20261113
+files:
+  - src/auv_lowlevel/_json.py
+  - src/auv_lowlevel/config.py
+  - src/auv_lowlevel/ppo_config.py
+public_api_change: none
+```
+
+LOCAL-A2 只把 `load_config` 和 `load_training_config` 中重复的
+`Path.read_text(encoding="utf-8") + json.loads` 收敛到内部只读 helper。它不改变
+JSON schema、默认值、配置哈希、异常类型或文件编码。
+
+```bash
+/home/bubble/水下机器人/.venv/bin/python \
+  /home/bubble/水下机器人/总协调/scripts/check_refactor_equivalence.py \
+  --expected tests/fixtures/refactor/local-config-json/before.json \
+  --actual tests/fixtures/refactor/local-config-json/after.json \
+  --atol 0 --rtol 0
+```
+
+- 结果：`PENDING`
