@@ -110,4 +110,17 @@ JSON schema、默认值、配置哈希、异常类型或文件编码。
   --atol 0 --rtol 0
 ```
 
-- 结果：`PENDING`
+- 候选 commit：`29d24f4`；
+- 等价性：`equivalence: PASS`；
+- 受影响测试：`75 passed`；
+- 全量测试：`2035 passed, 11 skipped`；
+- ruff：改动文件和 fixture 全部 PASS；
+- format：新增 `_json.py`、测试和 fixture PASS；两个存量配置文件按
+  `WAIVERS.yaml` 的 REF-LOCAL-003/004 保留历史格式欠账；
+- mypy：全仓 `381 errors / 83 files`，与基线数量一致，无新增类型错误；
+- shape：`0 new violations, 1189 suppressed`；
+- dependency checker：`repository dependency boundaries: ok`；
+- 已知失败：无新增；
+- 是否新增失败：`no`；
+- 回滚 commit：`ae20d65`；
+- 结论：`PASS`
