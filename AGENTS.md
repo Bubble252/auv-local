@@ -13,6 +13,18 @@
 - 外部 PVS/MSS 资产用 `PVS_SOURCE_DIR` / `MSS_SOURCE_DIR` 指定；`artifacts/`
   只作为本地测试 fixture，不进入 Git。
 
+## 0.1 跨仓库治理入口
+
+- 工作区规则：`/home/bubble/水下机器人/AGENTS.md`；
+- canonical 代码规范：`/home/bubble/水下机器人/总协调/doc/governance/CODE_STYLE.md`；
+- 接口与单位契约：`/home/bubble/水下机器人/总协调/doc/governance/CODE_INTERFACE_CONTRACT.md`；
+- Goal registry：`doc/goals/registry/goals.jsonl`；人读索引：`doc/goals/INDEX.md`；
+- Goal173 pilot matrix：`configs/governance/goal173_matrix.json`；
+- 历史阶段提案：`doc/goals/phases/PROPOSED.md`（确认前不是事实）。
+
+本仓库保留项目特有实验纪律；通用字段、状态机、matrix 和 ledger schema 只在
+`总协调` 维护，不复制第二套正文。
+
 ## 1. 项目定位
 
 - PC 臂：合成传感器 + Batch Torch REMUS100，不依赖 IsaacLab/IsaacSim 才能跑主实验。
