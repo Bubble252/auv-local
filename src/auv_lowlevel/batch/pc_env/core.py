@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable
-from dataclasses import dataclass, fields, is_dataclass, replace
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -72,107 +72,12 @@ from ..randomization import (
     sample_episode_randomizations,
 )
 from ..sensors import SyntheticSensorOutput, SyntheticSensorSuite, pc_critic_state
-
-
-@dataclass(frozen=True)
-class PCCommand:
-    heading_rad: Tensor
-    pitch_rad: Tensor
-    speed_mps: Tensor
-
-    def normalized(self) -> Tensor:
-        return torch.stack(
-            [
-                wrap_angle(self.heading_rad) / math.pi,
-                self.pitch_rad / (math.pi / 2.0),
-                self.speed_mps / 2.5,
-            ],
-            dim=1,
-        )
-
-
-@dataclass(frozen=True)
-class BatchedPCObservation:
-    actor_state: Tensor
-    actor_path: Tensor | None
-    critic_state: Tensor
-    command: PCCommand
-    actor_current_body: Tensor
-    critic_current_ned: Tensor
-    ground_velocity_body_mps: Tensor
-    water_velocity_body_mps: Tensor
-    sensor: SyntheticSensorOutput
-    projection: BatchedPathProjection | None
-    solution: BatchedAlosSolution | None
-
-
-@dataclass(frozen=True)
-class BatchedPCLowLevelStep:
-    observation: BatchedPCObservation
-    reward: PCRewardBreakdown
-    terminated: Tensor
-    truncated: Tensor
-    info: dict[str, Any]
-
-    @property
-    def done(self) -> Tensor:
-        return self.terminated | self.truncated
-
-
-_MISSING_ROW_STATE = object()
-
-
-def _clone_row_state(value: Any, count: int) -> Any:
-    """Clone row-aligned tensors from a nested dataclass/dict state tree."""
-
-    if isinstance(value, Tensor):
-        if value.ndim >= 1 and value.shape[0] == count:
-            return value.clone()
-        return _MISSING_ROW_STATE
-    if is_dataclass(value) and not isinstance(value, type):
-        cloned: dict[str, Any] = {}
-        for field in fields(value):
-            state = _clone_row_state(getattr(value, field.name), count)
-            if state is not _MISSING_ROW_STATE:
-                cloned[field.name] = state
-        if cloned:
-            return ("dataclass", type(value), cloned)
-        return _MISSING_ROW_STATE
-    if isinstance(value, dict):
-        cloned = {}
-        for key, item in value.items():
-            state = _clone_row_state(item, count)
-            if state is not _MISSING_ROW_STATE:
-                cloned[key] = state
-        return cloned if cloned else _MISSING_ROW_STATE
-    return _MISSING_ROW_STATE
-
-
-def _merge_row_state(old: Any, new: Any, active_mask: Tensor) -> Any:
-    """Keep ``old`` rows where ``active_mask`` is false and ``new`` elsewhere."""
-
-    if isinstance(old, Tensor):
-        if not isinstance(new, Tensor) or old.shape != new.shape:
-            return new
-        view = (active_mask.shape[0],) + (1,) * (old.ndim - 1)
-        return torch.where(active_mask.view(view), new, old)
-    if isinstance(old, tuple) and len(old) == 3 and old[0] == "dataclass":
-        _, value_type, old_fields = old
-        if not isinstance(new, value_type):
-            return new
-        merged = {
-            name: _merge_row_state(value, getattr(new, name), active_mask)
-            for name, value in old_fields.items()
-        }
-        return replace(new, **merged)
-    if isinstance(old, dict):
-        if not isinstance(new, dict):
-            return new
-        merged_dict = dict(new)
-        for name, value in old.items():
-            merged_dict[name] = _merge_row_state(value, new.get(name), active_mask)
-        return merged_dict
-    return new
+from .state import _clone_row_state, _merge_row_state
+from .types import (
+    BatchedPCLowLevelStep,
+    BatchedPCObservation,
+    PCCommand,
+)
 
 
 class BatchedPCLowLevelEnv:
