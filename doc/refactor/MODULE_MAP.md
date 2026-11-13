@@ -17,8 +17,8 @@
 | `src/auv_lowlevel/_json.py` | 内部 JSON 文本读取与稳定文档写出 | 不校验 schema、不创建父目录 | 无（下划线内部模块） | `tests/test_lowlevel_json_io.py` | lowlevel | 无 |
 | `src/auv_lowlevel/config.py` | 低层配置 schema 与解析 | 不执行训练或评价 | `LowLevelConfig`, `load_config` | `tests/test_lowlevel_ppo_config.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/ppo_config.py` | PPO 配置族与校验 | 不实现 PPO 算法 | `__all__` | `tests/test_lowlevel_ppo_config.py` | lowlevel | 存量文件长度 |
-| `src/auv_lowlevel/batch/pc_bc_merge.py` | 合并 PC BC 数据集和 manifest | 不训练网络、不改数据字段 | `merge_pc_demonstration_datasets` | `tests/test_lowlevel_pc_bc_merge.py` | lowlevel | 无 |
-| `src/auv_lowlevel/batch/pc_bc_subset.py` | 按 seed 生成 PC BC 子集和 manifest | 不训练网络、不改输入数据 | `subset_pc_demonstration_dataset` | `tests/test_pc_bc_subset.py` | lowlevel | 无 |
+| `src/auv_lowlevel/batch/pc_bc_merge.py` | 合并 PC BC 数据集和 manifest | 不训练网络、不改数据字段 | `merge_pc_demonstration_datasets` | `tests/test_lowlevel_pc_bc_merge.py` | lowlevel | 历史 format 欠账 |
+| `src/auv_lowlevel/batch/pc_bc_subset.py` | 按 seed 生成 PC BC 子集和 manifest | 不训练网络、不改输入数据 | `subset_pc_demonstration_dataset` | `tests/test_pc_bc_subset.py` | lowlevel | 历史 format 欠账 |
 | `src/auv_lowlevel/batch/pc_env.py` | PC batch 环境和 episode 记录 | 不承载重构期的新职责 | `__all__` | PC 环境测试 | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/batch/pc_bc.py` | PC BC 数据、训练和 manifest | 不复制训练脚本入口 | `__all__` | `tests/test_lowlevel_pc_bc.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/batch/metrics.py` | rollout 指标聚合 | 不写 artifact | `__all__` | `tests/test_batch_metrics.py` | lowlevel | 无 |

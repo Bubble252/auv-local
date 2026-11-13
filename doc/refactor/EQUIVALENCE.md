@@ -153,4 +153,17 @@ cd /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref
   tests/test_lowlevel_pc_bc_merge.py
 ```
 
-- 结果：`PENDING`
+- 候选 commit：`a05a59b`；
+- 针对性测试：`16 passed`；
+- 全量测试：`2037 passed, 11 skipped`；
+- ruff：改动源码和测试全部 PASS；
+- format：新增 helper 和测试 PASS；两个存量数据工具按 REF-LOCAL-005/006 保留
+  历史格式欠账；
+- mypy：全仓 `381 errors / 83 files`，与基线数量一致，无新增类型错误；
+- shape：脚本函数长度缩短并已刷新 ratchet 基线，`0 new violations, 1189 suppressed`；
+- dependency checker：`repository dependency boundaries: ok`；
+- manifest 字节格式：sorted keys、2-space indent、末尾换行由单元测试锁定；
+- 已知失败：无新增；
+- 是否新增失败：`no`；
+- 回滚 commit：`d2b0dbd`；
+- 结论：`PASS`
