@@ -4,32 +4,32 @@
 
 | Goal | Repo | Phase | Status | Plan | Result | Report | Matrix |
 |---|---|---|---|---:|---:|---:|---|
-| Goal1 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal2 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal3 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal4 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal5 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
+| Goal1 | settled_局部规划器_反应式 | UNCLASSIFIED | superseded (SUPERSEDED（2026-10-28）) | 1 | 0 | 0 | - |
+| Goal2 | settled_局部规划器_反应式 | UNCLASSIFIED | running (ACTIVE) | 1 | 0 | 0 | - |
+| Goal3 | settled_局部规划器_反应式 | UNCLASSIFIED | superseded (SUPERSEDED（2026-10-28）) | 1 | 0 | 0 | - |
+| Goal4 | settled_局部规划器_反应式 | UNCLASSIFIED | running (PARTIAL（2026-10-28 执行后：配对完成，`max` 门未通过）) | 1 | 0 | 0 | - |
+| Goal5 | settled_局部规划器_反应式 | UNCLASSIFIED | running (PARTIAL（已执行至 P7；P4 未筛出通过候选，P5/P6 学习门未通过）) | 1 | 0 | 0 | - |
 | Goal6 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal7 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal8 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
+| Goal7 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (B2 门通过（E5，200k）；B3/B4/B5 尚未启动) | 1 | 0 | 0 | - |
+| Goal8 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (G1–G6 PASS；G7 解析最终评估 PASS；G7 OceanSim 50Hz 稳定性 FAIL（仅保留评估用途）；最终总状态 FAIL；G8 阻塞) | 1 | 0 | 0 | - |
 | Goal9 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 28 | 2 | 7 | - |
-| Goal10 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 1 | - |
-| Goal11 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
+| Goal10 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (P0–P4 全部完成。) | 1 | 0 | 1 | - |
+| Goal11 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (提案，未开始实现。) | 1 | 0 | 0 | - |
 | Goal12 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
 | Goal13 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal14 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
+| Goal14 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (已完成，整体门禁 fail。) | 1 | 0 | 0 | - |
 | Goal15 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal16 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 1 | - |
-| Goal17 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 1 | - |
-| Goal18 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 1 | - |
-| Goal19 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 1 | - |
+| Goal16 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (阶段 0–3 已执行；两个纯限速教师均未通过门禁；按预注册停止。) | 1 | 0 | 1 | - |
+| Goal17 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (已收口（负结果）。) | 1 | 0 | 1 | - |
+| Goal18 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (已执行并收口。判定 `FAIL_RMSE`，停止，不进入残差 PPO。) | 1 | 0 | 1 | - |
+| Goal19 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (已执行并收口。判定 `FAIL_RMSE`。) | 1 | 0 | 1 | - |
 | Goal20 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 1 | - |
-| Goal21 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal22 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 1 | - |
-| Goal23 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 0 | 0 | - |
-| Goal24 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 2 | 0 | 4 | - |
-| Goal25 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 4 | 0 | 2 | - |
-| Goal26 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 4 | 1 | 0 | - |
+| Goal21 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (已实现；待用户验收) | 1 | 0 | 0 | - |
+| Goal22 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (已执行；Goal22 预注册门禁 FAIL（2026-11-07），未进入 P3/P5/理想臂) | 1 | 0 | 1 | - |
+| Goal23 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (已于 Goal22 门禁停止；N12 未通过 default 门禁，P3/P5/理想臂均未启动) | 1 | 0 | 0 | - |
+| Goal24 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (提示词已就绪，待执行；默认不自动启动训练) | 2 | 0 | 4 | configs/lowlevel/eval/pc_v1_nominal_eval_matrix_20261108.json |
+| Goal25 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (已完成并 FAIL 收口：D3 pre-goal 门禁失败；stress 诊断与 PPO 均未启动) | 4 | 0 | 2 | configs/lowlevel/eval/pc_v1_nominal_eval_matrix_teacher_fixed_20261108.json |
+| Goal26 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 4 | 1 | 0 | configs/lowlevel/eval/pc_v1_nominal_eval_matrix_goal25_d3_20261108.json |
 | Goal27 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 5 | 2 | 0 | - |
 | Goal28 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
 | Goal29 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
@@ -61,7 +61,7 @@
 | Goal55 | settled_局部规划器_反应式 | UNCLASSIFIED | invalid (RESULT_COMPLETE / INVALID_INPUT / SMOKE_PRECHECK_FAIL) | 1 | 1 | 0 | - |
 | Goal56 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / PRETERMINAL_FEATURES_INDEPENDENTLY_REPLICATED / CONTINUE) | 1 | 1 | 0 | - |
 | Goal57 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / HEADING_ERROR_PRIMARY_ONLY / PIVOT) | 1 | 1 | 0 | - |
-| Goal58 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
+| Goal58 | settled_局部规划器_反应式 | UNCLASSIFIED | failed (OFFPOLICY_RESIDUAL_FAIL_PIVOT) | 1 | 1 | 0 | - |
 | Goal59 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 2 | 0 | - |
 | Goal60 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
 | Goal61 | settled_局部规划器_反应式 | UNCLASSIFIED | unknown (unknown) | 1 | 1 | 0 | - |
