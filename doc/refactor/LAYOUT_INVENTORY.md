@@ -99,7 +99,7 @@ wrapper，且 wrapper 要 re-export 测试访问的模块级名称（包括下�
 | A1: goal28-40 | - | 13 | `migrated` |
 | A2: goal59-85 | - | 29 | `migrated` |
 | A3: goal93-116 | - | 23 | `migrated` |
-| A4: goal117-139 | - | 24 | `wrapper-needed` |
+| A4: goal117-139 | - | 24 | `migrated` |
 | A5: goal145-165 | - | 16 | `wrapper-needed` |
 
 ### 3.3 文件清单
@@ -227,6 +227,9 @@ wrapper，且 wrapper 要 re-export 测试访问的模块级名称（包括下�
 - A3 `goal93-116`（23 个）已迁入同一目录。`goal105-116` 的绝对 sibling import
   在新目录内可直接解析；`goal106` 还依赖未迁移的 `run_pc_goal106...`，其新入口
   用 `python -m analysis.pc_goal.analyze_pc_goal106...` 从 `scripts/` 验证。
+- A4 `goal117-139`（24 个）已迁入。`goal128 -> 129/130/131/132/133` 的 sibling
+  import 保持；`goal136_dline_ppo` 的 `from scripts.analyze_pc_goal136_dline`
+  依赖仓库根，旧/新入口均用 `python -m scripts...` 从仓库根验证。
 
 ## 4. `scripts/audit_pc_goal*.py`
 

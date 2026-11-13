@@ -175,3 +175,8 @@ A3 `goal93-116` 的 23 个 analyzer 已迁入。`goal104 -> 105/106/107 -> 109` 
 `goal110 -> 111/112/113/116 -> 114` 的 sibling import 在新目录内继续解析；
 `goal106` 对未迁移 `run_pc_goal106_near_terminal_rpm_schedule` 的依赖保持原样，
 新入口以 `python -m analysis.pc_goal...` 验证。
+
+A4 `goal117-139` 的 24 个 analyzer 已迁入。`goal128 -> 129/130/131/132/133`
+的 sibling import 保持不变；`goal136_dline_ppo` 仍通过仓库根的
+`scripts.analyze_pc_goal136_dline` 导入，旧/新入口都用 `python -m scripts...`
+验证。
