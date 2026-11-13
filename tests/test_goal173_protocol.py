@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -28,6 +29,12 @@ def test_goal173_manifest_has_eight_arms_and_88_cells() -> None:
 
 
 def test_goal173_protocol_accepts_frozen_train_and_eval_matrix() -> None:
+    manifest = json.loads(protocol.MANIFEST_PATH.read_text(encoding="utf-8"))
+    ppo_entry = next(entry for entry in manifest["arms"] if entry["algorithm"] == "PPO")
+    ppo_config = json.loads((protocol.REPO_ROOT / ppo_entry["config"]).read_text(encoding="utf-8"))
+    base_checkpoint = protocol.REPO_ROOT / ppo_config["base_policy"]["checkpoint"]
+    if not base_checkpoint.is_file():
+        pytest.skip("frozen BC checkpoint is not included in the clean source checkout")
     protocol._check_train()
     protocol._check_eval(
         argparse.Namespace(

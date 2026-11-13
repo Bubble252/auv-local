@@ -117,10 +117,7 @@ def test_pc_vec_env_exposes_separate_actor_and_critic_layouts() -> None:
     assert torch.allclose(critic_command, observation.command.normalized().float())
     assert torch.allclose(actor_long[:, -1, :12], actor_state)
     assert torch.allclose(critic_long[:, -1, :15], critic_state)
-    assert torch.allclose(
-        actor_long[:, -1, 12:],
-        env.normalization.normalize_current(observation.actor_current_body).float(),
-    )
+    assert torch.equal(actor_long[:, -1, 12:], torch.zeros_like(actor_long[:, -1, 12:]))
     assert torch.allclose(
         critic_long[:, -1, 15:],
         env.normalization.normalize_current(observation.critic_current_ned).float(),

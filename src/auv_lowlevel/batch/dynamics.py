@@ -24,7 +24,6 @@ import numpy as np
 import torch
 from torch import Tensor
 
-
 PLANT_SCALE_NAMES = (
     "drag_scale",
     "thrust_scale",
@@ -451,8 +450,10 @@ class BatchedRemus100Dynamics:
             "plant_scales",
             (batch_size, len(PLANT_SCALE_NAMES)),
         )
-        if not bool((plant_scales > 0.0).all().item()):
-            raise ValueError("plant_scales must be strictly positive")
+        torch._assert(
+            (plant_scales > 0.0).all(),
+            "plant_scales must be strictly positive",
+        )
         (
             drag_scale,
             thrust_scale,

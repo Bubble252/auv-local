@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
+import pytest
 import torch
 from auv_core.attitude import quaternion_from_euler
 from auv_core.contracts import Reference, State, UniformCurrent
@@ -170,6 +173,8 @@ def test_batched_teacher_matches_scalar_controller_and_shadow_integral() -> None
 
 def test_batched_bc_matches_scalar_policy_on_smoke_checkpoint() -> None:
     checkpoint = "artifacts/lowlevel/i_bc_smoke_02/bc/pi0.pt"
+    if not Path(checkpoint).is_file():
+        pytest.skip("smoke BC checkpoint is not included in the clean source checkout")
     scalar = BCPolicy(checkpoint, device="cpu")
     batched = BatchedBCPolicy(checkpoint, device="cpu")
     rng = np.random.default_rng(71)

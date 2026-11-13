@@ -6,6 +6,7 @@ from pathlib import Path
 from types import ModuleType
 
 import numpy as np
+import pytest
 import torch
 
 from auv_lowlevel.batch.pc_policy import PCReservedSlotEncoder
@@ -66,6 +67,8 @@ def test_ridge_probe_recovers_exact_linear_signal() -> None:
 
 
 def test_checkpoint_reconstruction_matches_model_forward() -> None:
+    if not CHECKPOINT.is_file() or not DATASET.is_file():
+        pytest.skip("latent-probe checkpoint and labels are not included in the clean source checkout")
     module = _load_module()
     device = torch.device("cpu")
     checkpoint, model = module.load_checkpoint_and_model(CHECKPOINT, device=device)
@@ -108,6 +111,8 @@ def test_checkpoint_reconstruction_matches_model_forward() -> None:
 
 
 def test_jacobian_summary_is_finite_and_has_expected_shape() -> None:
+    if not CHECKPOINT.is_file() or not DATASET.is_file():
+        pytest.skip("latent-probe checkpoint and labels are not included in the clean source checkout")
     module = _load_module()
     device = torch.device("cpu")
     checkpoint, model = module.load_checkpoint_and_model(CHECKPOINT, device=device)

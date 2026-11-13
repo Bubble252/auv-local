@@ -4,6 +4,8 @@ import importlib.util
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 
 def _render_module() -> Any:
     spec = importlib.util.spec_from_file_location(
@@ -38,9 +40,12 @@ def test_render_resolves_fixed_curriculum_variants() -> None:
 
 
 def test_gallery_summary_contains_analytic_gate_metrics() -> None:
+    summary_path = Path("artifacts/ppo_isaaclab/final_evaluation.json")
+    if not summary_path.is_file():
+        pytest.skip("IsaacLab final evaluation artifact is not included in the clean source checkout")
     module = _gallery_module()
 
-    summary = module._evaluation_summary_html(Path("artifacts/ppo_isaaclab/final_evaluation.json"))
+    summary = module._evaluation_summary_html(summary_path)
 
     assert "解析最终评估" in summary
     assert "S1 无障碍" in summary
