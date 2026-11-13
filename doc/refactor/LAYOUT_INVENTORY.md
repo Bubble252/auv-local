@@ -96,7 +96,7 @@ wrapper，且 wrapper 要 re-export 测试访问的模块级名称（包括下�
 
 | 批次 | goal 范围 | 文件数 | 状态 |
 |---|---|---:|---|
-| A1: goal28-40 | - | 13 | `wrapper-needed` |
+| A1: goal28-40 | - | 13 | `migrated` |
 | A2: goal59-85 | - | 29 | `wrapper-needed` |
 | A3: goal93-116 | - | 23 | `wrapper-needed` |
 | A4: goal117-139 | - | 24 | `wrapper-needed` |
@@ -211,6 +211,15 @@ wrapper，且 wrapper 要 re-export 测试访问的模块级名称（包括下�
 | `analyze_pc_goal161_phaseA.py` | 350 | Analyze Goal161 Phase A eval-only command-residual authority scaling. | 0/0 | A5: goal145-165 |
 | `analyze_pc_goal162_eval.py` | 581 | Analyze Goal162 controller-gain residual evaluations against paired H3 zero. | 0/0 | A5: goal145-165 |
 | `analyze_pc_goal165_eval.py` | 597 | Analyze Goal165 corrected-contract gain-residual evaluations against H3 zero. | 0/0 | A5: goal145-165 |
+
+### 3.4 已迁移批次
+
+- A1 `goal28-40`（13 个）已迁入 `scripts/analysis/pc_goal/`，保留原文件名；
+  旧路径 `scripts/analyze_pc_goal*.py` 为语义等价 wrapper。
+- 这些脚本通过 `_HERE / "analyze_pc_goal*.py"` 加载同批 helper；一起迁移后
+  `_HERE` 仍指向同目录，加载链保持不变。
+- wrapper 在旧模块命名空间执行新源码，保持模块级 monkeypatch、函数 globals、
+  `spec_from_file_location()` 加载和直接执行的一致语义。
 
 ## 4. `scripts/audit_pc_goal*.py`
 

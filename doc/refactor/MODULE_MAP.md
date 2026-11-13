@@ -150,3 +150,19 @@ P1b 组保留原实现，不进入本轮源码迁移：
 
 原因：goal55 读取 goal54、goal56 读取 goal55、goal57 读取 goal56，并逐级校验 SHA；
 wrapper 会改变 hash 契约。
+
+## 7. META-G04-LAYOUT analysis batch A1
+
+`scripts/analysis/pc_goal/` 首批迁入 goal28-40 的 13 个 analyzer，保留原文件名：
+
+- `analyze_pc_goal28_terminal.py`、`analyze_pc_goal28_traces.py`
+- `analyze_pc_goal30_failure.py`、`analyze_pc_goal30_traces.py`
+- `analyze_pc_goal31_gate.py`、`analyze_pc_goal31_h2h3.py`
+- `analyze_pc_goal32_terminal_entry.py`、`analyze_pc_goal33_terminal_authority.py`
+- `analyze_pc_goal34_global_vertical.py`、`analyze_pc_goal35_early_vertical.py`
+- `analyze_pc_goal36_initial_geometry.py`、`analyze_pc_goal37_local_path_frame.py`
+- `analyze_pc_goal40_terminal_components.py`
+
+历史入口使用与 audit 相同的命名空间 wrapper：旧路径的执行、import、
+monkeypatch 和 sibling-helper 加载保持不变。`_HERE` 相对加载在新目录内继续解析
+同批文件，没有复制或改写算法。
