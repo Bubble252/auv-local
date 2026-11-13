@@ -214,38 +214,41 @@ wrapper，且 wrapper 要 re-export 测试访问的模块级名称（包括下�
 
 ## 4. `scripts/audit_pc_goal*.py`
 
-23 个脚本均无 AST 级组内 import，但 21 个被测试按旧路径引用。
-例外是 `audit_pc_goal55_preterminal_replication.py`：它按路径读取
-`audit_pc_goal54_preterminal_outcome.py` 并校验 SHA；把 goal54 替换成 wrapper 会改变
-hash，因此 goal54/55 显式 `defer`。
+23 个脚本均无 AST 级组内 import，但 21 个被测试按旧路径引用。19 个已迁入
+`scripts/audit/pc_goal/`，旧路径保留语义等价 wrapper；goal54-57 显式 `defer`。
+
+`audit_pc_goal55_preterminal_replication.py` 按路径读取
+`audit_pc_goal54_preterminal_outcome.py` 并校验 SHA；`audit_pc_goal56` 又对 goal55
+做同样的 SHA 校验，`audit_pc_goal57` 对 goal56 做同样的 SHA 校验。替换成 wrapper
+会改变 hash，因此这四个保持原样。
 
 | 文件 | 行数 | 一句话职责（docstring） | 测试/脚本引用 | 分类 |
 |---|---:|---|---:|---|
-| `audit_pc_goal125_checkpoint_parity.py` | 206 | Compare Goal125 initialization/checkpoint structure against a prior PC run. | 0/0 | `package-ready` |
-| `audit_pc_goal153_phase0.py` | 147 | Read-only Phase 0 audit for Goal153/154: residual bins vs outcome. | 0/0 | `package-ready` |
-| `audit_pc_goal38_path_provenance.py` | 491 | Audit Goal38 path provenance and control invariance. | 1/0 | `wrapper-needed` |
-| `audit_pc_goal41_terminal_nav_bias.py` | 535 | Audit terminal p_nav-versus-eta bias on the Goal40 discordant subgroup. | 1/0 | `wrapper-needed` |
-| `audit_pc_goal42_estimator_calibration_nav_age.py` | 591 | Audit terminal nav-age association and residual toward-goal bias. | 1/0 | `wrapper-needed` |
-| `audit_pc_goal42_replay.py` | 265 | Validate Goal42 instrumentation replay against frozen Goal38 traces. | 1/0 | `wrapper-needed` |
-| `audit_pc_goal43_nav_age_semantics.py` | 621 | Audit Goal42 residual projections with exact p_nav queue-delay semantics. | 1/0 | `wrapper-needed` |
-| `audit_pc_goal44_terminal_bias_persistence.py` | 628 | Audit whether terminal exact queue-delay bias persists before the terminal. | 1/0 | `wrapper-needed` |
-| `audit_pc_goal45_fixed_calibration_residual.py` | 792 | Audit fixed calibration versus dynamic components of the persistent nav bias. | 2/1 | `wrapper-needed` |
-| `audit_pc_goal46_dynamic_residual_association.py` | 1314 | Audit associations between Goal45 dynamic residual and sensor exposures. | 2/0 | `wrapper-needed` |
-| `audit_pc_goal47_estimator_state.py` | 1041 | Audit realized estimator components against Goal45 dynamic residual. | 2/1 | `wrapper-needed` |
-| `audit_pc_goal48_strict125_sigma_residual.py` | 1019 | Discriminate strict125 sigma residual association using Goal47 traces. | 2/2 | `wrapper-needed` |
-| `audit_pc_goal49_controller_feedback.py` | 1192 | Read-only controller/executor feedback discrimination for Goal49. | 2/2 | `wrapper-needed` |
-| `audit_pc_goal50_guidance_timing.py` | 520 | Read-only episode-level guidance timing audit for Goal50. | 2/0 | `wrapper-needed` |
-| `audit_pc_goal51_unrecorded_state.py` | 969 | Read-only unrecorded-state proxy audit for Goal51. | 2/0 | `wrapper-needed` |
-| `audit_pc_goal52_sigma_outcome_relevance.py` | 1017 | Read-only outcome-relevance audit for strict125 nav_drift_sigma (Goal52). | 2/0 | `wrapper-needed` |
-| `audit_pc_goal53_recorded_feature_outcome.py` | 1157 | Read-only outcome-relevance audit for Goal53 recorded features. | 2/0 | `wrapper-needed` |
+| `audit_pc_goal125_checkpoint_parity.py` | 206 | Compare Goal125 initialization/checkpoint structure against a prior PC run. | 0/0 | `migrated` |
+| `audit_pc_goal153_phase0.py` | 147 | Read-only Phase 0 audit for Goal153/154: residual bins vs outcome. | 0/0 | `migrated` |
+| `audit_pc_goal38_path_provenance.py` | 491 | Audit Goal38 path provenance and control invariance. | 1/0 | `migrated` |
+| `audit_pc_goal41_terminal_nav_bias.py` | 535 | Audit terminal p_nav-versus-eta bias on the Goal40 discordant subgroup. | 1/0 | `migrated` |
+| `audit_pc_goal42_estimator_calibration_nav_age.py` | 591 | Audit terminal nav-age association and residual toward-goal bias. | 1/0 | `migrated` |
+| `audit_pc_goal42_replay.py` | 265 | Validate Goal42 instrumentation replay against frozen Goal38 traces. | 1/0 | `migrated` |
+| `audit_pc_goal43_nav_age_semantics.py` | 621 | Audit Goal42 residual projections with exact p_nav queue-delay semantics. | 1/0 | `migrated` |
+| `audit_pc_goal44_terminal_bias_persistence.py` | 628 | Audit whether terminal exact queue-delay bias persists before the terminal. | 1/0 | `migrated` |
+| `audit_pc_goal45_fixed_calibration_residual.py` | 792 | Audit fixed calibration versus dynamic components of the persistent nav bias. | 2/1 | `migrated` |
+| `audit_pc_goal46_dynamic_residual_association.py` | 1314 | Audit associations between Goal45 dynamic residual and sensor exposures. | 2/0 | `migrated` |
+| `audit_pc_goal47_estimator_state.py` | 1041 | Audit realized estimator components against Goal45 dynamic residual. | 2/1 | `migrated` |
+| `audit_pc_goal48_strict125_sigma_residual.py` | 1019 | Discriminate strict125 sigma residual association using Goal47 traces. | 2/2 | `migrated` |
+| `audit_pc_goal49_controller_feedback.py` | 1192 | Read-only controller/executor feedback discrimination for Goal49. | 2/2 | `migrated` |
+| `audit_pc_goal50_guidance_timing.py` | 520 | Read-only episode-level guidance timing audit for Goal50. | 2/0 | `migrated` |
+| `audit_pc_goal51_unrecorded_state.py` | 969 | Read-only unrecorded-state proxy audit for Goal51. | 2/0 | `migrated` |
+| `audit_pc_goal52_sigma_outcome_relevance.py` | 1017 | Read-only outcome-relevance audit for strict125 nav_drift_sigma (Goal52). | 2/0 | `migrated` |
+| `audit_pc_goal53_recorded_feature_outcome.py` | 1157 | Read-only outcome-relevance audit for Goal53 recorded features. | 2/0 | `migrated` |
 | `audit_pc_goal54_preterminal_outcome.py` | 1427 | Read-only pre-terminal outcome audit for Goal54. | 1/1 | `defer` |
 | `audit_pc_goal55_preterminal_replication.py` | 881 | Independent pre-terminal outcome replication for Goal55. | 1/1 | `defer` |
-| `audit_pc_goal56_preterminal_fixed_cutoff_replication.py` | 511 | Goal56: independent pre-terminal replication with a fixed 6.0 s cutoff. | 1/1 | `wrapper-needed` |
-| `audit_pc_goal57_heading_error_replication.py` | 1057 | Goal57: single-feature heading-error replication on fresh seeds 190-229. | 2/0 | `wrapper-needed` |
-| `audit_pc_goal85_unbiased_nav.py` | 158 | Audit the Goal85 unbiased-noise sensor contract without stepping a plant. | 1/0 | `package-ready` |
-| `audit_pc_goal86_pa_residual_labels.py` | 222 | Build and audit D3-minus-ALOS actuator residual labels for Goal86 P-A. | 1/0 | `package-ready` |
+| `audit_pc_goal56_preterminal_fixed_cutoff_replication.py` | 511 | Goal56: independent pre-terminal replication with a fixed 6.0 s cutoff. | 1/1 | `defer` |
+| `audit_pc_goal57_heading_error_replication.py` | 1057 | Goal57: single-feature heading-error replication on fresh seeds 190-229. | 2/0 | `defer` |
+| `audit_pc_goal85_unbiased_nav.py` | 158 | Audit the Goal85 unbiased-noise sensor contract without stepping a plant. | 1/0 | `migrated` |
+| `audit_pc_goal86_pa_residual_labels.py` | 222 | Build and audit D3-minus-ALOS actuator residual labels for Goal86 P-A. | 1/0 | `migrated` |
 
-### 4.1 试点（本 Goal Step 1）
+### 4.1 第一批：独立试点（已提交 `14a2ea9`）
 
 迁入 `scripts/audit/pc_goal/`：
 
@@ -257,16 +260,34 @@ hash，因此 goal54/55 显式 `defer`。
 旧路径 `scripts/audit_pc_goal*.py` 保留薄 wrapper。验收同时覆盖：直接执行、
 `spec_from_file_location()` 旧路径加载、旧模块属性访问、新入口和 `--help`。
 
+### 4.2 第二批：Goal38-53（已迁移）
+
+迁入 `scripts/audit/pc_goal/` 的 15 个脚本：
+
+- `goal38_path_provenance.py`、`goal41_terminal_nav_bias.py`
+- `goal42_estimator_calibration_nav_age.py`、`goal42_replay.py`
+- `goal43_nav_age_semantics.py`、`goal44_terminal_bias_persistence.py`
+- `goal45_fixed_calibration_residual.py`
+- `goal46_dynamic_residual_association.py`
+- `goal47_estimator_state.py`、`goal48_strict125_sigma_residual.py`
+- `goal49_controller_feedback.py`、`goal50_guidance_timing.py`
+- `goal51_unrecorded_state.py`、`goal52_sigma_outcome_relevance.py`
+- `goal53_recorded_feature_outcome.py`
+
+wrapper 不复制逻辑，而是在旧模块命名空间中执行新源码。这样旧路径的模块级
+monkeypatch、函数 globals、`spec_from_file_location()` 加载和直接执行都保持一致。
+`goal47 -> 48 -> 49 -> 50/51/52` 的运行时加载链继续经旧路径 wrapper 解析。
+
 ## 5. `experiments/m*.py`
 
 | 文件 | 行数 | 一句话职责（docstring） | 测试/库/脚本引用 | 分类 |
 |---|---:|---|---:|---|
-| `m4_closed_loop.py` | 279 | （解析失败: [Errno 2] No such file or directory: 'src/auv_planner/experiments/m4_closed_loop.py'） | 1/2/1 | `defer` |
-| `m5_validation.py` | 1134 | （解析失败: [Errno 2] No such file or directory: 'src/auv_planner/experiments/m5_validation.py'） | 1/0/1 | `defer` |
-| `m6_recovery.py` | 653 | （解析失败: [Errno 2] No such file or directory: 'src/auv_planner/experiments/m6_recovery.py'） | 3/2/1 | `defer` |
-| `m7_1.py` | 1483 | （解析失败: [Errno 2] No such file or directory: 'src/auv_planner/experiments/m7_1.py'） | 2/3/4 | `defer` |
-| `m7_2.py` | 750 | （解析失败: [Errno 2] No such file or directory: 'src/auv_planner/experiments/m7_2.py'） | 1/1/2 | `defer` |
-| `m7_budget.py` | 848 | （解析失败: [Errno 2] No such file or directory: 'src/auv_planner/experiments/m7_budget.py'） | 1/3/3 | `defer` |
+| `m4_closed_loop.py` | 279 | closed-loop tracking evaluation and log/summary output | 1/2/1 | `defer` |
+| `m5_validation.py` | 1134 | validation scenarios, metrics and report assembly | 1/0/1 | `defer` |
+| `m6_recovery.py` | 653 | recovery scenario and recoverability evaluation | 3/2/1 | `defer` |
+| `m7_1.py` | 1483 | planner benchmark case specs, path audit and run orchestration | 2/3/4 | `defer` |
+| `m7_2.py` | 750 | planner/aggregate comparison over M7.1 cases | 1/1/2 | `defer` |
+| `m7_budget.py` | 848 | hardware/recoverability budget manifest and reports | 1/3/3 | `defer` |
 
 全局规划器 `experiments/__init__.py` 统一 re-export；迁移必须保留稳定入口和输出
 schema。`m7_1` 等 BIG1 审批后再处理，LAYOUT 不并发修改。

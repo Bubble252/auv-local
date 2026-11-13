@@ -115,7 +115,18 @@ P1b 组保留原实现，不进入本轮源码迁移：
 
 ## 6. META-G04-LAYOUT audit pilot
 
-首批迁移到 `scripts/audit/pc_goal/` 的四个独立 audit：
+已迁移到 `scripts/audit/pc_goal/` 的 19 个独立 audit：
+
+`goal85_unbiased_nav`、`goal86_pa_residual_labels`、`goal125_checkpoint_parity`、
+`goal153_phase0`、`goal38_path_provenance`、`goal41_terminal_nav_bias`、
+`goal42_estimator_calibration_nav_age`、`goal42_replay`、`goal43_nav_age_semantics`、
+`goal44_terminal_bias_persistence`、`goal45_fixed_calibration_residual`、
+`goal46_dynamic_residual_association`、`goal47_estimator_state`、
+`goal48_strict125_sigma_residual`、`goal49_controller_feedback`、
+`goal50_guidance_timing`、`goal51_unrecorded_state`、
+`goal52_sigma_outcome_relevance`、`goal53_recorded_feature_outcome`。
+
+首批四个试点：
 
 | 新实现 | 历史入口 | 公共 API / 测试访问名 |
 |---|---|---|
@@ -124,14 +135,18 @@ P1b 组保留原实现，不进入本轮源码迁移：
 | `scripts/audit/pc_goal/goal125_checkpoint_parity.py` | `scripts/audit_pc_goal125_checkpoint_parity.py` | `ARCHITECTURE_METADATA_KEYS`、`_load`、`main` |
 | `scripts/audit/pc_goal/goal153_phase0.py` | `scripts/audit_pc_goal153_phase0.py` | `REPO_ROOT`、`CHECKPOINTS`、`_trace_bins`、`main` |
 
-历史入口保留为薄 wrapper：按路径加载新实现，re-export 模块级名称并转发 `main()`；
-wrapper 不复制算法、I/O 或参数定义。`goal86`、`goal153` 的 `REPO_ROOT` 已按新目录
-深度改为 `parents[3]`，并有 import smoke 覆盖。存量 `main` 复杂度/长度和两条
-format 债务继续由 `CODE_SHAPE_BASELINE.json` 按新路径抑制，没有扩大 ratchet。
+历史入口保留为薄 wrapper：在旧模块命名空间中执行新源码，使模块级 monkeypatch、
+函数 globals、旧 import 和 `main()` 语义保持一致；wrapper 不复制算法、I/O 或参数
+定义。迁移文件的 `REPO_ROOT` 已按新目录深度改为 `parents[3]`，并有 import smoke
+覆盖。存量复杂度/长度和 format 债务继续由 `CODE_SHAPE_BASELINE.json` 按新路径
+抑制，没有扩大 ratchet。
 
 显式不迁移：
 
 - `scripts/audit_pc_goal54_preterminal_outcome.py`
 - `scripts/audit_pc_goal55_preterminal_replication.py`
+- `scripts/audit_pc_goal56_preterminal_fixed_cutoff_replication.py`
+- `scripts/audit_pc_goal57_heading_error_replication.py`
 
-原因：goal55 按路径读取 goal54 并校验 SHA，wrapper 会改变 hash 契约。
+原因：goal55 读取 goal54、goal56 读取 goal55、goal57 读取 goal56，并逐级校验 SHA；
+wrapper 会改变 hash 契约。
