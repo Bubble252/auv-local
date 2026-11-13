@@ -112,3 +112,26 @@ P1b 组保留原实现，不进入本轮源码迁移：
 
 `scripts/run_pc_goal105_channel_interaction.py` 有存量 F401，本轮不改动该文件，
 避免把无关 import 清理混入 CLI 迁移。
+
+## 6. META-G04-LAYOUT audit pilot
+
+首批迁移到 `scripts/audit/pc_goal/` 的四个独立 audit：
+
+| 新实现 | 历史入口 | 公共 API / 测试访问名 |
+|---|---|---|
+| `scripts/audit/pc_goal/goal85_unbiased_nav.py` | `scripts/audit_pc_goal85_unbiased_nav.py` | `run_audit`、`_profile_audit`、`SCHEMA_VERSION`、`main` |
+| `scripts/audit/pc_goal/goal86_pa_residual_labels.py` | `scripts/audit_pc_goal86_pa_residual_labels.py` | `REPO_ROOT`、`_base_actuator`、`_stats`、`main` |
+| `scripts/audit/pc_goal/goal125_checkpoint_parity.py` | `scripts/audit_pc_goal125_checkpoint_parity.py` | `ARCHITECTURE_METADATA_KEYS`、`_load`、`main` |
+| `scripts/audit/pc_goal/goal153_phase0.py` | `scripts/audit_pc_goal153_phase0.py` | `REPO_ROOT`、`CHECKPOINTS`、`_trace_bins`、`main` |
+
+历史入口保留为薄 wrapper：按路径加载新实现，re-export 模块级名称并转发 `main()`；
+wrapper 不复制算法、I/O 或参数定义。`goal86`、`goal153` 的 `REPO_ROOT` 已按新目录
+深度改为 `parents[3]`，并有 import smoke 覆盖。存量 `main` 复杂度/长度和两条
+format 债务继续由 `CODE_SHAPE_BASELINE.json` 按新路径抑制，没有扩大 ratchet。
+
+显式不迁移：
+
+- `scripts/audit_pc_goal54_preterminal_outcome.py`
+- `scripts/audit_pc_goal55_preterminal_replication.py`
+
+原因：goal55 按路径读取 goal54 并校验 SHA，wrapper 会改变 hash 契约。

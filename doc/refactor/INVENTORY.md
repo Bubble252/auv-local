@@ -138,3 +138,13 @@ rg -l 'def _wrap_angle\(' src scripts
 /home/bubble/水下机器人/.venv/bin/python \
   /home/bubble/水下机器人/总协调/scripts/check_code_shape.py --root . --check
 ```
+
+## 7. META-G04-LAYOUT 存量布局
+
+存量布局的逐文件职责、调用方、测试引用、依赖链、风险与分批计划见
+`doc/refactor/LAYOUT_INVENTORY.md`。首批试点为四个独立
+`scripts/audit_pc_goal*.py` -> `scripts/audit/pc_goal/`，历史路径保留薄 wrapper。
+
+试点验收：`2089 passed, 11 skipped`；shape `0 new / 1189 suppressed`；repository
+dependency boundaries PASS。试点不改变算法、reward、termination、success、seed、
+评价协议或 artifact。
