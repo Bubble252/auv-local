@@ -1,4 +1,4 @@
-"""Tests for the internal JSON reading helper."""
+"""Tests for the internal JSON helpers."""
 
 from __future__ import annotations
 
@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 
 import pytest
-from auv_lowlevel._json import load_json_value
+
+from auv_lowlevel._json import load_json_value, write_json_document
 
 
 def test_load_json_value_reads_object(tmp_path: Path) -> None:
@@ -32,3 +33,18 @@ def test_load_json_value_preserves_decode_error(tmp_path: Path) -> None:
 
     with pytest.raises(json.JSONDecodeError):
         load_json_value(path)
+
+
+def test_write_json_document_preserves_manifest_format(tmp_path: Path) -> None:
+    """Written bytes keep sorted keys, two-space indent, and a final newline."""
+    path = tmp_path / "manifest.json"
+
+    write_json_document(path, {"z": 1, "a": [2]})
+
+    assert path.read_bytes() == b'{\n  "a": [\n    2\n  ],\n  "z": 1\n}\n'
+
+
+def test_write_json_document_does_not_create_parent(tmp_path: Path) -> None:
+    """The helper preserves the legacy requirement that callers create parents."""
+    with pytest.raises(FileNotFoundError):
+        write_json_document(tmp_path / "missing" / "manifest.json", {"ok": True})
