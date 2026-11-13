@@ -16,6 +16,7 @@
 | `src/auv_isaaclab/tasks/p1_avoidance/batch.py` | IsaacLab P1 Torch batch core | 不依赖 CPU NumPy 标量 helper | `P1BatchCore` | `tests/test_isaaclab_p1_batch.py` | isaaclab | 无 |
 | `src/auv_lowlevel/_json.py` | 内部 JSON 文本读取与稳定文档写出 | 不校验 schema、不创建父目录 | 无（下划线内部模块） | `tests/test_lowlevel_json_io.py` | lowlevel | 无 |
 | `src/auv_lowlevel/_paths.py` | 显式 root 的相对路径拼接 | 不检查存在性、不解析 symlink、不读取 CWD | 无（下划线内部模块） | `tests/test_lowlevel_paths.py` | lowlevel | 无 |
+| `src/auv_lowlevel/_cli.py` | 共享 argparse 参数组 | 不定义命令、不解析业务参数、不改变帮助文本 | `add_seed_range_arguments` | `tests/test_lowlevel_cli.py` | lowlevel | 无 |
 | `src/auv_lowlevel/config.py` | 低层配置 schema 与解析 | 不执行训练或评价 | `LowLevelConfig`, `load_config` | `tests/test_lowlevel_ppo_config.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/ppo_config.py` | PPO 配置族与校验 | 不实现 PPO 算法 | `__all__` | `tests/test_lowlevel_ppo_config.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/batch/pc_bc_merge.py` | 合并 PC BC 数据集和 manifest | 不训练网络、不改数据字段 | `merge_pc_demonstration_datasets` | `tests/test_lowlevel_pc_bc_merge.py` | lowlevel | 历史 format 欠账 |
@@ -46,3 +47,19 @@
 - 标量、NumPy 数组和 Torch Tensor 角度 helper 保持各自 dtype/device 契约，不强行
   合并。
 - 触碰超大模块前必须有单独候选、职责拆分计划和等价性证据。
+
+## 4. G04-CLI seed-range group
+
+`META-G04-CLI` 的 seed-range 组包含以下 10 个脚本；它们使用完全相同的
+`--seed-start` 与 `--seed-count` 定义，并保留各自 `parse_args`、其他参数和入口：
+
+- `scripts/run_pc_goal97_scale_sweep.py`
+- `scripts/run_pc_goal98_scale_grid.py`
+- `scripts/run_pc_goal99_distance_schedule.py`
+- `scripts/run_pc_goal100_terminal_prior.py`
+- `scripts/run_pc_goal101_alos_pairing.py`
+- `scripts/run_pc_goal102_ppo_dose_response.py`
+- `scripts/run_pc_goal104_channel_parameterization.py`
+- `scripts/run_pc_goal105_channel_interaction.py`
+- `scripts/run_pc_goal106_near_terminal_rpm_schedule.py`
+- `scripts/run_pc_goal107_terminal_reward_credit.py`
