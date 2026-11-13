@@ -90,7 +90,7 @@ summary 33。数量本身不是重构目标；优先处理有明确等价边界�
 | P0 | LOCAL-A1：标量角度 helper 去重 | 只改 4 个 `src/` 调用方，保留私有符号 | DONE；`before.json` / `after.json`、4 个模块测试 |
 | P1 | LOCAL-A2：JSON 读取 helper | 只读、错误文本不变 | DONE；调用方 fixture 和异常测试 |
 | P2 | LOCAL-A3：manifest 写出 helper | artifact 路径和字段不变 | DONE；manifest 字节格式测试 |
-| P3 | LOCAL-A4：artifact 路径 helper | 显式传入 root；只迁移一个带测试的 CLI | IN_PROGRESS；helper 单测、入口 fixture |
+| P3 | LOCAL-A4：artifact 路径 helper | 显式传入 root；只迁移一个带测试的 CLI | DONE；helper 单测、入口测试和全量回归 |
 | P4 | 评价入口拆分 | 不改变 CLI、matrix 和 artifact | PENDING；入口 help、短 smoke、Goal173 契约测试 |
 | P5 | 超大模块拆分 | 一次一个完整职责 | PENDING；模块级等价性和全量测试 |
 

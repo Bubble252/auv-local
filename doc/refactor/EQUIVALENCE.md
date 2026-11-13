@@ -223,4 +223,19 @@ skill_usage:
     module: scripts/run_pc_standing_eval_suite.py
 ```
 
-- 结果：`PENDING`
+- 候选 commit：`753bbb4`；测试 commit：`0001692`、`632d15b`；格式 waiver：`c21c2ee`；
+- 针对性测试：`11 passed`；
+- 全量测试：`2042 passed, 11 skipped`；
+- ruff：新增 helper、脚本和测试全部 PASS；
+- format：新增 helper 和测试 PASS；`run_pc_standing_eval_suite.py` 按
+  REF-LOCAL-007 保留存量格式欠账；
+- mypy：全仓 `381 errors / 83 files`，与基线数量一致，无新增类型错误；
+- shape：`0 new violations, 1189 suppressed`；
+- dependency checker：`repository dependency boundaries: ok`；
+- 旧入口：`--help` smoke PASS；linked worktree 中仓库 `.venv` 的 editable 安装仍指向
+  main checkout，因此 smoke 使用本仓库自己的 `PYTHONPATH=$PWD/src`。这不是跨仓库
+  路径注入；合入 main 后安装包会自然解析到新 helper；
+- 已知失败：无新增；
+- 是否新增失败：`no`；
+- 回滚 commit：`8ca3daa`；
+- 结论：`PASS`
