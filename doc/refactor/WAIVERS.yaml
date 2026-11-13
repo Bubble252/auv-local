@@ -61,6 +61,16 @@ waivers:
     owner: settled_局部规划器_反应式
     approved_by: user
     created: 2026-11-13
+  - id: REF-LOCAL-007
+    path: scripts/run_pc_standing_eval_suite.py
+    check: format
+    reason: >-
+      The repository baseline has 220 unformatted files. LOCAL-A4 changes only
+      the path-resolution boundary; whole-file formatting would add unrelated churn.
+    expires: META-G03
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
 
 # 存量超大模块由 CODE_SHAPE_BASELINE.json 做 ratchet 抑制；未触碰时不进入新代码
 # 标准。若后续候选触碰这些文件，再为具体检查项新增有到期 Goal 的 waiver，或先拆分
