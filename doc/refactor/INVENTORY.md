@@ -1,6 +1,6 @@
 # auv-local Refactor Inventory
 
-**状态**：`REF_LOCAL_INVENTORY_COMPLETE`<br>
+**状态**：`REF_LOCAL_COMPLETE`<br>
 **仓库**：`settled_局部规划器_反应式`<br>
 **基线 commit**：`8bf7e68`<br>
 **日期**：2026-11-13
@@ -96,6 +96,37 @@ summary 33。数量本身不是重构目标；优先处理有明确等价边界�
 
 P0-P3 是 REF-LOCAL pilot 的闭合范围；P4/P5 中涉及公共接口、matrix 或大文件拆分的
 候选留给后续子 Goal。本 Goal 不允许一次同时改多个仓库。
+
+## 7. G03 最终验证与 G04 交接
+
+最终分支验证结果：
+
+| 检查 | 结果 |
+|---|---|
+| pytest | `2042 passed, 11 skipped` |
+| 候选 Python diff 的 ruff check | PASS |
+| 非 waiver 候选文件 format check | PASS；13 files already formatted |
+| 全仓 ruff | 124 个存量错误，未新增到候选文件 |
+| 全仓 format | 220 个存量文件待格式化 |
+| mypy | `381 errors / 83 files`，与基线一致 |
+| shape | `0 new / 1189 suppressed` |
+| dependency | PASS |
+
+允许自动处理的目录和行为：
+
+| 级别 | 候选 | 证伪条件 | 边界 |
+|---|---|---|---|
+| L0 | 只对候选 diff 运行 ruff import 排序/format | 产生非格式 diff、候选文件 lint 失败或测试回退 | 禁止全仓 220 文件批量格式化 |
+| L1 | 逐个迁移语义完全相同的 `_resolve` helper 到显式 root helper | 绝对/相对路径、CWD、symlink、存在性检查或 CLI 行为发生变化 | 每次只迁一个入口，必须有路径单测和 `--help` smoke |
+| L1 | 合并具有相同 schema、编码、异常和父目录策略的 JSON writer | 字段、排序、缩进、尾换行或异常行为出现字节差异 | 先建立 golden fixture，再改一个调用方 |
+
+禁止自动修改：`doc/goals/` 历史 Goal、Goal173 88-cell matrix、训练/评价协议、
+`src/auv_lowlevel/config.py` 的语义字段、reward/termination/success、policy 接口、
+checkpoint 选择、seed split、held-out、`artifacts/`、`outputs/` 和 `checkpoints/`。
+
+允许修改目录是 `src/auv_local/`、`src/auv_lowlevel/`、`src/auv_rl/`、`scripts/`
+和 `tests/`；修改 `scripts/` 必须附入口等价测试。G04 shadow 只能生成候选和风险分级，
+不能在本分支上自动写入。
 
 ## 6. 只读盘点命令
 

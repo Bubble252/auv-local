@@ -1,5 +1,5 @@
 version: 1
-status: ref_local_inventory
+status: ref_local_complete
 waivers:
   - id: REF-LOCAL-001
     path: src/auv_lowlevel/config.py

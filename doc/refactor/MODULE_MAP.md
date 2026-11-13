@@ -1,6 +1,6 @@
 # auv-local Module Map
 
-**状态**：`REF_LOCAL_INVENTORY_COMPLETE`<br>
+**状态**：`REF_LOCAL_COMPLETE`<br>
 **用途**：记录本 pilot 可修改模块的职责、边界、公共 API 和测试入口。
 
 ## 1. 模块清单

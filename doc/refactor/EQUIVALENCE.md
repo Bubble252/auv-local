@@ -1,6 +1,6 @@
 # auv-local Equivalence Evidence
 
-**状态**：`REF_LOCAL_INVENTORY_COMPLETE`<br>
+**状态**：`REF_LOCAL_COMPLETE`<br>
 **仓库**：`settled_局部规划器_反应式`<br>
 **基线 commit**：`8bf7e68`<br>
 **日期**：2026-11-13
