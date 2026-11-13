@@ -1,0 +1,30 @@
+{
+  "exception": null,
+  "inputs": {
+    "environment_config": "configs/lowlevel/odarrl_control_base.json",
+    "training_config": "configs/lowlevel/odarrl_control_ppo_i1.json"
+  },
+  "manifest": {
+    "candidate": "LOCAL-A2",
+    "encoding": "utf-8",
+    "helper": "load_json_value"
+  },
+  "outputs": {
+    "load_config": {
+      "arm": "B0",
+      "config_sha256": "5732876e409c73c83b995779407dc63a6ff4a043dfd6615aaf804d69e6d1c8eb",
+      "name": "lowlevel_g1_baseline",
+      "policy_mode": "residual"
+    },
+    "load_training_config": {
+      "arm": "I",
+      "config_sha256": "4aa710a191d7945e6cad2821e326e558e38f3473735e61f7583afb2e3dd4dd90",
+      "environment_config": "configs/lowlevel/odarrl_control_i_residual.json",
+      "iterations": 100,
+      "name": "odarrl_i1_residual_ppo",
+      "num_envs": 64,
+      "vector_env_backend": "pvs"
+    }
+  },
+  "randomized": false
+}
