@@ -167,3 +167,60 @@ cd /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref
 - 是否新增失败：`no`；
 - 回滚 commit：`d2b0dbd`；
 - 结论：`PASS`
+
+## 9. 候选 LOCAL-A4
+
+```yaml
+goal: META-G03
+candidate: LOCAL-A4
+repository: settled_局部规划器_反应式
+base_commit: 8ca3daa
+branch: refactor/local-20261113
+files:
+  - src/auv_lowlevel/_paths.py
+  - scripts/run_pc_standing_eval_suite.py
+public_api_change: none
+```
+
+LOCAL-A4 只把 `run_pc_standing_eval_suite.py` 的私有 `_resolve` 路径语义抽成
+显式接收 `root` 的纯函数：
+
+```python
+def resolve_from_root(root: Path, path: str | Path) -> Path:
+    value = Path(path)
+    return value if value.is_absolute() else root / value
+```
+
+它不调用 `resolve()`、`expanduser()` 或 `exists()`，不读取 `Path.cwd()`，也不改变
+相对路径的拼接结果。旧 `_resolve` 保留为薄 wrapper，避免脚本内部调用点和未来兼容
+入口同时变化。
+
+| 项目 | 重构前 | 重构后 | 证据 |
+|---|---|---|---|
+| 绝对路径 | 原样返回 | 原样返回 | helper 单测 |
+| 相对路径 | `REPO_ROOT / value` | `resolve_from_root(REPO_ROOT, value)` | helper 单测和入口测试 |
+| `str` / `Path` 输入 | 均可 | 均可 | helper 单测 |
+| 文件存在性 | 不检查 | 不检查 | 纯路径运算测试 |
+| 异常 | 只可能来自 `Path(...)` | 相同 | 类型测试 |
+| RNG / 全局状态 | 不消耗/不修改 | 不变 | 纯函数检查 |
+
+验证命令：
+
+```bash
+cd /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref-local-20261113
+/home/bubble/水下机器人/settled_局部规划器_反应式/.venv/bin/python \
+  -m pytest -q tests/test_lowlevel_paths.py tests/test_pc_standing_eval_runner.py
+```
+
+Preflight 证据：
+
+```yaml
+skill_usage:
+  - skill: auv-refactor-guard
+    phase: preflight
+    outcome: passed
+    repo: /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref-local-20261113
+    module: scripts/run_pc_standing_eval_suite.py
+```
+
+- 结果：`PENDING`

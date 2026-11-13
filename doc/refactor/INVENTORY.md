@@ -48,6 +48,14 @@ summary 33。数量本身不是重构目标；优先处理有明确等价边界�
 `auv_core._validation.wrap_angle` 会拒绝非有限值，因此不能直接替换；REF-LOCAL
 必须保留现有的 NaN/Inf 传播行为。
 
+### 2.2 artifact 路径 helper 的盘点
+
+`scripts/` 中共有 66 个名为 `_resolve` 的本地路径 helper。多数实现是
+“绝对路径原样返回，否则拼到 `REPO_ROOT`”，但至少 6 个 analyzer 使用
+`Path.cwd()`，另有若干脚本使用自定义 `root` 或搜索多个候选根。因此不能用一个
+隐式全局根替代全部实现；LOCAL-A4 只抽一个显式接收 `root` 的纯函数，并迁移
+`run_pc_standing_eval_suite.py` 一个入口。其余脚本留给 G04 的候选队列逐个审计。
+
 ## 3. 超大模块
 
 以下文件超过新代码硬上限，只能通过 ratchet 和单独职责拆分处理，不能在本 pilot
@@ -77,15 +85,17 @@ summary 33。数量本身不是重构目标；优先处理有明确等价边界�
 
 ## 5. 候选队列
 
-| 优先级 | 候选 | 边界 | 前置证据 |
+| 优先级 | 候选 | 边界 | 状态 / 前置证据 |
 |---|---|---|---|
-| P0 | LOCAL-A1：标量角度 helper 去重 | 只改 4 个 `src/` 调用方，保留私有符号 | `before.json` / `after.json`、4 个模块测试 |
-| P1 | JSON 读取 helper | 只读、错误文本不变 | 调用方 fixture 和异常负控 |
-| P2 | manifest 写出 helper | artifact 路径和字段不变 | 短 smoke + manifest golden |
-| P3 | 评价入口拆分 | 不改变 CLI、matrix 和 artifact | 入口 help、短 smoke、Goal173 契约测试 |
-| P4 | 超大模块拆分 | 一次一个完整职责 | 模块级等价性和全量测试 |
+| P0 | LOCAL-A1：标量角度 helper 去重 | 只改 4 个 `src/` 调用方，保留私有符号 | DONE；`before.json` / `after.json`、4 个模块测试 |
+| P1 | LOCAL-A2：JSON 读取 helper | 只读、错误文本不变 | DONE；调用方 fixture 和异常测试 |
+| P2 | LOCAL-A3：manifest 写出 helper | artifact 路径和字段不变 | DONE；manifest 字节格式测试 |
+| P3 | LOCAL-A4：artifact 路径 helper | 显式传入 root；只迁移一个带测试的 CLI | IN_PROGRESS；helper 单测、入口 fixture |
+| P4 | 评价入口拆分 | 不改变 CLI、matrix 和 artifact | PENDING；入口 help、短 smoke、Goal173 契约测试 |
+| P5 | 超大模块拆分 | 一次一个完整职责 | PENDING；模块级等价性和全量测试 |
 
-P0 完成并通过 Gate 后，再决定是否继续 P1/P2；本 Goal 不允许一次同时改多个仓库。
+P0-P3 是 REF-LOCAL pilot 的闭合范围；P4/P5 中涉及公共接口、matrix 或大文件拆分的
+候选留给后续子 Goal。本 Goal 不允许一次同时改多个仓库。
 
 ## 6. 只读盘点命令
 

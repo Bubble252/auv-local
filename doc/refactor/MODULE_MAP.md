@@ -15,6 +15,7 @@
 | `src/auv_rl/envs/parallel_planar.py` | 并行平面环境 | 不复用标量 helper 的 dtype 契约 | 环境类 | `tests/test_m4_planar_env.py` | rl | 无 |
 | `src/auv_isaaclab/tasks/p1_avoidance/batch.py` | IsaacLab P1 Torch batch core | 不依赖 CPU NumPy 标量 helper | `P1BatchCore` | `tests/test_isaaclab_p1_batch.py` | isaaclab | 无 |
 | `src/auv_lowlevel/_json.py` | 内部 JSON 文本读取与稳定文档写出 | 不校验 schema、不创建父目录 | 无（下划线内部模块） | `tests/test_lowlevel_json_io.py` | lowlevel | 无 |
+| `src/auv_lowlevel/_paths.py` | 显式 root 的相对路径拼接 | 不检查存在性、不解析 symlink、不读取 CWD | 无（下划线内部模块） | `tests/test_lowlevel_paths.py` | lowlevel | 无 |
 | `src/auv_lowlevel/config.py` | 低层配置 schema 与解析 | 不执行训练或评价 | `LowLevelConfig`, `load_config` | `tests/test_lowlevel_ppo_config.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/ppo_config.py` | PPO 配置族与校验 | 不实现 PPO 算法 | `__all__` | `tests/test_lowlevel_ppo_config.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/batch/pc_bc_merge.py` | 合并 PC BC 数据集和 manifest | 不训练网络、不改数据字段 | `merge_pc_demonstration_datasets` | `tests/test_lowlevel_pc_bc_merge.py` | lowlevel | 历史 format 欠账 |
@@ -26,7 +27,7 @@
 | `scripts/evaluate_pc_ppo.py` | PC PPO 评价 CLI 与产物写出 | 不定义成功判定或 matrix | `main` | `tests/test_pc_server_eval_summary.py` | evaluation | 存量文件长度 |
 | `scripts/check_goal173_protocol.py` | Goal173 预注册协议检查 | 不改 Gate 阈值或 split | `main` | `tests/test_goal173_protocol.py` | protocol | 无 |
 | `scripts/audit_goal173_artifacts.py` | Goal173 artifact 审计 | 不清理或重写 artifact | `main` | `tests/test_goal173_artifact_audit.py` | protocol | 无 |
-| `scripts/run_pc_standing_eval_suite.py` | standing evaluation matrix 调度 | 不修改评价 cell 定义 | `main` | `tests/test_pc_standing_eval_runner.py` | evaluation | 存量文件长度 |
+| `scripts/run_pc_standing_eval_suite.py` | standing evaluation matrix 调度；相对路径统一走显式 root helper | 不修改评价 cell 定义 | `main` | `tests/test_pc_standing_eval_runner.py` | evaluation | 存量文件长度 |
 
 ## 2. 边界说明
 
