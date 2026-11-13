@@ -252,6 +252,98 @@ waivers:
     owner: settled_局部规划器_反应式
     approved_by: user
     created: 2026-11-13
+
+  - id: REF-LOCAL-CLI-001
+    path: scripts/run_pc_goal97_scale_sweep.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy runner. META-G04-CLI changes only two
+      argparse declarations and would otherwise reformat unrelated code.
+    expires: META-G04-CLI
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-CLI-002
+    path: scripts/run_pc_goal98_scale_grid.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy runner. META-G04-CLI changes only two
+      argparse declarations and would otherwise reformat unrelated code.
+    expires: META-G04-CLI
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-CLI-003
+    path: scripts/run_pc_goal99_distance_schedule.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy runner. META-G04-CLI changes only two
+      argparse declarations and would otherwise reformat unrelated code.
+    expires: META-G04-CLI
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-CLI-004
+    path: scripts/run_pc_goal100_terminal_prior.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy runner. META-G04-CLI changes only two
+      argparse declarations and would otherwise reformat unrelated code.
+    expires: META-G04-CLI
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-CLI-005
+    path: scripts/run_pc_goal101_alos_pairing.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy runner. META-G04-CLI changes only two
+      argparse declarations and would otherwise reformat unrelated code.
+    expires: META-G04-CLI
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-CLI-006
+    path: scripts/run_pc_goal102_ppo_dose_response.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy runner. META-G04-CLI changes only two
+      argparse declarations and would otherwise reformat unrelated code.
+    expires: META-G04-CLI
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-CLI-007
+    path: scripts/run_pc_goal104_channel_parameterization.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy runner. META-G04-CLI changes only two
+      argparse declarations and would otherwise reformat unrelated code.
+    expires: META-G04-CLI
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-CLI-008
+    path: scripts/run_pc_goal106_near_terminal_rpm_schedule.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy runner. META-G04-CLI changes only two
+      argparse declarations and would otherwise reformat unrelated code.
+    expires: META-G04-CLI
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+  - id: REF-LOCAL-CLI-009
+    path: scripts/run_pc_goal107_terminal_reward_credit.py
+    check: format
+    reason: >-
+      Pre-existing format debt in a legacy runner. META-G04-CLI changes only two
+      argparse declarations and would otherwise reformat unrelated code.
+    expires: META-G04-CLI
+    owner: settled_局部规划器_反应式
+    approved_by: user
+    created: 2026-11-13
+
 # 存量超大模块由 CODE_SHAPE_BASELINE.json 做 ratchet 抑制；未触碰时不进入新代码
 # 标准。若后续候选触碰这些文件，再为具体检查项新增有到期 Goal 的 waiver，或先拆分
 # 一个完整职责。禁止无路径、无 owner、无到期 Goal 的全局豁免。

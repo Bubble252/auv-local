@@ -21,6 +21,8 @@ from run_pc_goal104_channel_parameterization import (
     read_training_scale,
 )
 
+from auv_lowlevel._cli import add_seed_range_arguments
+
 SCENARIOS = ("default", "strict125")
 
 
@@ -72,8 +74,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=Path("artifacts/lowlevel/goal106_near_terminal_rpm_20261111"),
     )
     parser.add_argument("--workers", type=int, default=8)
-    parser.add_argument("--seed-start", type=int, default=20)
-    parser.add_argument("--seed-count", type=int, default=40)
+    add_seed_range_arguments(parser)
     parser.add_argument("--trace-mode", choices=("none", "full"), default="full")
     parser.add_argument("--python", default=sys.executable)
     return parser.parse_args(argv)

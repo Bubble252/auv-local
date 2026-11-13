@@ -320,3 +320,75 @@ skill_usage:
 - 是否新增失败：`no`；
 - 回滚 commit：`94ea92b`；
 - 结论：`PASS`
+
+## 11. 候选 G04-CLI
+
+```yaml
+goal: META-G04-CLI
+repository: settled_局部规划器_反应式
+base_commit: 94ea92b
+branch: refactor/g04-cli-20261113
+files:
+  - src/auv_lowlevel/_cli.py
+  - tests/test_lowlevel_cli.py
+  - scripts/run_pc_goal97_scale_sweep.py
+  - scripts/run_pc_goal98_scale_grid.py
+  - scripts/run_pc_goal99_distance_schedule.py
+  - scripts/run_pc_goal100_terminal_prior.py
+  - scripts/run_pc_goal101_alos_pairing.py
+  - scripts/run_pc_goal102_ppo_dose_response.py
+  - scripts/run_pc_goal104_channel_parameterization.py
+  - scripts/run_pc_goal106_near_terminal_rpm_schedule.py
+  - scripts/run_pc_goal107_terminal_reward_credit.py
+public_api_change: none
+```
+
+G04-CLI 把 9 个完全同构的 `--seed-start` 与 `--seed-count` 声明收敛到
+`add_seed_range_arguments(parser)`。每个脚本仍保留自己的 `parse_args`、其他参数、
+描述、错误处理和入口。`run_pc_goal105_channel_interaction.py` 有存量 F401，本轮
+不改动该文件，避免把无关 import 清理混入 CLI 迁移。
+
+| 项目 | 重构前 | 重构后 | 证据 |
+|---|---|---|---|
+| help 文本 | 9 个脚本各自声明 | 同一 helper 声明 | 9 个 SHA256 全部一致 |
+| 默认 namespace | `seed_start=20`, `seed_count=40` | 相同 | helper 测试 |
+| 参数类型 | `int` | `int` | helper 测试 |
+| 其他参数/命令入口 | 各自保留 | 相同 | help 字节和静态检查 |
+| 错误/退出码 | argparse 默认 | 相同 | `--help` exit 0 fixture |
+| RNG / 全局状态 | 不消耗/不修改 | 不变 | 纯参数构造检查 |
+
+验证命令：
+
+```bash
+cd /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref-g04-cli-20261113
+/home/bubble/水下机器人/settled_局部规划器_反应式/.venv/bin/python \
+  -m pytest -q tests/test_lowlevel_cli.py
+```
+
+Preflight 证据：
+
+```yaml
+skill_usage:
+  - skill: auv-refactor-guard
+    phase: preflight
+    outcome: passed
+    repo: /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/ref-g04-cli-20261113
+    module: scripts/run_pc_goal97_scale_sweep.py
+```
+
+- 计划 commit：`751063c`；测试 commit：`2be3712`；分组/waiver：`c224f6b`；
+- 候选 commit：`9362702`；
+- 针对性测试：`19 passed`；
+- 全量测试：`2063 passed, 11 skipped`；
+- `--help` 字节：9 个脚本迁移前后 SHA256 和退出码全部一致；
+- ruff：helper、9 个脚本和测试全部 PASS；
+- format：helper 和测试 PASS；9 个存量脚本按 `REF-LOCAL-CLI-001` 至 `009`
+  保留格式欠账；
+- mypy：全仓 `381 errors / 83 files`，与基线一致，无新增类型错误；
+- shape：`0 new violations, 1189 suppressed`；
+- dependency checker：`repository dependency boundaries: ok`；
+- 未迁移：`run_pc_goal105_channel_interaction.py`（存量 F401）；
+- 已知失败：无新增；
+- 是否新增失败：`no`；
+- 回滚 commit：`94ea92b`；
+- 结论：`PASS`

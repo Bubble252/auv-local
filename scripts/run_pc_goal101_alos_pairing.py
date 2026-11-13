@@ -13,6 +13,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 
+from auv_lowlevel._cli import add_seed_range_arguments
+
 ARMS = ("P_D3", "P_BC15")
 SCENARIOS = ("default", "strict125")
 EVAL_SCALE = 2.00
@@ -44,8 +46,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=Path("artifacts/lowlevel/goal101_alos_pairing_20261111"),
     )
     parser.add_argument("--workers", type=int, default=4)
-    parser.add_argument("--seed-start", type=int, default=20)
-    parser.add_argument("--seed-count", type=int, default=40)
+    add_seed_range_arguments(parser)
     parser.add_argument(
         "--trace-mode",
         choices=("none", "full"),
