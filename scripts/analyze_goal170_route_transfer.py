@@ -336,7 +336,9 @@ def _load_run(run_dir: Path) -> tuple[list[dict[str, Any]], dict[str, Any], Any]
         episodes = summary.get("episodes")
         if not isinstance(episodes, list):
             raise ValueError(f"{run_dir} has neither episodes.json nor summary.episodes")
-        trace_path = run_dir.parent / f"{run_dir.name}.npz"
+        trace_path = run_dir / "trace.npz"
+        if not trace_path.is_file():
+            trace_path = run_dir.parent / f"{run_dir.name}.npz"
         if not trace_path.is_file():
             raise ValueError(f"{run_dir} is missing PPO trace {trace_path}")
         trace = np.load(trace_path, allow_pickle=False)
