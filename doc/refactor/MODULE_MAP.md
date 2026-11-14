@@ -32,6 +32,19 @@
 | `src/auv_lowlevel/ppo_config.py` | PPO 配置族与校验 | 不实现 PPO 算法 | `__all__` | `tests/test_lowlevel_ppo_config.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/batch/pc_bc_merge.py` | 合并 PC BC 数据集和 manifest | 不训练网络、不改数据字段 | `merge_pc_demonstration_datasets` | `tests/test_lowlevel_pc_bc_merge.py` | lowlevel | 历史 format 欠账 |
 | `src/auv_lowlevel/batch/pc_bc_subset.py` | 按 seed 生成 PC BC 子集和 manifest | 不训练网络、不改输入数据 | `subset_pc_demonstration_dataset` | `tests/test_pc_bc_subset.py` | lowlevel | 历史 format 欠账 |
+| `src/auv_lowlevel/batch/pc_calibration.py` | PC20 高速指令包络标定 | 不修改控制律或配置 schema | `calibrate_pc20_high_speed` | `tests/test_pc_high_speed_calibration.py` | lowlevel | 无 |
+| `src/auv_lowlevel/batch/pc_diagnostics.py` | PC actor/path 参数诊断 | 不训练网络、不写 artifact | `parameter_snapshot`, `policy_diagnostics` | `tests/test_lowlevel_pc_diagnostics.py` | lowlevel | 无 |
+| `src/auv_lowlevel/batch/pc_normalization.py` | PC actor/critic 固定观测尺度 | 不改变观测 schema | `PCNormalization` | `tests/test_lowlevel_pc_vec_env.py` | lowlevel | 无 |
+| `src/auv_lowlevel/batch/pc_history_ablation.py` | 评价期 history/path ablation | 不训练、不改变 checkpoint | `ablate_pc_history`, `ablate_pc_path` | `tests/test_lowlevel_pc_history_ablation.py` | lowlevel | 无 |
+| `src/auv_lowlevel/batch/pc_teacher.py` | PC20 示范采集的 privileged teacher adapter | 不训练网络、不写 manifest | `BatchedPCTeacher` | `tests/test_lowlevel_pc_teacher.py` | lowlevel | 无 |
+| `src/auv_lowlevel/batch/pc_controller_gain_residual.py` | H3 controller-gain residual wrapper | 不改变基础控制律或动作范围 | `BatchedPCControllerGainResidualEnv` | `tests/test_lowlevel_controller_gain_residual.py` | lowlevel | 无 |
+| `src/auv_lowlevel/batch/pc_actuator_residual.py` | ALOS actuator-space residual wrapper | 不修改 ALOS baseline 或 zero-action 语义 | `BatchedPCActuatorResidualEnv` | `tests/test_lowlevel_pc_actuator_residual.py` | lowlevel | 存量文件长度 |
+| `src/auv_lowlevel/batch/pc_frozen_residual_vec_env.py` | frozen-BC PPO residual 环境组合 | 不定义 history 或 policy 算法 | `BatchTorchPCFrozenBCResidualVecEnv` | `tests/test_lowlevel_pc_frozen_residual.py` | lowlevel | 无 |
+| `src/auv_lowlevel/batch/pc_residual_pretrain.py` | frozen PC20 actor 的 teacher-residual 监督预训练 | 不执行 PPO、不修改 BC checkpoint schema | `PCResidualTrainingConfig`, `train_pc_supervised_residual` | `tests/test_lowlevel_pc_residual_pretrain.py` | lowlevel | 存量文件长度 |
+| `src/auv_lowlevel/batch/pc_path.py` | PC path observation schema、blocks 和 normalization | 不训练网络、不改观测字段 | `PC_PATH_*`, `normalize_path_features` | `tests/test_lowlevel_pc_path_observations.py` | lowlevel | 存量文件长度 |
+| `src/auv_lowlevel/batch/pc_command_residual.py` | ALOS command-space residual wrapper 和 terminal gate | 不修改基础控制律或训练协议 | `BatchedPCCommandResidualEnv`, `smooth_terminal_gate` | `tests/test_lowlevel_pc_command_residual.py` | lowlevel | 无 |
+| `src/auv_lowlevel/batch/pc_vec_env.py` | rsl_rl-compatible PC vector environment | 不定义 policy 或 reward 算法 | `BatchTorchPCVecEnv` | `tests/test_lowlevel_pc_vec_env.py` | lowlevel | 存量文件长度 |
+| `src/auv_lowlevel/batch/pc_policy.py` | PC actor-critic、layout 和 encoder 契约 | 不执行训练或环境 step | `PCActorCritic`, `PCPolicyLayout`, `PC_*` 常量 | `tests/test_lowlevel_pc_policy.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/batch/pc_env/__init__.py` | PC batch 环境稳定导入入口 | 不复制实现 | 原 `__all__` | `tests/test_g04_big3_pc_env_trace.py` | lowlevel | 无 |
 | `src/auv_lowlevel/batch/pc_env/types.py` | `PCCommand`、observation 和 step 返回类型 | 不实现环境逻辑 | 4 个原公共类型 | `tests/test_g04_big3_pc_env_trace.py` | lowlevel | 无 |
 | `src/auv_lowlevel/batch/pc_env/state.py` | row-aligned state 克隆与合并 | 不执行 reset/step | 两个内部 helper | `tests/test_lowlevel_pc_env.py` | lowlevel | 复杂度 ratchet |

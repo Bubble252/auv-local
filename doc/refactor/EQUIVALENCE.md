@@ -321,6 +321,54 @@ skill_usage:
 - 回滚 commit：`94ea92b`；
 - 结论：`PASS`
 
+## 13. 候选 G04-BATCH-B1-B4
+
+```yaml
+goal: META-G04-BATCH
+candidate: BATCH-B1-B4
+repository: settled_局部规划器_反应式
+base_commit: d97173c
+branch: refactor/g04-batch-20261114
+implementation_commits:
+  - a4ce0c1
+  - 54f3560
+  - b2f665c
+  - 7fa1e1a
+files:
+  - src/auv_lowlevel/batch/pc_support/
+  - src/auv_lowlevel/batch/pc_representation/
+  - src/auv_lowlevel/batch/pc_residual_env/
+  - src/auv_lowlevel/batch/pc_bc_tools/
+public_api_change: none
+```
+
+B1-B4 把 11 个低/中风险 `batch/pc_*.py` 按职责迁入四个子包。旧 `pc_*.py` 保留为
+模块对象别名：旧路径与实现路径指向同一 module object，因此公共名称、类型身份、
+`__module__` 和模块级 monkeypatch 语义不分叉。
+
+| 项目 | 重构前 | 重构后 | 证据 |
+|---|---:|---:|---|
+| 全量测试 | `2089 passed, 11 skipped` | `2097 passed, 11 skipped` | 每批独立全量回归 |
+| shape | `0 new / 1189 suppressed` | `0 new / 1188 suppressed` | 最终 B4 检查 |
+| changed-file naming | - | `0 new / 16 suppressed` | wrapper 兼容别名豁免 |
+| dependency | `ok` | `ok` | `check_repo_dependencies.py --check` |
+| B5 源码 | 未修改 | 未修改 | 五个文件仍待单独批准 |
+
+各批 commit 与测试结果：
+
+| 批次 | commit | 全量测试 | 结论 |
+|---|---|---:|---|
+| B1 `pc_support/` | `a4ce0c1` | `2091 passed, 11 skipped` | `PASS` |
+| B2 `pc_representation/` | `54f3560` | `2093 passed, 11 skipped` | `PASS` |
+| B3 `pc_residual_env/` | `b2f665c` | `2095 passed, 11 skipped` | `PASS` |
+| B4 `pc_bc_tools/` | `7fa1e1a` | `2097 passed, 11 skipped` | `PASS` |
+
+定向契约测试分别位于 `tests/test_g04_batch_pc_support_contract.py`、
+`tests/test_g04_batch_pc_representation_contract.py`、
+`tests/test_g04_batch_pc_residual_env_contract.py` 和
+`tests/test_g04_batch_pc_bc_tools_contract.py`。触碰文件的 ruff 与 format 检查通过；
+未修改 reward、termination、success、seed、观测 schema、动作空间或训练协议。
+
 ## 13. 候选 G04-BIG3
 
 ```yaml
