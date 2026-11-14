@@ -17,7 +17,7 @@
 | Goal | 范围 | 文档 | 状态 |
 |---|---|---|---|
 | `META-G04-BATCH` | `src/auv_lowlevel/batch/pc_*.py` 分批子包化 | `总协调/doc/goals/meta_g04_batch_pc_modules_20261113.md` | DRAFT |
-| `META-G04-EXPERIMENTS` | 全局规划器 `experiments/m*.py` 归组 | `总协调/doc/goals/meta_g04_experiments_m_migration_20261113.md` | BLOCKED on BIG1 |
+| `META-G04-EXPERIMENTS` | 全局规划器 `experiments/m*.py` 归组 | `总协调/doc/goals/meta_g04_experiments_m_migration_20261113.md` | READY / BIG1 merged |
 | `META-G04-AUDITSHA` | audit goal54-57 的 SHA 安全迁移 | `总协调/doc/goals/meta_g04_audit_sha_contract_20261113.md` | CLOSED / 方案 A：保持原样 |
 
 ## 3. BATCH 建议顺序
@@ -41,8 +41,9 @@ assert old.Thing is Thing
 
 ## 4. EXPERIMENTS 前置
 
-先等 `META-G04-BIG1` 合入全局规划器 `main`。当前全局 `main` 仍是旧 `m7_1.py`，
-不得与 BIG1 并发修改 `experiments/`。E1/E2/E3 的顺序和 Gate 见 Goal 文档。
+`META-G04-BIG1` 已合入全局规划器本地 `main`（`e55cf5f`），当前为
+`experiments/m7_1/` package。E0 inventory、E1/E2 可以开始；E3 仍需用户批准，
+顺序和 Gate 见 Goal 文档。
 
 ## 5. AUDITSHA 默认方案
 
