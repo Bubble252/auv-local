@@ -22,7 +22,7 @@ REQUIRED_TRACE_FIELDS = (
     "path_error_3d",
     "path_horizontal_error",
     "path_vertical_error",
-    "goal_distance_eta",
+    "goal_distance_eta_m",
 )
 STABILITY_METRICS = (
     "success_rate",
@@ -144,7 +144,12 @@ def _audit_cell(
     trace_seeds = set(int(value) for value in np.unique(np.asarray(trace["seed"], dtype=np.int64)[active]))
     if trace_seeds != set(EXPECTED_SEEDS):
         errors.append(f"{trace_path}: trace seeds do not cover 20-59")
-    for key in ("path_error_3d", "path_horizontal_error", "path_vertical_error", "goal_distance_eta"):
+    for key in (
+        "path_error_3d",
+        "path_horizontal_error",
+        "path_vertical_error",
+        "goal_distance_eta_m",
+    ):
         values = np.asarray(trace[key], dtype=np.float64)
         if not np.isfinite(values).all():
             errors.append(f"{trace_path}: {key} contains NaN/Inf")
