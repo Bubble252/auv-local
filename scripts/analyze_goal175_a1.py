@@ -37,7 +37,11 @@ def _fmt(value: Any, digits: int = 3, signed: bool = False) -> str:
 def _terminal_vertical_mean(run_dir: Path) -> float:
     trace_path = run_dir / "trace.npz"
     trace = np.load(trace_path, allow_pickle=False)
-    active = np.asarray(trace["active"], dtype=bool)
+    active = (
+        np.asarray(trace["active"], dtype=bool)
+        if "active" in trace.files
+        else np.ones(np.asarray(trace["seed"]).shape, dtype=bool)
+    )
     seeds = np.asarray(trace["seed"], dtype=np.int64)
     vertical = np.asarray(trace["path_vertical_error"], dtype=np.float64)
     values: list[float] = []
