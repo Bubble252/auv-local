@@ -852,7 +852,7 @@
   "src/auv_lowlevel/batch/pc_bc_subset.py:complexity:subset_pc_demonstration_dataset: 20 > 10": 1,
   "src/auv_lowlevel/batch/pc_bc_subset.py:function-length:sample_pc_demonstration_dataset: 93 lines > 80": 1,
   "src/auv_lowlevel/batch/pc_bc_subset.py:function-length:subset_pc_demonstration_dataset: 96 lines > 80": 1,
-  "src/auv_lowlevel/batch/pc_calibration.py:function-length:calibrate_pc20_high_speed: 144 lines > 80": 1,
+  "src/auv_lowlevel/batch/pc_support/calibration.py:function-length:calibrate_pc20_high_speed: 144 lines > 80": 1,
   "src/auv_lowlevel/batch/pc_env/core.py:complexity:__init__: 36 > 10": 1,
   "src/auv_lowlevel/batch/pc_env/core.py:complexity:_advance_direct_commands: 11 > 10": 1,
   "src/auv_lowlevel/batch/pc_env/core.py:complexity:_refresh_current: 16 > 10": 1,
