@@ -1,6 +1,6 @@
 # auv-local Batch Package Inventory
 
-**状态**：`G04_BATCH_B0_COMPLETE / B5_DESIGN_ONLY`<br>
+**状态**：`G04_BATCH_B1_B4_COMPLETE / B5_DESIGN_ONLY`<br>
 **仓库**：`settled_局部规划器_反应式`<br>
 **基线**：`main@d97173c`<br>
 **日期**：2026-11-14
@@ -64,12 +64,12 @@ assert old.Thing is Thing
 
 ## 5. B1-B4 执行顺序
 
-| 批次 | 迁移内容 | Gate |
-|---|---|---|
-| B1 | calibration、diagnostics -> `pc_support/` | import/type identity、全量测试、shape、dependency |
-| B2 | normalization、history ablation -> `pc_representation/` | B1 通过；旧路径和 schema 名称不变 |
-| B3 | teacher、两种 residual wrapper、frozen vec env -> `pc_residual_env/` | B2 通过；零动作/step 语义不变 |
-| B4 | BC merge/subset/pretrain -> `pc_bc_tools/` | B3 通过；manifest 字段和字节不变 |
+| 批次 | 迁移内容 | Gate | 状态 |
+|---|---|---|---|
+| B1 | calibration、diagnostics -> `pc_support/` | import/type identity、全量测试、shape、dependency | `PASS` (`a4ce0c1`) |
+| B2 | normalization、history ablation -> `pc_representation/` | B1 通过；旧路径和 schema 名称不变 | `PASS` (`54f3560`) |
+| B3 | teacher、两种 residual wrapper、frozen vec env -> `pc_residual_env/` | B2 通过；零动作/step 语义不变 | `PASS` (`b2f665c`) |
+| B4 | BC merge/subset/pretrain -> `pc_bc_tools/` | B3 通过；manifest 字段和字节不变 | `PASS` (`7fa1e1a`) |
 
 每批单独 commit。任何一批 import 身份、全量测试、shape 或 dependency 失败，停止
 该批并回滚，不继续后续批次。
@@ -123,3 +123,20 @@ B5 暂不执行，等待用户审阅本设计；执行时需要再次确认目�
 - B1-B4 的组内 import 闭包已确认；
 - B5 五个模块的职责、依赖和推荐拆分边界已记录；
 - B0 不修改任何源码、测试、reward、termination、success、seed 或 artifact。
+
+## 9. B1-B4 完成证据
+
+| 批次 | commit | 全量测试 | 结论 |
+|---|---|---:|---|
+| B0 | `898d8e9` | `2089 passed, 11 skipped` | inventory |
+| B1 | `a4ce0c1` | `2091 passed, 11 skipped` | `PASS` |
+| B2 | `54f3560` | `2093 passed, 11 skipped` | `PASS` |
+| B3 | `b2f665c` | `2095 passed, 11 skipped` | `PASS` |
+| B4 | `7fa1e1a` | `2097 passed, 11 skipped` | `PASS` |
+
+- 每组定向契约测试均验证旧/新 import 指向同一 module object，公共对象身份和旧
+  模块级 monkeypatch 语义未分裂；
+- B4 最终 shape：`0 new / 1188 suppressed`；changed-file naming：
+  `0 new / 16 suppressed`；dependency：`ok`；
+- 触碰文件的 ruff 与 format 检查通过；
+- B5 五个源码文件未修改，仍等待设计审阅和单独实施批准。
