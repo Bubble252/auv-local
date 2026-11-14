@@ -101,8 +101,9 @@ def build_jobs(
                 str(seed_start),
                 "--seed-count",
                 str(seed_count),
-                "--curriculum-stage",
-                "C3",
+                # A1 configs deliberately disable the environment curriculum and
+                # carry one explicit pressure profile.  Passing --curriculum-stage
+                # would resample current/shear/noise and erase that axis.
                 "--disable-curriculum-direct-command",
                 "--device",
                 device,

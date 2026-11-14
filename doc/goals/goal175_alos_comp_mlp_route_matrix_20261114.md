@@ -129,6 +129,9 @@ Goal174 当前状态是 `PROTOCOL_IMPLEMENTED_NOT_RUN`，没有完整的
 - 压力档：`nominal / current10 / noise_n2 / plant20`；
 - radii：`default=2.0 / strict125=1.25`；
 - ALOS 模式：`ALOS-COMP` 与 `ALOS-NONE`，两者使用同一 guidance 和同一 actor 输入；
+- A1 使用 builder 生成的固定 environment config；这些配置已将 `curriculum.enabled`
+  关闭，并在 config 内直接写入 pressure。A1 evaluator 不得再传
+  `--curriculum-stage`，否则课程 sampler 会覆盖 current/shear/noise，使 pressure 轴失效；
 - 路线族：冻结 Goal173 的 `legacy_sine`，`length_m=35.0`、`speed_mps=1.2`、
   `path_bank_seed=41`、`path_bank_size=32`；不启用 `path_family` mix；
 - guidance：冻结 Goal173 的 `terminal_alignment_min_m=max_m=50.0`，A1/A2 都不改；
@@ -217,7 +220,7 @@ python ../scripts/check_research_ledger.py --goal Goal175 \
 | A1 协议完整性 | `40/40` cells（5 arms × 8 scenarios）；所有 cell 有 `alos_current_mode` 和 seeds 20–59 | `INVALID_INCOMPLETE_EVAL` |
 | A2/formal 协议完整性 | `72/72` cells；6/6 training runs；所有 cell 有 `alos_current_mode` | `INVALID_INCOMPLETE_EVAL` |
 | 洋流契约 | 0 true-current leak；0 crab；COMP 仅 estimated current | `INVALID_CURRENT_LEAK` |
-| 课程 | 6/6 run 有逐 episode provenance；`stage=C3`、冻结 mix、`promotion_enabled=false` | `INVALID_NONCURRICULUM` |
+| 课程 | A1 使用固定 pressure config，`curriculum_stage=null`；A2 的 6/6 run 必须有逐 episode provenance、冻结 C3 mix 和 `promotion_enabled=false` | `INVALID_NONCURRICULUM` |
 | cross-track 主指标 | COMP 相对 NONE 在 current10 的 cross p90 改善 `>=4%` 且 `>=0.08 m` | `CROSS_TRACK_NO_GAIN` |
 | 整条 route | 3D route RMSE 改善 `>=2%` 且 `>=0.04 m`；至少 `3/5` 分段改善；至少 `5/8` keypoints 改善 | `ROUTE_HEALTH_NO_GAIN` |
 | vertical guard | vertical p90 退化不超过 `0.02 m`，末端 vertical 不恶化超过 `0.02 m` | `VERTICAL_GUARD_FAIL` |

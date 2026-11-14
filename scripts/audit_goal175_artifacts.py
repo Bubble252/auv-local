@@ -76,8 +76,8 @@ def _audit_cell(
         errors.append(f"{summary_path}: checkpoint SHA drifted")
     if summary.get("action_mode") != arm["action_mode"]:
         errors.append(f"{summary_path}: action_mode drifted")
-    if summary.get("curriculum_stage") != "C3":
-        errors.append(f"{summary_path}: curriculum_stage is not C3")
+    if summary.get("curriculum_stage") is not None:
+        errors.append(f"{summary_path}: A1 must not activate curriculum sampling")
     if summary.get("curriculum_direct_commands_enabled") is not False:
         errors.append(f"{summary_path}: curriculum direct commands are enabled")
     if summary.get("guidance_config") is not None:
