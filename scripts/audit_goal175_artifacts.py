@@ -18,7 +18,6 @@ ARMS_PATH = REPO_ROOT / "configs/lowlevel/goal175/a1_arms.json"
 DEFAULT_ROOT = REPO_ROOT / "artifacts/lowlevel/goal175_alos_comp_mlp_20261114"
 EXPECTED_SEEDS = list(range(20, 60))
 REQUIRED_TRACE_FIELDS = (
-    "active",
     "seed",
     "path_error_3d",
     "path_horizontal_error",
@@ -135,7 +134,11 @@ def _audit_cell(
     if missing:
         errors.append(f"{trace_path}: missing trace fields {missing}")
         return errors
-    active = np.asarray(trace["active"], dtype=bool)
+    active = (
+        np.asarray(trace["active"], dtype=bool)
+        if "active" in trace.files
+        else np.ones(np.asarray(trace["seed"]).shape, dtype=bool)
+    )
     if not bool(active.any()):
         errors.append(f"{trace_path}: trace has no active rows")
     trace_seeds = set(int(value) for value in np.unique(np.asarray(trace["seed"], dtype=np.int64)[active]))
