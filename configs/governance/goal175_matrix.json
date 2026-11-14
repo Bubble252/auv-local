@@ -1,0 +1,136 @@
+{
+  "schema_version": "auv_goal_matrix.v1",
+  "goal_id": "Goal175",
+  "repo": "settled_局部规划器_反应式",
+  "arms": [
+    {
+      "arm": "P_RUD_075_COMP",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_only",
+      "residual_scale": 0.75,
+      "alos_current_mode": "ALOS-COMP"
+    },
+    {
+      "arm": "P_RUD_075_NONE",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_only",
+      "residual_scale": 0.75,
+      "alos_current_mode": "ALOS-NONE"
+    },
+    {
+      "arm": "P_RUD_025_COMP",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_only",
+      "residual_scale": 0.25,
+      "alos_current_mode": "ALOS-COMP"
+    },
+    {
+      "arm": "P_RUD_025_NONE",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_only",
+      "residual_scale": 0.25,
+      "alos_current_mode": "ALOS-NONE"
+    },
+    {
+      "arm": "P_ALL_075_COMP",
+      "algorithm": "PPO",
+      "channel_mode": "all",
+      "residual_scale": 0.75,
+      "alos_current_mode": "ALOS-COMP"
+    },
+    {
+      "arm": "P_ALL_075_NONE",
+      "algorithm": "PPO",
+      "channel_mode": "all",
+      "residual_scale": 0.75,
+      "alos_current_mode": "ALOS-NONE"
+    }
+  ],
+  "levels": [
+    "nominal",
+    "current10",
+    "noise_n2",
+    "plant20"
+  ],
+  "radii": {
+    "default": 2.0,
+    "strict125": 1.25
+  },
+  "seeds": {
+    "start": 20,
+    "count": 40
+  },
+  "checkpoint_seeds": [
+    86201
+  ],
+  "baselines": [
+    "zero_bc50",
+    "zero_alos_comp",
+    "zero_alos_none"
+  ],
+  "baseline_seed": 86201,
+  "expected_cells": {
+    "policy": 48,
+    "zero": 24,
+    "total": 72
+  },
+  "artifacts_root": "artifacts/lowlevel/goal175_alos_comp_mlp_20261114",
+  "manifest_path": "run_manifest.json",
+  "metrics": [
+    "route_three_d_rmse_m",
+    "route_cross_abs_p90_m",
+    "route_vertical_abs_p90_m",
+    "preterminal_three_d_rmse_m",
+    "segment_three_d_rmse_m",
+    "keypoint_20_90_three_d_m",
+    "completion_fraction",
+    "success",
+    "timeout",
+    "safety",
+    "speed_max_mps",
+    "overspeed_steps",
+    "guidance_crab_deg_abs_mean",
+    "current_estimation_source"
+  ],
+  "gates": [
+    {
+      "check": "A1 current10 cross-track p90 COMP vs NONE",
+      "threshold": ">=4% and >=0.08 m improvement",
+      "failure_label": "CROSS_TRACK_NO_GAIN"
+    },
+    {
+      "check": "A1 current10 3D route RMSE COMP vs NONE",
+      "threshold": ">=2% and >=0.04 m improvement",
+      "failure_label": "ROUTE_HEALTH_NO_GAIN"
+    },
+    {
+      "check": "A1 current10 five segments and 20-90% keypoints",
+      "threshold": ">=3/5 segments and >=5/8 keypoints improve",
+      "failure_label": "ROUTE_HEALTH_NO_GAIN"
+    },
+    {
+      "check": "A1 vertical guard",
+      "threshold": "vertical p90 and terminal vertical regress <=0.02 m",
+      "failure_label": "VERTICAL_GUARD_FAIL"
+    },
+    {
+      "check": "A1 success and safety guards",
+      "threshold": "success drop <=2/40 per cell; timeout/safety do not increase",
+      "failure_label": "SUCCESS_GUARD_FAIL"
+    },
+    {
+      "check": "A1 speed and stability",
+      "threshold": "all episodes <=2.5 m/s; no NaN/Inf/flew-out",
+      "failure_label": "SPEED_OR_STABILITY_FAIL"
+    },
+    {
+      "check": "current compensation contract",
+      "threshold": "COMP uses estimated current; NONE uses none; crab=0; no true-current leak",
+      "failure_label": "INVALID_CURRENT_LEAK"
+    }
+  ],
+  "heldout": {
+    "enabled": false,
+    "seeds": []
+  }
+}

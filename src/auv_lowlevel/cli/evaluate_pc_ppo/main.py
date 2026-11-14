@@ -75,6 +75,7 @@ def main() -> int:
         allow_sensor_override=args.allow_sensor_override,
         allow_actor_observation_override=args.allow_actor_observation_override,
         allow_guidance_rate_limit_override=args.allow_guidance_rate_limit_override,
+        allow_alos_current_mode_override=args.allow_alos_current_mode_override,
         allow_diversity_environment_override=(args.allow_diversity_environment_override),
         allow_start_progress_training_override=(args.allow_start_progress_training_override),
         curriculum_stage=args.curriculum_stage,
@@ -137,6 +138,7 @@ def main() -> int:
             None if controller_config_path is None else str(controller_config_path)
         ),
         "guidance_rate_limit_override": args.allow_guidance_rate_limit_override,
+        "alos_current_mode_override": args.allow_alos_current_mode_override,
         "diversity_environment_override": (args.allow_diversity_environment_override),
         "start_progress_training_override": (args.allow_start_progress_training_override),
         "guidance_command_rate_limit_enabled": (effective_guidance.command_rate_limit_enabled),

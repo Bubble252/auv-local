@@ -1,0 +1,45 @@
+{
+  "schema_version": "auv_goal175_a1_arms.v1",
+  "goal_id": "Goal175",
+  "phase": "A1",
+  "training_config": "configs/lowlevel/goal173/train_p_rud_075_seed86201.json",
+  "checkpoint": "artifacts/lowlevel/goal173_rudder_only_residual_20261112/train/P_RUD_075/seed86201/final.pt",
+  "checkpoint_sha256": "c70b9af5e78c0c4007b3715e346e4cfca8ffac928dc30484ea9754cde7f56b03",
+  "arms": [
+    {
+      "tag": "P_RUD_075_COMP",
+      "role": "policy",
+      "action_mode": "policy",
+      "alos_current_mode": "ALOS-COMP",
+      "evaluator": "ppo"
+    },
+    {
+      "tag": "P_RUD_075_NONE",
+      "role": "policy",
+      "action_mode": "policy",
+      "alos_current_mode": "ALOS-NONE",
+      "evaluator": "ppo"
+    },
+    {
+      "tag": "zero_bc50",
+      "role": "zero_bc",
+      "action_mode": "frozen-base",
+      "alos_current_mode": "ALOS-COMP",
+      "evaluator": "ppo"
+    },
+    {
+      "tag": "zero_alos_comp",
+      "role": "zero_alos",
+      "action_mode": "alos",
+      "alos_current_mode": "ALOS-COMP",
+      "evaluator": "ppo"
+    },
+    {
+      "tag": "zero_alos_none",
+      "role": "zero_alos",
+      "action_mode": "alos",
+      "alos_current_mode": "ALOS-NONE",
+      "evaluator": "ppo"
+    }
+  ]
+}

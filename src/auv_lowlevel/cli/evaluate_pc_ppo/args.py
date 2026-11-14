@@ -195,6 +195,14 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--allow-alos-current-mode-override",
+        action="store_true",
+        help=(
+            "allow an evaluation-only switch between the canonical ALOS-COMP and "
+            "ALOS-NONE current modes; all other guidance fields remain locked"
+        ),
+    )
+    parser.add_argument(
         "--allow-sensor-override",
         action="store_true",
         help=(

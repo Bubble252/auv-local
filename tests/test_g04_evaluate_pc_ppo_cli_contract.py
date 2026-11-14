@@ -10,7 +10,7 @@ from scripts.evaluate_pc_ppo import _parse_args
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "evaluate_pc_ppo.py"
-HELP_SHA256 = "944559f9b0e88678d3d0560e17cd3462ab97692a2c0bff355eeaba2ab2e11dd4"
+HELP_SHA256 = "02f82c57b62f6e0b6ecaf92307f35ee707018bfa7a92a7ad50aed77c7bf35fa2"
 
 
 def test_help_text_is_byte_stable() -> None:
@@ -45,6 +45,7 @@ def test_default_namespace_is_stable() -> None:
         "actuator_residual_scale_override": None,
         "actuator_residual_scale_switch_distance_m": None,
         "allow_actor_observation_override": False,
+        "allow_alos_current_mode_override": False,
         "allow_diversity_environment_override": False,
         "allow_guidance_rate_limit_override": False,
         "allow_sensor_override": False,

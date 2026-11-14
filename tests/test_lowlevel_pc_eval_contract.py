@@ -152,6 +152,60 @@ def test_sensor_override_requires_explicit_opt_in() -> None:
     )
 
 
+def test_alos_current_mode_override_allows_only_canonical_modes() -> None:
+    module = _load_module()
+    base = load_config(
+        ROOT / "configs/lowlevel/goal173/env_route_health_train_nu_ground.json"
+    )
+    comp = replace(
+        base,
+        guidance=replace(
+            base.guidance,
+            compensate_current=True,
+            current_crab_enabled=False,
+            current_compensation_source="estimated",
+        ),
+    )
+    none = replace(
+        base,
+        guidance=replace(
+            base.guidance,
+            compensate_current=False,
+            current_crab_enabled=False,
+            current_compensation_source="none",
+        ),
+    )
+    true_current = replace(
+        base,
+        guidance=replace(
+            base.guidance,
+            compensate_current=True,
+            current_crab_enabled=False,
+            current_compensation_source="true",
+        ),
+    )
+
+    with pytest.raises(ValueError, match="guidance contract"):
+        module._validate_environment_override(base, comp)
+
+    module._validate_environment_override(
+        base,
+        comp,
+        allow_alos_current_mode_override=True,
+    )
+    module._validate_environment_override(
+        base,
+        none,
+        allow_alos_current_mode_override=True,
+    )
+    with pytest.raises(ValueError, match="canonical ALOS-COMP or ALOS-NONE"):
+        module._validate_environment_override(
+            base,
+            true_current,
+            allow_alos_current_mode_override=True,
+        )
+
+
 def test_actor_observation_source_override_requires_explicit_opt_in() -> None:
     module = _load_module()
     base = load_config(

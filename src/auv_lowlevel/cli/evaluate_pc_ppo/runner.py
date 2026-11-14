@@ -70,6 +70,7 @@ def _run(
     allow_sensor_override: bool = False,
     allow_actor_observation_override: bool = False,
     allow_guidance_rate_limit_override: bool = False,
+    allow_alos_current_mode_override: bool = False,
     allow_diversity_environment_override: bool = False,
     allow_start_progress_training_override: bool = False,
     curriculum_stage: str | None = None,
@@ -158,6 +159,7 @@ def _run(
             allow_sensor_override=allow_sensor_override,
             allow_actor_observation_override=allow_actor_observation_override,
             allow_guidance_rate_limit_override=allow_guidance_rate_limit_override,
+            allow_alos_current_mode_override=allow_alos_current_mode_override,
             allow_diversity_environment_override=(allow_diversity_environment_override),
             allow_start_progress_training_override=(allow_start_progress_training_override),
         )

@@ -178,6 +178,7 @@ def _validate_environment_override(
     allow_sensor_override: bool = False,
     allow_actor_observation_override: bool = False,
     allow_guidance_rate_limit_override: bool = False,
+    allow_alos_current_mode_override: bool = False,
     allow_diversity_environment_override: bool = False,
     allow_start_progress_training_override: bool = False,
 ) -> None:
@@ -196,6 +197,22 @@ def _validate_environment_override(
             base.guidance,
             command_rate_limit_enabled=override.guidance.command_rate_limit_enabled,
             pitch_rate_limit_rad_s=override.guidance.pitch_rate_limit_rad_s,
+        )
+    if allow_alos_current_mode_override:
+        mode = (
+            override.guidance.compensate_current,
+            override.guidance.current_crab_enabled,
+            override.guidance.current_compensation_source,
+        )
+        if mode not in {(True, False, "estimated"), (False, False, "none")}:
+            raise ValueError(
+                "ALOS current-mode override must be canonical ALOS-COMP or ALOS-NONE"
+            )
+        guidance_allowed = replace(
+            guidance_allowed,
+            compensate_current=override.guidance.compensate_current,
+            current_crab_enabled=override.guidance.current_crab_enabled,
+            current_compensation_source=override.guidance.current_compensation_source,
         )
     if override.guidance != guidance_allowed:
         raise ValueError("environment override changes the guidance contract")
