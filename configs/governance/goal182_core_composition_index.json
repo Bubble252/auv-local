@@ -1,0 +1,29 @@
+{
+  "axis_registry": "configs/governance/goal182_axis_registry.json",
+  "axis_registry_sha256": "52ef810fd515143fda82a856d3054f3ef0a73f853633917158324b045844db9d",
+  "cross_program_pooling": false,
+  "evaluation_matrix": "configs/governance/goal182_eval_matrix.json",
+  "goal_id": "Goal182",
+  "human_id": "G182-CORE-COMP",
+  "program_matrices": [
+    {
+      "arm_count": 20,
+      "control_contract": "CC_PE2E",
+      "matrix_id": "G182-CORE-PE2E",
+      "matrix_status": "DRAFT",
+      "path": "configs/governance/goal182_core_pe2e_matrix.json",
+      "program_group_id": "G-PATH-CONDITIONED-POLICY"
+    },
+    {
+      "arm_count": 40,
+      "control_contract": "CC_ALOS_BODY",
+      "matrix_id": "G182-CORE-ALOSB",
+      "matrix_status": "DRAFT",
+      "path": "configs/governance/goal182_core_alosb_matrix.json",
+      "program_group_id": "G-ALOS-BODY-RL"
+    }
+  ],
+  "schema_version": "auv_core_composition_index.v1",
+  "status": "DRAFT",
+  "training_profile": "PPO-FLAT-4096x48-E5-MB4"
+}

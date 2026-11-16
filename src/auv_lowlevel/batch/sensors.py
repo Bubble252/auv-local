@@ -298,6 +298,15 @@ PROFILES["unbiased_noise_v1"] = replace(
     nav_noise_m=(0.05, 0.20),
 )
 
+# Goal182 default: same zero-mean, latency-free navigation contract as
+# ``unbiased_noise_v1`` with smaller per-step position noise.  Keep v1 intact
+# so historical configs remain bit-compatible.
+PROFILES["unbiased_small_noise_v2"] = replace(
+    PROFILES["unbiased_noise_v1"],
+    name="unbiased_small_noise_v2",
+    nav_noise_m=(0.001, 0.1),
+)
+
 
 # Keep the pre-2026-11-07 calibrated distribution available for historical
 # reproduction, and expose the old realistic ranges as an explicit stress arm.

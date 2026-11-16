@@ -31,6 +31,12 @@ BASE_CHECKPOINT_SHA256 = (
 ARTIFACT_ROOT = "artifacts/lowlevel/goal180_path_conditioned_reward_20261114"
 TRAIN_SEED = 86201
 TRAINING_PROFILE = "PPO-FLAT-4096x48-E5-MB4"
+ACTOR_METADATA = {
+    "actor_kind": "mlp",
+    "actor_input_contract": "fused",
+    "token_contract": "none",
+    "pooling": "none",
+}
 PPO_NUM_ENVS = 4096
 PPO_STEPS_PER_ENV = 48
 PPO_LEARNING_EPOCHS = 5
@@ -191,6 +197,7 @@ def _environment(arm: str) -> dict[str, Any]:
 def _training(arm: str, environment_path: Path) -> dict[str, Any]:
     payload = _load(BASE_TRAIN_PATH)
     payload["training_profile"] = TRAINING_PROFILE
+    payload["actor"] = copy.deepcopy(ACTOR_METADATA)
     payload["environment"]["config"] = _relative(environment_path)
     payload["environment"]["num_envs"] = PPO_NUM_ENVS
     payload["base_policy"]["checkpoint"] = BASE_CHECKPOINT

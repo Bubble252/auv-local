@@ -105,6 +105,33 @@ def test_unbiased_profile_has_no_systematic_navigation_terms() -> None:
         assert getattr(profile, field) == (0.0, 0.0)
 
 
+def test_unbiased_small_noise_v2_only_reduces_nav_noise() -> None:
+    baseline = PROFILES["unbiased_noise_v1"]
+    profile = PROFILES["unbiased_small_noise_v2"]
+
+    assert profile.name == "unbiased_small_noise_v2"
+    assert profile.nav_noise_m == (0.001, 0.1)
+    unchanged_fields = (
+        "dvl_bottom_noise_mps",
+        "dvl_water_noise_mps",
+        "imu_rollpitch_noise_rad",
+        "imu_heading_noise_rad",
+        "imu_gyro_noise_rad_s",
+        "usbl_noise_m",
+        "current_est_noise_mps",
+        "current_est_tau_s",
+        "nav_bias_m",
+        "nav_drift_sigma_m",
+        "nav_usbl_gain",
+        "nav_dvl_outage_drift_mps",
+        "nav_delay_s",
+        "nav_bias_calibration_fraction",
+    )
+    for field in unchanged_fields:
+        assert getattr(profile, field) == getattr(baseline, field), field
+    assert len(unchanged_fields) == 14
+
+
 def test_unbiased_nav_noise_is_zero_mean_without_drift() -> None:
     config = _pc_config()
     suite = SyntheticSensorSuite(config, num_envs=8)

@@ -80,6 +80,20 @@ HIDDEN_I_CONFIG_PATH = (
     / "lowlevel"
     / "odarrl_control_ppo_i1_26d_hidden.json"
 )
+GOAL182_FINETUNE_CONFIG_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "configs"
+    / "lowlevel"
+    / "goal182"
+    / "train_finetune_5d_m_seed86201.json"
+)
+GOAL182_RESIDUAL_CONFIG_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "configs"
+    / "lowlevel"
+    / "goal182"
+    / "train_residual_5d_m_seed86201.json"
+)
 HIDDEN_I_ENVIRONMENT_PATH = (
     Path(__file__).resolve().parents[1]
     / "configs"
@@ -145,8 +159,80 @@ def test_training_profile_binding_is_optional_and_preserved() -> None:
 
     payload = _raw()
     payload["training_profile"] = "PPO-FLAT-4096x48-E5-MB4"
+    payload["actor"] = {
+        "actor_kind": "mlp",
+        "actor_input_contract": "fused",
+        "token_contract": "none",
+        "pooling": "none",
+    }
     bound = parse_training_config(payload)
     assert bound.training_profile == "PPO-FLAT-4096x48-E5-MB4"
+    assert bound.actor is not None
+    assert bound.actor.as_dict() == payload["actor"]
+
+
+def test_profile_bound_config_requires_explicit_actor_metadata() -> None:
+    payload = _raw()
+    payload["training_profile"] = "PPO-FLAT-4096x48-E5-MB4"
+
+    with pytest.raises(ValueError, match="ACTOR_METADATA_MISSING"):
+        parse_training_config(payload)
+
+
+def test_actor_metadata_contract_must_match_actor_kind() -> None:
+    payload = _raw()
+    payload["training_profile"] = "PPO-FLAT-4096x48-E5-MB4"
+    payload["actor"] = {
+        "actor_kind": "mlp",
+        "actor_input_contract": "token_mean",
+        "token_contract": "none",
+        "pooling": "mean",
+    }
+
+    with pytest.raises(ValueError, match="ACTOR_METADATA_CONTRACT_MISMATCH"):
+        parse_training_config(payload)
+
+
+@pytest.mark.parametrize(
+    "path", [GOAL182_FINETUNE_CONFIG_PATH, GOAL182_RESIDUAL_CONFIG_PATH]
+)
+def test_goal182_configs_declare_explicit_actor_metadata(path: Path) -> None:
+    config = load_training_config(path)
+
+    assert config.actor is not None
+    assert config.actor.as_dict() == {
+        "actor_kind": "mlp",
+        "actor_input_contract": "fused",
+        "token_contract": "none",
+        "pooling": "none",
+    }
+
+
+def test_trres_requires_fresh_encoder_initialization() -> None:
+    payload = json.loads(GOAL182_FINETUNE_CONFIG_PATH.read_text(encoding="utf-8"))
+    payload["experiment"]["learning_composition"] = "TRRES_CMD"
+    payload["experiment"]["encoder_init"] = "standard_fresh"
+
+    config = parse_training_config(payload)
+    assert config.learning_composition == "TRRES_CMD"
+    assert config.encoder_init == "standard_fresh"
+    assert config.encoder_init_checkpoint is None
+
+
+def test_trres_rejects_borrowed_encoder_or_bc_base() -> None:
+    payload = json.loads(GOAL182_FINETUNE_CONFIG_PATH.read_text(encoding="utf-8"))
+    payload["experiment"]["learning_composition"] = "TRRES_ACT"
+    payload["experiment"]["encoder_init"] = "bc_checkpoint"
+
+    with pytest.raises(ValueError, match="TRRES_ENCODER_INIT_INVALID"):
+        parse_training_config(payload)
+
+    payload = json.loads(GOAL182_RESIDUAL_CONFIG_PATH.read_text(encoding="utf-8"))
+    payload["experiment"]["learning_composition"] = "TRRES_CMD"
+    payload["experiment"]["encoder_init"] = "standard_fresh"
+
+    with pytest.raises(ValueError, match="must not borrow BC"):
+        parse_training_config(payload)
 
 
 def test_training_profile_binding_must_be_a_non_empty_string() -> None:

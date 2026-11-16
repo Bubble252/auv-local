@@ -175,11 +175,15 @@ class CurriculumTrainerHook:
         completed_transitions: int,
         decision: CurriculumDecision | None,
         *,
+        completed_iterations: int | None = None,
         finalized: bool = False,
     ) -> None:
         payload = {
             "schema_version": "auv_pc_curriculum_trainer_state.v1",
             "completed_transitions": int(completed_transitions),
+            "completed_iterations": (
+                None if completed_iterations is None else int(completed_iterations)
+            ),
             "stage": self.controller.stage,
             "stage_mix": [[key, float(weight)] for key, weight in self.sampler.stage_mix],
             "promotion_enabled": self.promotion_enabled,
@@ -200,17 +204,29 @@ class CurriculumTrainerHook:
         ):
             self._mix_ramp = None
 
-    def maybe_update(self, completed_transitions: int) -> CurriculumDecision | None:
+    def maybe_update(
+        self,
+        completed_transitions: int,
+        completed_iterations: int | None = None,
+    ) -> CurriculumDecision | None:
         """Evaluate at the next scheduled boundary, then promote or roll back."""
 
         if isinstance(completed_transitions, bool) or completed_transitions < 0:
             raise ValueError("completed_transitions must be a non-negative integer")
+        if completed_iterations is not None and (
+            isinstance(completed_iterations, bool) or completed_iterations < 0
+        ):
+            raise ValueError("completed_iterations must be a non-negative integer")
         self._apply_mix_ramp(completed_transitions)
         if not self.promotion_enabled:
             if completed_transitions >= self._next_eval_transition:
                 while completed_transitions >= self._next_eval_transition:
                     self._next_eval_transition += self.eval_interval_transitions
-                self._write_state(completed_transitions, None)
+            self._write_state(
+                completed_transitions,
+                None,
+                completed_iterations=completed_iterations,
+            )
             return None
         if completed_transitions < self._next_eval_transition:
             return None
@@ -221,6 +237,7 @@ class CurriculumTrainerHook:
         decision = self.controller.observe(
             evaluation,
             completed_transitions=completed_transitions,
+            completed_iterations=completed_iterations,
         )
         if self.controller.stage != previous_stage:
             self._stage_entered_at = int(completed_transitions)
@@ -245,7 +262,11 @@ class CurriculumTrainerHook:
                 self._apply_mix_ramp(completed_transitions)
             else:
                 self.sampler.set_stage_mix(target_mix)
-        self._write_state(completed_transitions, decision)
+        self._write_state(
+            completed_transitions,
+            decision,
+            completed_iterations=completed_iterations,
+        )
         return decision
 
     def finalize(self, completed_transitions: int) -> None:

@@ -10,13 +10,19 @@ from typing import Any
 import numpy as np
 
 from ._json import load_json_value
-from .config import LowLevelConfig
 from .batch.pc_privileged_schema import PC_CRITIC_PRIV_DIM
+from .config import LowLevelConfig
 
 SCHEMA_VERSION = "auv_odarrl_control_ppo.v1"
 PC_PATH_BLOCK_NAMES = frozenset(
     {"state_base", "path_geom", "path_context", "path_lookahead", "path_velocity"}
 )
+ACTOR_INPUT_CONTRACTS = {
+    "mlp": ("fused", "none"),
+    "token_mlp": ("token_mean", "mean"),
+    "transformer": ("token_attention", "attention"),
+}
+TRRES_LEARNING_COMPOSITIONS = frozenset({"TRRES_CMD", "TRRES_ACT"})
 
 
 def _mapping(
@@ -103,6 +109,54 @@ def _float_tuple3(value: Any, path: str) -> tuple[float, float, float]:
         raise ValueError(f"{path} must be a list of exactly three numbers")
     result = tuple(_number(item, f"{path}[{index}]") for index, item in enumerate(value))
     return result  # type: ignore[return-value]
+
+
+@dataclass(frozen=True)
+class ActorMetadata:
+    """Explicit actor backend and token contract for a training config."""
+
+    actor_kind: str
+    actor_input_contract: str
+    token_contract: str
+    pooling: str
+
+    def __post_init__(self) -> None:
+        contract = ACTOR_INPUT_CONTRACTS.get(self.actor_kind)
+        if contract is None:
+            raise ValueError(
+                "actor.actor_kind must be 'mlp', 'token_mlp', or 'transformer'"
+            )
+        expected_input, expected_pooling = contract
+        if self.actor_input_contract != expected_input:
+            raise ValueError(
+                f"actor.actor_input_contract for actor_kind={self.actor_kind!r} "
+                f"must be {expected_input!r}; got {self.actor_input_contract!r} "
+                "(ACTOR_METADATA_CONTRACT_MISMATCH)"
+            )
+        if self.pooling != expected_pooling:
+            raise ValueError(
+                f"actor.pooling for actor_kind={self.actor_kind!r} must be "
+                f"{expected_pooling!r}; got {self.pooling!r} "
+                "(ACTOR_METADATA_CONTRACT_MISMATCH)"
+            )
+        if self.actor_kind == "mlp":
+            if self.token_contract != "none":
+                raise ValueError(
+                    "actor.token_contract for actor_kind='mlp' must be 'none'"
+                )
+        elif self.token_contract == "none":
+            raise ValueError(
+                f"actor.token_contract for actor_kind={self.actor_kind!r} must name "
+                "the token schema (TOKENIZATION_CONFOUND)"
+            )
+
+    def as_dict(self) -> dict[str, str]:
+        return {
+            "actor_kind": self.actor_kind,
+            "actor_input_contract": self.actor_input_contract,
+            "token_contract": self.token_contract,
+            "pooling": self.pooling,
+        }
 
 
 @dataclass(frozen=True)
@@ -533,6 +587,10 @@ def resolve_pc_action_interface(
 class PPOTrainingConfig:
     schema_version: str
     training_profile: str | None
+    actor: ActorMetadata | None
+    learning_composition: str | None
+    encoder_init: str | None
+    encoder_init_checkpoint: str | None
     name: str
     arm: str
     seed: int
@@ -798,16 +856,68 @@ def parse_training_config(
             "encoder",
             "pc",
         },
-        optional={"instrumentation", "history", "encoder", "pc", "training_profile"},
+        optional={
+            "instrumentation",
+            "history",
+            "encoder",
+            "pc",
+            "training_profile",
+            "actor",
+        },
     )
     if root["schema_version"] != SCHEMA_VERSION:
         raise ValueError(f"schema_version must be {SCHEMA_VERSION!r}")
     training_profile = None
     if "training_profile" in root:
         training_profile = _string(root["training_profile"], "training_profile")
+    actor = None
+    if "actor" in root:
+        actor_block = _mapping(
+            root["actor"],
+            "actor",
+            {
+                "actor_kind",
+                "actor_input_contract",
+                "token_contract",
+                "pooling",
+            },
+        )
+        actor = ActorMetadata(
+            actor_kind=_string(actor_block["actor_kind"], "actor.actor_kind"),
+            actor_input_contract=_string(
+                actor_block["actor_input_contract"], "actor.actor_input_contract"
+            ),
+            token_contract=_string(
+                actor_block["token_contract"], "actor.token_contract"
+            ),
+            pooling=_string(actor_block["pooling"], "actor.pooling"),
+        )
+    if training_profile is not None and actor is None:
+        raise ValueError(
+            "training configs bound to training_profile require explicit actor "
+            "metadata (actor_kind, actor_input_contract, token_contract, pooling); "
+            "ACTOR_METADATA_MISSING"
+        )
     experiment = _mapping(
-        root["experiment"], "experiment", {"name", "arm", "seed", "output", "device"}
+        root["experiment"],
+        "experiment",
+        {"name", "arm", "seed", "output", "device"},
+        optional={"learning_composition", "encoder_init", "encoder_init_checkpoint"},
     )
+    learning_composition = None
+    if "learning_composition" in experiment:
+        learning_composition = _string(
+            experiment["learning_composition"], "experiment.learning_composition"
+        )
+    encoder_init = None
+    if "encoder_init" in experiment:
+        encoder_init = _string(experiment["encoder_init"], "experiment.encoder_init")
+    encoder_init_checkpoint = None
+    if "encoder_init_checkpoint" in experiment:
+        encoder_init_checkpoint = _string(
+            experiment["encoder_init_checkpoint"],
+            "experiment.encoder_init_checkpoint",
+        )
     environment = _mapping(
         root["environment"],
         "environment",
@@ -1510,6 +1620,10 @@ def parse_training_config(
     result = PPOTrainingConfig(
         schema_version=SCHEMA_VERSION,
         training_profile=training_profile,
+        actor=actor,
+        learning_composition=learning_composition,
+        encoder_init=encoder_init,
+        encoder_init_checkpoint=encoder_init_checkpoint,
         name=_string(experiment["name"], "experiment.name"),
         arm=_string(experiment["arm"], "experiment.arm"),
         seed=_integer(experiment["seed"], "experiment.seed"),
@@ -1649,6 +1763,22 @@ def _validate_semantics(config: PPOTrainingConfig) -> None:
         raise ValueError("algorithm.num_mini_batches exceeds rollout sample count")
     if config.arm not in {"I", "O", "PC", "R", "S"}:
         raise ValueError("experiment.arm must be I, O, PC, R, or S")
+    if config.learning_composition in TRRES_LEARNING_COMPOSITIONS:
+        if config.base_mode != "none":
+            raise ValueError(
+                f"{config.learning_composition} requires base_policy.mode='none'; "
+                "TRRES must not borrow BC or other arm weights"
+            )
+        if config.encoder_init != "standard_fresh":
+            raise ValueError(
+                f"{config.learning_composition} requires encoder_init='standard_fresh'; "
+                "TRRES_ENCODER_INIT_INVALID"
+            )
+        if config.encoder_init_checkpoint is not None:
+            raise ValueError(
+                f"{config.learning_composition} requires encoder_init_checkpoint=null; "
+                "TRRES_ENCODER_INIT_INVALID"
+            )
     if config.history is not None and config.vector_env_backend != "batch_torch":
         raise ValueError("history observations require vector_env.backend='batch_torch'")
     if config.encoder is not None:
@@ -1700,7 +1830,10 @@ def load_training_config(path: Path | str) -> PPOTrainingConfig:
 
 
 __all__ = [
+    "ACTOR_INPUT_CONTRACTS",
+    "ActorMetadata",
     "ARM_BASE_MODE_CONSISTENCY",
+    "TRRES_LEARNING_COMPOSITIONS",
     "EncoderConfig",
     "HistoryConfig",
     "PCConfig",

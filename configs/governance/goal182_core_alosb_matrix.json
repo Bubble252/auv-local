@@ -1,0 +1,736 @@
+{
+  "arm_count": 40,
+  "arms": [
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_BCFT_MOD0",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 5,
+      "learning_composition": "BCFT",
+      "module_set": "MS_NONE",
+      "module_short_code": "MOD0",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": null,
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_BCFT_MOD1",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 4,
+      "learning_composition": "BCFT",
+      "module_set": "MS_TEMP",
+      "module_short_code": "MOD1",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": null,
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_BCFT_MOD2",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 3,
+      "learning_composition": "BCFT",
+      "module_set": "MS_TEMP_PRIV",
+      "module_short_code": "MOD2",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": null,
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_BCFT_MOD3",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 2,
+      "learning_composition": "BCFT",
+      "module_set": "MS_TEMP_CURRENT",
+      "module_short_code": "MOD3",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": null,
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_BCFT_MOD4",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 1,
+      "learning_composition": "BCFT",
+      "module_set": "MS_FULL",
+      "module_short_code": "MOD4",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": null,
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_BCRES_MOD0",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 5,
+      "learning_composition": "BCRES",
+      "module_set": "MS_NONE",
+      "module_short_code": "MOD0",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_BCRES_MOD1",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 4,
+      "learning_composition": "BCRES",
+      "module_set": "MS_TEMP",
+      "module_short_code": "MOD1",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_BCRES_MOD2",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 3,
+      "learning_composition": "BCRES",
+      "module_set": "MS_TEMP_PRIV",
+      "module_short_code": "MOD2",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_BCRES_MOD3",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 2,
+      "learning_composition": "BCRES",
+      "module_set": "MS_TEMP_CURRENT",
+      "module_short_code": "MOD3",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_BCRES_MOD4",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 1,
+      "learning_composition": "BCRES",
+      "module_set": "MS_FULL",
+      "module_short_code": "MOD4",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_TRRES_CMD_MOD0",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 5,
+      "learning_composition": "TRRES_CMD",
+      "module_set": "MS_NONE",
+      "module_short_code": "MOD0",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_CMD",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_TRRES_CMD_MOD1",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 4,
+      "learning_composition": "TRRES_CMD",
+      "module_set": "MS_TEMP",
+      "module_short_code": "MOD1",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_CMD",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_TRRES_CMD_MOD2",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 3,
+      "learning_composition": "TRRES_CMD",
+      "module_set": "MS_TEMP_PRIV",
+      "module_short_code": "MOD2",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_CMD",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_TRRES_CMD_MOD3",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 2,
+      "learning_composition": "TRRES_CMD",
+      "module_set": "MS_TEMP_CURRENT",
+      "module_short_code": "MOD3",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_CMD",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_TRRES_CMD_MOD4",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 1,
+      "learning_composition": "TRRES_CMD",
+      "module_set": "MS_FULL",
+      "module_short_code": "MOD4",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_CMD",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_TRRES_ACT_MOD0",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 5,
+      "learning_composition": "TRRES_ACT",
+      "module_set": "MS_NONE",
+      "module_short_code": "MOD0",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_TRRES_ACT_MOD1",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 4,
+      "learning_composition": "TRRES_ACT",
+      "module_set": "MS_TEMP",
+      "module_short_code": "MOD1",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_TRRES_ACT_MOD2",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 3,
+      "learning_composition": "TRRES_ACT",
+      "module_set": "MS_TEMP_PRIV",
+      "module_short_code": "MOD2",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_TRRES_ACT_MOD3",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 2,
+      "learning_composition": "TRRES_ACT",
+      "module_set": "MS_TEMP_CURRENT",
+      "module_short_code": "MOD3",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "fused",
+        "actor_kind": "mlp",
+        "pooling": "none",
+        "token_contract": "none"
+      },
+      "actor_backend": "AB_MLP_M",
+      "arm_id": "G182_INT_STACK_MLP_ALOSB_TRRES_ACT_MOD4",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": 1,
+      "learning_composition": "TRRES_ACT",
+      "module_set": "MS_FULL",
+      "module_short_code": "MOD4",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_BCFT_MOD0",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "BCFT",
+      "module_set": "MS_NONE",
+      "module_short_code": "MOD0",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": null,
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_BCFT_MOD1",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "BCFT",
+      "module_set": "MS_TEMP",
+      "module_short_code": "MOD1",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": null,
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_BCFT_MOD2",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "BCFT",
+      "module_set": "MS_TEMP_PRIV",
+      "module_short_code": "MOD2",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": null,
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_BCFT_MOD3",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "BCFT",
+      "module_set": "MS_TEMP_CURRENT",
+      "module_short_code": "MOD3",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": null,
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_BCFT_MOD4",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "BCFT",
+      "module_set": "MS_FULL",
+      "module_short_code": "MOD4",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": null,
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_BCRES_MOD0",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "BCRES",
+      "module_set": "MS_NONE",
+      "module_short_code": "MOD0",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_BCRES_MOD1",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "BCRES",
+      "module_set": "MS_TEMP",
+      "module_short_code": "MOD1",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_BCRES_MOD2",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "BCRES",
+      "module_set": "MS_TEMP_PRIV",
+      "module_short_code": "MOD2",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_BCRES_MOD3",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "BCRES",
+      "module_set": "MS_TEMP_CURRENT",
+      "module_short_code": "MOD3",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_BCRES_MOD4",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "BCRES",
+      "module_set": "MS_FULL",
+      "module_short_code": "MOD4",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_TRRES_CMD_MOD0",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "TRRES_CMD",
+      "module_set": "MS_NONE",
+      "module_short_code": "MOD0",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_CMD",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_TRRES_CMD_MOD1",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "TRRES_CMD",
+      "module_set": "MS_TEMP",
+      "module_short_code": "MOD1",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_CMD",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_TRRES_CMD_MOD2",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "TRRES_CMD",
+      "module_set": "MS_TEMP_PRIV",
+      "module_short_code": "MOD2",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_CMD",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_TRRES_CMD_MOD3",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "TRRES_CMD",
+      "module_set": "MS_TEMP_CURRENT",
+      "module_short_code": "MOD3",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_CMD",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_TRRES_CMD_MOD4",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "TRRES_CMD",
+      "module_set": "MS_FULL",
+      "module_short_code": "MOD4",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_CMD",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_TRRES_ACT_MOD0",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "TRRES_ACT",
+      "module_set": "MS_NONE",
+      "module_short_code": "MOD0",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_TRRES_ACT_MOD1",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "TRRES_ACT",
+      "module_set": "MS_TEMP",
+      "module_short_code": "MOD1",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_TRRES_ACT_MOD2",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "TRRES_ACT",
+      "module_set": "MS_TEMP_PRIV",
+      "module_short_code": "MOD2",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_TRRES_ACT_MOD3",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "TRRES_ACT",
+      "module_set": "MS_TEMP_CURRENT",
+      "module_short_code": "MOD3",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    },
+    {
+      "actor": {
+        "actor_input_contract": "token_attention",
+        "actor_kind": "transformer",
+        "pooling": "attention",
+        "token_contract": "pc_history_dual_horizon_v1"
+      },
+      "actor_backend": "AB_TA_M",
+      "arm_id": "G182_INT_STACK_TA_ALOSB_TRRES_ACT_MOD4",
+      "control_contract": "CC_ALOS_BODY",
+      "first_wave_order": null,
+      "learning_composition": "TRRES_ACT",
+      "module_set": "MS_FULL",
+      "module_short_code": "MOD4",
+      "program_group_id": "G-ALOS-BODY-RL",
+      "residual_interface": "RI_ACT",
+      "status": "DRAFT"
+    }
+  ],
+  "axis_registry": "configs/governance/goal182_axis_registry.json",
+  "axis_registry_sha256": "52ef810fd515143fda82a856d3054f3ef0a73f853633917158324b045844db9d",
+  "control_contract": "CC_ALOS_BODY",
+  "cross_program_pooling": false,
+  "goal_id": "Goal182",
+  "matrix_family_id": "G182-CORE-COMP",
+  "matrix_id": "G182-CORE-ALOSB",
+  "matrix_status": "DRAFT",
+  "program_group_id": "G-ALOS-BODY-RL",
+  "schema_version": "auv_core_composition_matrix.v1",
+  "training_profile": "PPO-FLAT-4096x48-E5-MB4"
+}

@@ -275,6 +275,36 @@ def test_budget_and_current_encoder_guards() -> None:
     assert budget is CurriculumDecision.STAGE_BUDGET_EXHAUSTED
 
 
+def test_goal182_iteration_caps_replace_transition_budget_unit() -> None:
+    stages = default_curriculum_stages()
+    expected = {
+        "C0": (72, 120),
+        "C1": (108, 180),
+        "C2": (156, 260),
+        "C3": (216, 360),
+        "C4": (252, 420),
+        "C5": (336, 560),
+        "C6": (420, 700),
+    }
+    assert {
+        name: (stage.soft_budget_iterations, stage.hard_cap_iterations)
+        for name, stage in stages.items()
+    } == expected
+    assert sum(stage.hard_cap_iterations for stage in stages.values()) == 2600
+
+    controller = CurriculumPromotionController(start_stage="C0")
+    assert (
+        controller.observe(_passing_evaluation(), completed_iterations=60)
+        is CurriculumDecision.CONTINUE
+    )
+    assert controller.stage_consumed_iterations == 60
+    assert (
+        controller.observe(_passing_evaluation(), completed_iterations=120)
+        is CurriculumDecision.STAGE_BUDGET_EXHAUSTED
+    )
+    assert controller.stage_consumed_iterations == 120
+
+
 def test_rollback_reentry_uses_per_stage_budget_not_global_transitions() -> None:
     controller = CurriculumPromotionController(start_stage="C0")
     passing = _passing_evaluation()

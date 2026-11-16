@@ -1877,6 +1877,13 @@ config、checkpoint metadata、matrix 和 run manifest。`token_mlp` 与 `transf
 `TOKENIZATION_CONFOUND`。普通 `mlp` 的 `fused` 输入只作 fused-token control，不能
 冒充 `token_mlp` 去证明/否定 attention 收益。
 
+**Actor metadata 缺失不再有隐式默认（2026-11-16 确认）**：新 Goal182 config、matrix
+和 manifest 必须显式记录 `actor_kind`、`actor_input_contract`、`token_contract` 和
+`pooling`；缺失任一项判 `ACTOR_METADATA_MISSING`，不得按普通 MLP 静默补默认值。
+第一波正式基线使用 `AB_MLP_M + actor_kind=mlp + actor_input_contract=fused`；
+`token_mlp` 只作为单独登记的 token-mean 对照，不能复用 `mlp` 的 arm_id。历史 config
+或 checkpoint 没有该字段时统一标 `historical_only`，不追溯改写，也不进入新正式主表。
+
 现有 `encoder.kind=dual_horizon_transformer` 只表示历史编码器，不能当作
 `AB_TA_M`；DADE/dual-horizon 属于 module set，不是 actor backend。Goal182 首轮只
 启用 `M` 档；S/L 档不进入 active core。M 档 MLP actor 与 critic 都是
@@ -1895,6 +1902,18 @@ warmstart checkpoint、SHA 和可训练参数范围必须写进 matrix，不能�
 `LC_BC_RESIDUAL` 使用 `base_policy.mode=frozen_pc_bc_residual`，当前短码 `BCRES`
 就是执行器残差版本。`LC_TRAD_RESIDUAL` 没有 BC 底座，使用传统 ALOS/PD-PI base
 加学习残差，并按 `AX_RESIDUAL_INTERFACE` 展开为命令残差和执行器残差。
+
+**TRRES encoder 初始化已确认（2026-11-16）：正式 TRRES 只复用编码器架构，不借用
+任何已训练权重。** 同一 `(actor_backend, module_set)` 的 TRRES arm 可以复用
+`actor_encoder`、DADE/dual-horizon、current encoder 的类型和隐藏层配置，但不得从
+BC checkpoint、其他 TRRES arm 或任何已完成 arm 加载编码器权重。正式 TRRES run 必须
+使用 `base_policy.mode=none`、无 `--warmstart-actor`、fresh optimizer、iteration 0
+和独立 fresh initialization；manifest 必须记录
+`encoder_init=standard_fresh`、`encoder_init_checkpoint=null`、`encoder_seed=<train seed>`
+以及编码器 schema/architecture SHA。`MOD4/MOD3` 配对只能共享架构、seed 和输入
+schema，不能通过加载外部权重实现配对。若未来要检验 BC encoder 初始化收益，必须
+另立预注册诊断族 `TRRES_BCENC_INIT_CMD/ACT`，不得进入 `G182-CORE-COMP`，也不得
+把该诊断结果写成正式 `TRRES_CMD/ACT` 结果。
 
 **CM3 已确认（2026-11-16）：正式 learning composition 固定为
 `BCFT / BCRES / TRRES` 三个 family。** 每个 `actor_backend × module_set` 的正式
@@ -2193,6 +2212,12 @@ ALOS + 命令层残差。完整的 `run_id` 和 `eval_cell` 继续使用 §4.12.
   改为 `MOD0–MOD4`，档位 ID 保留 `MS_*`；actor/critic 容量档位继续写 `M` 档。
   axis registry、matrix、文档和 run 命名必须使用 `MOD*`，不得再用裸 `M0–M4`
   表示 module set。
+- [x] MX9：TRRES encoder 权重复用边界。**已确认（2026-11-16）**：正式
+  `TRRES_CMD/ACT` 只复用同一 `(actor_backend, module_set)` 的编码器架构和配置，
+  不从 BC 或其他 arm 加载编码器权重；fresh initialization、fresh optimizer、
+  iteration 0。`MOD4/MOD3` 配对共享架构、seed 和输入 schema，不共享训练权重。
+  BC encoder 初始化若要做，只能另立预注册 `TRRES_BCENC_INIT_CMD/ACT` 诊断族，
+  不进入正式矩阵。
 
 **课程 CU1–CU8**
 
@@ -3137,6 +3162,7 @@ git diff --cached --check
 | 2026-11-15 | D14 gamma/lambda | `gamma=0.995`、`lam=0.95` | 保留 AUV 长时程信用跨度，不照搬 `0.99` |
 | 2026-11-15 | D15 entropy | `entropy_coef=0.005` 作为所有新 arm 公共配置 | Phase 4 只改变 `init_std`，不把 entropy 混入探索因子 |
 | 2026-11-15 | D16 warmstart/checkpoint | 同一 BC 底座与残差初始化；fresh optimizer；iteration=0；final/early-stop checkpoint；禁止 dev best 和跨 arm resume | 保证 arm 公平并隔离验证集 |
+| 2026-11-16 | TRRES encoder 初始化 | 正式 TRRES 只复用 encoder 架构，不借用 BC/其他 arm 的已训练权重；fresh init、fresh optimizer、iteration=0 | `MOD4/MOD3` 仅共享架构、seed 和输入 schema；manifest 记录 `encoder_init=standard_fresh`、`encoder_init_checkpoint=null`；BC encoder 初始化另立诊断族 `TRRES_BCENC_INIT_CMD/ACT`，不进入正式矩阵 |
 | 2026-11-15 | D17 capacity | 并入 D10：固定 M 档 MLP `[512,256,128]`，actor/critic 同容量 | 旧 `[256,128]` 仅 `historical_only` |
 | 2026-11-16 | 残差接口轴 | 用户确认残差组两种接口都有价值；新增条件轴 `AX_RESIDUAL_INTERFACE`，`ALOSB × TRRES` 拆成 `TRRES_CMD` 与 `TRRES_ACT` 两个正式 arm | `BCRES` 当前只支持执行器残差；`BCRES_CMD` 需兼容命令输出 BC，另立 arm 族 |
 | 2026-11-15 | D18 early-stop 作用域 | C6 arm early stop 只在 C6 使用 20/3；C0–C5 由 StageGate/hard cap 结束；StageGate 自身按 R5-D 使用 training-rollout 20/3 | arm early stop 与 StageGate 使用独立 counter；stage 变化时两套 window 和 consecutive 都清空 |
@@ -3180,6 +3206,7 @@ git diff --cached --check
 | 2026-11-16 | M2 评价矩阵 v2 与 cell 语义 | 采用 `auv_goal_matrix.v2`；每个 tier 独立 matrix；arm/baseline 通过 `evaluation_set` 声明覆盖；eval seeds 用显式列表；cell 不含 eval seed，episode 才含 eval seed；checker 自动重算 cells/episodes | `policy_cells` 和 `zero_cells` 由 coverage 展开；`expected_episodes` 另算；缺 cell/未登记 cell/算术不一致/held-out 泄漏分别判 `INVALID_INCOMPLETE_EVAL` / `INVALID_UNREGISTERED_CELL` / `INVALID_MATRIX_ARITHMETIC` / `INVALID_HELDOUT_LEAK`。见 §4.12.2 |
 | 2026-11-16 | 终点捕获统计边界 | 终点捕获/`goal_reached` 可以记录为描述性统计，但绝对不能作为评价指标 | 禁止进入 Gate、winner 排名、前三名选择、early-stop、路线泛化入选、matrix completeness 或 primary/secondary KPI；如报告保留，只能标 `DESCRIPTIVE_ONLY_NOT_A_METRIC`。success 必须由 EV5 单独定义，不能把终点捕获改名成 success。见 §5.2 |
 | 2026-11-16 | CM2 actor backend | `AX_ACTOR_BACKEND` 只保留 `AB_MLP_M / AB_TA_M` 两档；`token_mlp` 不新增第三档，而是 `AB_MLP_M` 内由 `actor_kind` 标识的公平对照 | `actor_kind=mlp|token_mlp|transformer` 必须写入 config/checkpoint/matrix/manifest；`AB_TA_M` 只允许 `transformer`，不得用历史 encoder 冒充；token-MLP 与 Transformer 必须共享 token 集合、顺序、宽度和 pooling，否则判 `TOKENIZATION_CONFOUND`；M 档容量配对与 ±20% 参数/latency 规则见 §4.13.2 |
+| 2026-11-16 | Actor metadata 显式化 | 用户确认后续基础设施必须把 `actor_kind` 显式写入 config/manifest；扩为 `actor_kind / actor_input_contract / token_contract / pooling` 四项一起显式 | 新 profile-bound config 缺失即 `ACTOR_METADATA_MISSING`；首波基线固定 `mlp/fused/none/none`；历史 config/checkpoint 标 `historical_only`。实现见 `goal182_infra_audit_20261116.md` |
 | 2026-11-16 | CM3 learning composition | 正式固定 `BCFT / BCRES / TRRES` 三个 family；`TRRES` 展开为 `TRRES_CMD / TRRES_ACT`；每 `actor_backend × module_set` 为 6 个正式 arm | `SCRATCH` 只作非正式 optional diagnostic，不进核心矩阵、第一波和 60 个正式组合，不参加 winner/路线泛化，不能替代 `BCFT`；完整 PPO 微调始终必做。见 §4.13.2 |
 | 2026-11-16 | CQ1 current estimator profile | 采用 A：Goal182 固定一套 `sensors.profile`；`current_estimator_level` 只作 metadata，不切换估计器 | 后续单独立项降低 current estimate 延迟；不得把估计器精度变化混入 MOD 或 curriculum；其余 CQ2–CQ8 待核对。见 §4.13.9 |
 | 2026-11-16 | CQ2 actor current view | 采用 A：actor 使用 raw `current_estimate_body` | guidance 的 filtered / valid-age-aware current 作为后续独立消融；本轮不改 actor current 语义，不把 EMA 过滤接入 actor。见 §4.13.9 |

@@ -21,6 +21,12 @@ BASE_TRAIN_PATH = (
 )
 
 TRAINING_PROFILE = "PPO-FLAT-4096x48-E5-MB4"
+ACTOR_METADATA = {
+    "actor_kind": "mlp",
+    "actor_input_contract": "fused",
+    "token_contract": "none",
+    "pooling": "none",
+}
 PPO_NUM_ENVS = 4096
 PPO_STEPS_PER_ENV = 48
 PPO_LEARNING_EPOCHS = 5
@@ -132,7 +138,7 @@ def _environment() -> dict[str, Any]:
     payload["reward"] = copy.deepcopy(REWARD)
     payload["termination"] = copy.deepcopy(TERMINATION)
     payload["plant"]["bounds_m"][2][1] = 520.0
-    payload["sensors"] = {"profile": "unbiased_noise_v1", "seed": 81300}
+    payload["sensors"] = {"profile": "unbiased_small_noise_v2", "seed": 81300}
     payload["experiment"].update(
         {
             "name": "goal182_path_fixed_speed_c3",
@@ -150,6 +156,7 @@ def _environment() -> dict[str, Any]:
 def _training(*, mode: str, environment_path: Path) -> dict[str, Any]:
     payload = _load(BASE_TRAIN_PATH)
     payload["training_profile"] = TRAINING_PROFILE
+    payload["actor"] = copy.deepcopy(ACTOR_METADATA)
     payload["environment"].update(
         {
             "config": _relative(environment_path),

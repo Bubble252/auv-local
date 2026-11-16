@@ -282,6 +282,8 @@ class CurriculumStageSpec:
     soft_budget_transitions: int
     hard_cap_transitions: int
     gate: StageGate
+    soft_budget_iterations: int | None = None
+    hard_cap_iterations: int | None = None
 
     def __post_init__(self) -> None:
         if self.name not in CURRICULUM_STAGE_ORDER:
@@ -337,6 +339,22 @@ class CurriculumStageSpec:
                 raise ValueError(f"{self.name}.{name} must be a positive integer")
         if self.soft_budget_transitions > self.hard_cap_transitions:
             raise ValueError(f"{self.name} soft budget exceeds hard cap")
+        if (self.soft_budget_iterations is None) != (
+            self.hard_cap_iterations is None
+        ):
+            raise ValueError(
+                f"{self.name} iteration soft/hard caps must be set together"
+            )
+        if self.hard_cap_iterations is not None:
+            for name, value in (
+                ("soft_budget_iterations", self.soft_budget_iterations),
+                ("hard_cap_iterations", self.hard_cap_iterations),
+            ):
+                if isinstance(value, bool) or value is None or value <= 0:
+                    raise ValueError(f"{self.name}.{name} must be a positive integer")
+            assert self.soft_budget_iterations is not None
+            if self.soft_budget_iterations > self.hard_cap_iterations:
+                raise ValueError(f"{self.name} iteration soft budget exceeds hard cap")
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -362,6 +380,8 @@ class CurriculumStageSpec:
             "speed_range_mps": list(self.speed_range_mps),
             "soft_budget_transitions": self.soft_budget_transitions,
             "hard_cap_transitions": self.hard_cap_transitions,
+            "soft_budget_iterations": self.soft_budget_iterations,
+            "hard_cap_iterations": self.hard_cap_iterations,
             "gate": self.gate.as_dict(),
         }
 
@@ -488,6 +508,8 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             speed_range_mps=(1.2, 1.2),
             soft_budget_transitions=250_000,
             hard_cap_transitions=400_000,
+            soft_budget_iterations=72,
+            hard_cap_iterations=120,
             gate=gates["C0"],
         ),
         CurriculumStageSpec(
@@ -507,6 +529,8 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             speed_range_mps=(1.15, 1.25),
             soft_budget_transitions=350_000,
             hard_cap_transitions=550_000,
+            soft_budget_iterations=108,
+            hard_cap_iterations=180,
             gate=gates["C1"],
         ),
         CurriculumStageSpec(
@@ -526,6 +550,8 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             speed_range_mps=(1.10, 1.30),
             soft_budget_transitions=450_000,
             hard_cap_transitions=650_000,
+            soft_budget_iterations=156,
+            hard_cap_iterations=260,
             gate=gates["C2"],
         ),
         CurriculumStageSpec(
@@ -545,6 +571,8 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             speed_range_mps=(1.10, 1.35),
             soft_budget_transitions=550_000,
             hard_cap_transitions=750_000,
+            soft_budget_iterations=216,
+            hard_cap_iterations=360,
             gate=gates["C3"],
         ),
         CurriculumStageSpec(
@@ -564,6 +592,8 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             speed_range_mps=(1.10, 1.35),
             soft_budget_transitions=550_000,
             hard_cap_transitions=750_000,
+            soft_budget_iterations=252,
+            hard_cap_iterations=420,
             gate=gates["C4"],
         ),
         CurriculumStageSpec(
@@ -583,6 +613,8 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             speed_range_mps=(1.10, 1.40),
             soft_budget_transitions=650_000,
             hard_cap_transitions=900_000,
+            soft_budget_iterations=336,
+            hard_cap_iterations=560,
             gate=gates["C5"],
         ),
         CurriculumStageSpec(
@@ -602,6 +634,8 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             speed_range_mps=(1.20, 1.40),
             soft_budget_transitions=700_000,
             hard_cap_transitions=1_000_000,
+            soft_budget_iterations=420,
+            hard_cap_iterations=700,
             gate=gates["C6"],
         ),
     )
@@ -855,6 +889,7 @@ class CurriculumDecisionRecord:
     next_stage: str | None
     evaluation: StageEvaluation
     completed_transitions: int | None
+    completed_iterations: int | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -876,6 +911,7 @@ class CurriculumDecisionRecord:
                 ),
             },
             "completed_transitions": self.completed_transitions,
+            "completed_iterations": self.completed_iterations,
         }
 
 
@@ -901,7 +937,11 @@ class CurriculumPromotionController:
         self._stage_consumed: dict[str, int] = {
             stage: 0 for stage in self.stages
         }
+        self._stage_consumed_iterations: dict[str, int] = {
+            stage: 0 for stage in self.stages
+        }
         self._stage_entry_transition: int | None = 0
+        self._stage_entry_iteration: int | None = 0
         self.history: list[CurriculumDecisionRecord] = []
 
     @property
@@ -928,6 +968,23 @@ class CurriculumPromotionController:
     def stage_consumed_transitions(self) -> int:
         return int(self._stage_consumed.get(self.stage, 0))
 
+    def _consume_iterations(self, completed_iterations: int | None) -> None:
+        """Accumulate training iterations spent in the current stage."""
+
+        if completed_iterations is None:
+            return
+        completed = int(completed_iterations)
+        if self._stage_entry_iteration is not None:
+            elapsed = max(0, completed - self._stage_entry_iteration)
+            self._stage_consumed_iterations[self.stage] = (
+                self._stage_consumed_iterations.get(self.stage, 0) + elapsed
+            )
+        self._stage_entry_iteration = completed
+
+    @property
+    def stage_consumed_iterations(self) -> int:
+        return int(self._stage_consumed_iterations.get(self.stage, 0))
+
     def _record(
         self,
         decision: CurriculumDecision,
@@ -935,6 +992,7 @@ class CurriculumPromotionController:
         evaluation: StageEvaluation,
         completed_transitions: int | None,
         next_stage: str | None,
+        completed_iterations: int | None = None,
     ) -> CurriculumDecision:
         self.history.append(
             CurriculumDecisionRecord(
@@ -944,6 +1002,7 @@ class CurriculumPromotionController:
                 next_stage=next_stage,
                 evaluation=evaluation,
                 completed_transitions=completed_transitions,
+                completed_iterations=completed_iterations,
             )
         )
         return decision
@@ -976,8 +1035,25 @@ class CurriculumPromotionController:
         evaluation: StageEvaluation,
         *,
         completed_transitions: int | None = None,
+        completed_iterations: int | None = None,
     ) -> CurriculumDecision:
         spec = self.stages[self.stage]
+        if completed_iterations is not None:
+            if isinstance(completed_iterations, bool) or int(completed_iterations) < 0:
+                raise ValueError("completed_iterations must be a non-negative integer")
+            self._consume_iterations(int(completed_iterations))
+            if (
+                spec.hard_cap_iterations is not None
+                and self.stage_consumed_iterations >= spec.hard_cap_iterations
+            ):
+                return self._record(
+                    CurriculumDecision.STAGE_BUDGET_EXHAUSTED,
+                    "stage iteration hard-cap exhausted before promotion",
+                    evaluation,
+                    None,
+                    None,
+                    completed_iterations=int(completed_iterations),
+                )
         if completed_transitions is not None:
             if isinstance(completed_transitions, bool) or int(completed_transitions) < 0:
                 raise ValueError("completed_transitions must be a non-negative integer")

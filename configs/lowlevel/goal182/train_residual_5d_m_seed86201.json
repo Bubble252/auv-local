@@ -1,4 +1,10 @@
 {
+  "actor": {
+    "actor_input_contract": "fused",
+    "actor_kind": "mlp",
+    "pooling": "none",
+    "token_contract": "none"
+  },
   "algorithm": {
     "clip_param": 0.2,
     "desired_kl": 0.01,

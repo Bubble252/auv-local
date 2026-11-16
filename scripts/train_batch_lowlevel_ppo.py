@@ -36,26 +36,26 @@ from auv_lowlevel.batch.metrics import (
     post_update_policy_metrics,
 )
 from auv_lowlevel.batch.observation import OBSERVATION_SCHEMA_V1, OBSERVATION_SCHEMA_V2
+from auv_lowlevel.batch.pc_actuator_residual import BatchedPCActuatorResidualEnv
 from auv_lowlevel.batch.pc_bc import (
     load_pc_bc_actor_prior,
     load_pc_bc_frozen_actor_prior,
     read_pc_bc_checkpoint_metadata,
 )
-from auv_lowlevel.batch.pc_actuator_residual import BatchedPCActuatorResidualEnv
+from auv_lowlevel.batch.pc_command_residual import BatchedPCCommandResidualEnv
 from auv_lowlevel.batch.pc_diagnostics import parameter_snapshot, policy_diagnostics
 from auv_lowlevel.batch.pc_env import BatchedPCLowLevelEnv
 from auv_lowlevel.batch.pc_frozen_residual_vec_env import (
     BatchTorchPCFrozenBCResidualVecEnv,
 )
-from auv_lowlevel.batch.pc_command_residual import BatchedPCCommandResidualEnv
 from auv_lowlevel.batch.pc_normalization import PCNormalization
 from auv_lowlevel.batch.pc_path import (
     PC_PATH_BLOCK_FEATURE_INDICES_BY_DIM,
     PC_PATH_DIMS,
+    path_block_column_mask,
+    pc_path_default_blocks_for_dim,
     pc_path_feature_names_for_dim,
     pc_path_feature_scales_for_dim,
-    pc_path_default_blocks_for_dim,
-    path_block_column_mask,
     pc_path_schema_hash,
 )
 from auv_lowlevel.batch.pc_policy import (
@@ -86,6 +86,7 @@ from auv_lowlevel.curriculum_trainer import (
 )
 from auv_lowlevel.experiment_contract import require_training_curriculum
 from auv_lowlevel.ppo_config import (
+    TRRES_LEARNING_COMPOSITIONS,
     load_training_config,
     resolve_pc_action_interface,
     validate_arm_base_consistency,
@@ -139,7 +140,6 @@ def _configure_optimizer_learning_rates(
     separate_dade_head_lr = (
         dade_head_lr is not None and float(dade_head_lr) != actor_lr
     )
-    frozen_bc_residual = training.base_mode == "frozen_pc_bc_residual"
     if (
         actor_lr == critic_lr
         and warmup_iterations == 0
@@ -543,6 +543,14 @@ def main() -> int:
         raise ValueError("--warmstart-actor requires training.initial_residual_zero=false")
     if warmstart_path is not None and not warmstart_path.is_file():
         raise FileNotFoundError(f"actor warm-start checkpoint not found: {warmstart_path}")
+    if (
+        training.learning_composition in TRRES_LEARNING_COMPOSITIONS
+        and warmstart_path is not None
+    ):
+        raise ValueError(
+            f"{training.learning_composition} must not use --warmstart-actor; "
+            "TRRES_ENCODER_INIT_INVALID"
+        )
     if residual_warmstart_path is not None and not residual_warmstart_path.is_file():
         raise FileNotFoundError(
             f"supervised residual warm-start checkpoint not found: {residual_warmstart_path}"
@@ -849,7 +857,10 @@ def main() -> int:
                     _path_blocks_for_iteration(training.pc, int(locs["it"]) + 1)
                 )
             if self._curriculum_hook is not None:
-                self._curriculum_hook.maybe_update(int(self.env.total_env_steps))
+                self._curriculum_hook.maybe_update(
+                    int(self.env.total_env_steps),
+                    completed_iterations=int(locs["it"]) + 1,
+                )
 
         def gpu_peak_summary(self) -> dict[str, float | None]:
             if self._record_device.type != "cuda":
@@ -1103,6 +1114,8 @@ def main() -> int:
             physics_dtype=training.physics_dtype,
             seed=seed,
         )
+    if training.actor is not None:
+        checkpoint_infos[CHECKPOINT_METADATA_KEY]["actor"] = training.actor.as_dict()
         checkpoint_infos[CHECKPOINT_METADATA_KEY]["actor_decision_stride"] = (
             training.actor_decision_stride
         )
@@ -1171,6 +1184,10 @@ def main() -> int:
         "training_config": str(training_path),
         "training_config_sha256": training_config_sha256,
         "training_profile": training.training_profile,
+        "actor": None if training.actor is None else training.actor.as_dict(),
+        "learning_composition": training.learning_composition,
+        "encoder_init": training.encoder_init,
+        "encoder_init_checkpoint": training.encoder_init_checkpoint,
         "environment_config": str(environment_path),
         "environment_config_sha256": environment_config_sha256,
         "backend": training.vector_env_backend,
