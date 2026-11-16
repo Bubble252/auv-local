@@ -85,6 +85,7 @@ def build_observation(self) -> BatchedPCObservation:
             path=self.path,
             position_ned_m=actor_position_ned_m,
             path_blocks=self.path_blocks,
+            path_dim=self.actor_path_dim,
             endpoint_enter_m=self.endpoint_enter_m,
             endpoint_full_m=self.endpoint_full_m,
         )

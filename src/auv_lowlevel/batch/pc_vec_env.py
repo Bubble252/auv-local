@@ -15,6 +15,8 @@ from .pc_env import BatchedPCLowLevelEnv, BatchedPCObservation
 from .pc_normalization import PCNormalization
 from .pc_path import normalize_path_features, path_block_column_mask, validate_path_blocks
 from .pc_policy import PCPolicyLayout
+from .pc_privileged import build_pc_critic_privileged
+from .pc_privileged_schema import PC_CRITIC_PRIV_DIM
 
 
 class BatchTorchPCVecEnv:
@@ -39,6 +41,7 @@ class BatchTorchPCVecEnv:
         actor_command_dim: int = 3,
         critic_command_dim: int = 3,
         history_path_dim: int = 0,
+        critic_path_dim: int = 0,
         actor_current_encoder_enabled: bool = False,
         normalization: PCNormalization | None = None,
         current_frame_dropout_prob: float = 0.0,
@@ -64,6 +67,8 @@ class BatchTorchPCVecEnv:
             )
         if observation_dtype != torch.float32:
             raise ValueError("policy observations must use float32")
+        if critic_path_dim not in (0, PC_CRITIC_PRIV_DIM):
+            raise ValueError(f"critic_path_dim must be 0 or {PC_CRITIC_PRIV_DIM}")
 
         self.env = env
         self.num_envs = env.num_envs
@@ -92,6 +97,7 @@ class BatchTorchPCVecEnv:
         )
         self.critic_layout = PCPolicyLayout(
             state_dim=env.critic_state_dim,
+            path_dim=critic_path_dim,
             short_window=short_window,
             long_window=long_window,
             command_dim=critic_command_dim,
@@ -154,6 +160,7 @@ class BatchTorchPCVecEnv:
             "command_dim": self.actor_layout.command_dim,
             "critic_command_dim": self.critic_layout.command_dim,
             "history_path_dim": self.actor_layout.history_path_dim,
+            "critic_path_dim": self.critic_layout.path_dim,
             "actor_current_encoder_enabled": actor_current_encoder_enabled,
             "actor_current_dim": self.actor_layout.current_dim,
             "side_channel_dim": self.actor_layout.side_channel_dim,
@@ -176,6 +183,9 @@ class BatchTorchPCVecEnv:
                 else "zero_when_actor_current_encoder_disabled"
             ),
             "critic_side_channel": "true_current_ned",
+            "critic_path_schema": (
+                "pc_critic_priv_v1" if self.critic_layout.path_dim else None
+            ),
             "true_current_in_actor_observation": False,
         }
         self.reset()
@@ -190,7 +200,17 @@ class BatchTorchPCVecEnv:
 
     def _tokens(
         self, observation: BatchedPCObservation
-    ) -> tuple[Tensor, Tensor | None, Tensor | None, Tensor, Tensor, Tensor, Tensor, Tensor]:
+    ) -> tuple[
+        Tensor,
+        Tensor | None,
+        Tensor | None,
+        Tensor,
+        Tensor | None,
+        Tensor,
+        Tensor,
+        Tensor,
+        Tensor,
+    ]:
         actor_state = self.normalization.normalize_actor_state(observation.actor_state)
         actor_path = observation.actor_path
         if self.actor_layout.path_dim:
@@ -218,6 +238,20 @@ class BatchTorchPCVecEnv:
             else torch.zeros_like(observation.actor_current_body)
         )
         critic_side = self.normalization.normalize_current(observation.critic_current_ned)
+        critic_path: Tensor | None = None
+        if self.critic_layout.path_dim:
+            if self.env.eta is None or self.env.path is None:
+                raise RuntimeError("privileged critic path requires initialized true eta")
+            true_projection = self.env.path.project(
+                self.env.eta[:, :3],
+                search_radius=self.env.reset_projection_search_radius,
+            )
+            critic_path = build_pc_critic_privileged(
+                env=self.env,
+                observation=observation,
+                projection=true_projection,
+                normalization=self.normalization,
+            )
         command_full = observation.command.normalized()
         actor_command = self.normalization.normalize_command(
             self._select_command(command_full, self.actor_layout.command_dim)
@@ -237,6 +271,7 @@ class BatchTorchPCVecEnv:
             None if actor_path is None else actor_path.to(self.observation_dtype),
             None if actor_current is None else actor_current.to(self.observation_dtype),
             critic_state.to(self.observation_dtype),
+            None if critic_path is None else critic_path.to(self.observation_dtype),
             actor_command.to(self.observation_dtype),
             critic_command.to(self.observation_dtype),
             actor_token,
@@ -309,6 +344,7 @@ class BatchTorchPCVecEnv:
             actor_path,
             actor_current,
             critic_state,
+            critic_path,
             actor_command,
             critic_command,
             _actor_token,
@@ -331,6 +367,7 @@ class BatchTorchPCVecEnv:
         )
         self._critic_observations = self.critic_layout.flatten(
             state=critic_state,
+            path=critic_path,
             command=critic_command,
             short=critic_short,
             long=critic_long,
@@ -409,6 +446,7 @@ class BatchTorchPCVecEnv:
         actor_path: Tensor | None,
         actor_current: Tensor | None,
         critic_state: Tensor,
+        critic_path: Tensor | None,
         actor_command: Tensor,
         critic_command: Tensor,
         *,
@@ -449,6 +487,13 @@ class BatchTorchPCVecEnv:
             drop=drop,
             reset_mask=reset_mask,
         )
+        if critic_path is not None and self.current_frame_dropout_prob > 0.0:
+            if self.current_frame_dropout_mode in {"full"}:
+                critic_path = torch.where(
+                    drop[:, None],
+                    torch.zeros_like(critic_path),
+                    critic_path,
+                )
         actor_obs = self.actor_layout.flatten(
             state=actor_state,
             path=actor_path,
@@ -459,6 +504,7 @@ class BatchTorchPCVecEnv:
         )
         critic_obs = self.critic_layout.flatten(
             state=critic_state,
+            path=critic_path,
             command=critic_command,
             short=critic_short,
             long=critic_long,
@@ -471,6 +517,7 @@ class BatchTorchPCVecEnv:
             actor_path,
             actor_current,
             critic_state,
+            critic_path,
             actor_command,
             critic_command,
             actor_token,
@@ -482,6 +529,7 @@ class BatchTorchPCVecEnv:
             actor_path,
             actor_current,
             critic_state,
+            critic_path,
             actor_command,
             critic_command,
             reset_mask=reset_mask,

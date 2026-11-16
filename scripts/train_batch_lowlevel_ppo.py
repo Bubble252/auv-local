@@ -50,11 +50,11 @@ from auv_lowlevel.batch.pc_frozen_residual_vec_env import (
 from auv_lowlevel.batch.pc_command_residual import BatchedPCCommandResidualEnv
 from auv_lowlevel.batch.pc_normalization import PCNormalization
 from auv_lowlevel.batch.pc_path import (
-    PC_PATH_BLOCK_FEATURE_INDICES,
-    PC_PATH_DEFAULT_BLOCKS,
-    PC_PATH_DIM,
-    PC_PATH_FEATURE_NAMES,
-    PC_PATH_FEATURE_SCALES,
+    PC_PATH_BLOCK_FEATURE_INDICES_BY_DIM,
+    PC_PATH_DIMS,
+    pc_path_feature_names_for_dim,
+    pc_path_feature_scales_for_dim,
+    pc_path_default_blocks_for_dim,
     path_block_column_mask,
     pc_path_schema_hash,
 )
@@ -63,6 +63,11 @@ from auv_lowlevel.batch.pc_policy import (
     PC_CRITIC_STATE_DIM,
     PCPolicyLayout,
     pc_schema_hash,
+)
+from auv_lowlevel.batch.pc_privileged_schema import (
+    PC_CRITIC_PRIV_BLOCK_NAMES,
+    PC_CRITIC_PRIV_FEATURE_NAMES,
+    PC_CRITIC_PRIV_GROUP_SLICES,
 )
 from auv_lowlevel.batch.pc_residual_pretrain import load_pc_supervised_residual
 from auv_lowlevel.batch.pc_vec_env import BatchTorchPCVecEnv
@@ -102,7 +107,7 @@ DEFAULT_CHECKPOINT_SELECTION_BASIS = (
 
 def _path_blocks_for_iteration(pc: Any, iteration: int) -> tuple[str, ...]:
     if not pc.path_curriculum:
-        return tuple(PC_PATH_DEFAULT_BLOCKS)
+        return pc_path_default_blocks_for_dim(pc.path_dim) if pc.path_dim else ()
     selected: tuple[str, ...] = ()
     for start, blocks in pc.path_curriculum:
         if iteration >= start:
@@ -112,7 +117,7 @@ def _path_blocks_for_iteration(pc: Any, iteration: int) -> tuple[str, ...]:
 
 def _final_path_blocks(pc: Any) -> tuple[str, ...]:
     if not pc.path_curriculum:
-        return tuple(PC_PATH_DEFAULT_BLOCKS)
+        return pc_path_default_blocks_for_dim(pc.path_dim) if pc.path_dim else ()
     last_start, last_blocks = pc.path_curriculum[-1]
     del last_start
     return tuple(block for block in last_blocks if block != "state_base")
@@ -139,7 +144,6 @@ def _configure_optimizer_learning_rates(
         actor_lr == critic_lr
         and warmup_iterations == 0
         and not separate_dade_head_lr
-        and not frozen_bc_residual
     ):
         return
     if not is_pc:
@@ -573,9 +577,13 @@ def main() -> int:
     physics_dtype = torch.float32 if training.physics_dtype == "float32" else torch.float64
     if is_pc:
         assert training.history is not None
-        if environment.pc_control_mode.startswith("path_") and training.pc.path_dim != PC_PATH_DIM:
+        if (
+            environment.pc_control_mode.startswith("path_")
+            and training.pc.path_dim not in PC_PATH_DIMS
+        ):
             raise ValueError(
-                "ALOS-free path_* PC control requires pc.path_dim=PC_PATH_DIM (8)"
+                "ALOS-free path_* PC control requires pc.path_dim in "
+                f"{PC_PATH_DIMS}"
             )
         actor_layout = PCPolicyLayout(
             state_dim=PC_ACTOR_STATE_DIM,
@@ -588,6 +596,7 @@ def main() -> int:
         )
         critic_layout = PCPolicyLayout(
             state_dim=PC_CRITIC_STATE_DIM,
+            path_dim=training.pc.critic_path_dim,
             short_window=training.history.short_window,
             long_window=training.history.long_window,
             command_dim=training.pc.critic_command_dim,
@@ -904,17 +913,32 @@ def main() -> int:
                 "output_dim": int(training.pc.d_z_total),
                 "alpha": float(bc_metadata["path_encoder_alpha"]),
             }
+        path_feature_indices = (
+            {
+                name: list(indices)
+                for name, indices in PC_PATH_BLOCK_FEATURE_INDICES_BY_DIM[
+                    training.pc.path_dim
+                ].items()
+            }
+            if training.pc.path_dim
+            else {}
+        )
         pc_metadata = {
             "schema_hash": pc_schema_hash(
                 path_dim=training.pc.path_dim,
                 path_blocks=final_path_blocks,
+                critic_path_dim=training.pc.critic_path_dim,
                 dade_history_mode=training.pc.dade_history_mode,
                 actor_command_dim=training.pc.actor_command_dim,
                 critic_command_dim=training.pc.critic_command_dim,
                 history_path_dim=training.pc.history_path_dim,
                 actor_current_encoder_enabled=training.pc.actor_current_encoder_enabled,
             ),
+            "actor_architecture": "mlp",
+            "actor_hidden_dims": list(training.policy["actor_hidden_dims"]),
+            "critic_hidden_dims": list(training.policy["critic_hidden_dims"]),
             "actor_layout": {
+                "kind": "mlp",
                 "state_dim": actor_layout.state_dim,
                 "path_dim": actor_layout.path_dim,
                 "current_dim": actor_layout.current_dim,
@@ -928,6 +952,7 @@ def main() -> int:
             },
             "critic_layout": {
                 "state_dim": critic_layout.state_dim,
+                "path_dim": critic_layout.path_dim,
                 "command_dim": critic_layout.command_dim,
                 "side_channel_dim": critic_layout.side_channel_dim,
                 "token_dim": critic_layout.token_dim,
@@ -948,14 +973,19 @@ def main() -> int:
             },
             "path": {
                 "dim": training.pc.path_dim,
-                "feature_names": list(PC_PATH_FEATURE_NAMES) if training.pc.path_dim else [],
-                "feature_scales": list(PC_PATH_FEATURE_SCALES) if training.pc.path_dim else [],
+                "feature_names": (
+                    list(pc_path_feature_names_for_dim(training.pc.path_dim))
+                    if training.pc.path_dim
+                    else []
+                ),
+                "feature_scales": (
+                    list(pc_path_feature_scales_for_dim(training.pc.path_dim))
+                    if training.pc.path_dim
+                    else []
+                ),
                 "blocks": list(final_path_blocks),
                 "active_column_mask": final_path_mask,
-                "feature_indices": {
-                    name: list(indices)
-                    for name, indices in PC_PATH_BLOCK_FEATURE_INDICES.items()
-                },
+                "feature_indices": path_feature_indices,
                 "schema_hash": (
                     pc_path_schema_hash(final_path_blocks)
                     if training.pc.path_dim
@@ -979,6 +1009,29 @@ def main() -> int:
                 "n_z_reserved": training.pc.n_z_reserved,
                 "output_active_mask": output_mask,
                 "hidden_dims": list(training.pc.state_encoder_hidden_dims),
+            },
+            "critic_path": {
+                "dim": training.pc.critic_path_dim,
+                "feature_names": (
+                    list(PC_CRITIC_PRIV_FEATURE_NAMES)
+                    if training.pc.critic_path_dim
+                    else []
+                ),
+                "groups": {
+                    name: list(PC_CRITIC_PRIV_GROUP_SLICES[name])
+                    for name in PC_CRITIC_PRIV_BLOCK_NAMES
+                }
+                if training.pc.critic_path_dim
+                else {},
+                "encoder_hidden_dims": list(
+                    training.pc.critic_path_encoder_hidden_dims
+                ),
+                "encoder_alpha": training.pc.critic_path_encoder_alpha,
+                "encoder_initialization": (
+                    "zero_final_linear"
+                    if training.pc.critic_path_encoder_zero_init
+                    else "default"
+                ),
             },
             "dade_enabled": training.pc.dade_enabled,
             "aux_current_coef": training.pc.aux_current_coef,
@@ -1117,6 +1170,7 @@ def main() -> int:
         "git_commit": _git_commit(),
         "training_config": str(training_path),
         "training_config_sha256": training_config_sha256,
+        "training_profile": training.training_profile,
         "environment_config": str(environment_path),
         "environment_config_sha256": environment_config_sha256,
         "backend": training.vector_env_backend,
@@ -1306,6 +1360,7 @@ def main() -> int:
                 actor_command_dim=training.pc.actor_command_dim,
                 critic_command_dim=training.pc.critic_command_dim,
                 history_path_dim=training.pc.history_path_dim,
+                critic_path_dim=training.pc.critic_path_dim,
                 actor_current_encoder_enabled=training.pc.actor_current_encoder_enabled,
                 current_frame_dropout_prob=training.history.current_frame_dropout_prob,
                 current_frame_dropout_mode=training.history.current_frame_dropout_mode,
@@ -1464,8 +1519,14 @@ def main() -> int:
             runner._current_encoder_alpha = initial_alpha
             runner.alg.policy.set_actor_current_encoder_alpha(initial_alpha)
         _configure_optimizer_learning_rates(runner, training, is_pc=is_pc)
+        if is_pc:
+            policy_parameter_counts = runner.alg.policy.parameter_counts()
+            checkpoint_infos[CHECKPOINT_METADATA_KEY].update(policy_parameter_counts)
+        else:
+            policy_parameter_counts = {}
         manifest.update(
             {
+                **policy_parameter_counts,
                 "optimizer_param_group_counts": {
                     group.get("name", f"group_{index}"): sum(
                         parameter.numel() for parameter in group["params"]
@@ -1654,6 +1715,7 @@ def main() -> int:
                 expected_schema_hash=pc_schema_hash(
                     path_dim=training.pc.path_dim,
                     path_blocks=final_path_blocks,
+                    critic_path_dim=training.pc.critic_path_dim,
                     dade_history_mode=training.pc.dade_history_mode,
                     actor_command_dim=training.pc.actor_command_dim,
                     critic_command_dim=training.pc.critic_command_dim,

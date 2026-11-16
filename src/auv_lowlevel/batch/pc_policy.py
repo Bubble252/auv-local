@@ -26,21 +26,30 @@ import torch
 from torch import Tensor, nn
 from torch.distributions import Normal
 from torch.nn import functional as F
+from torch.utils.checkpoint import checkpoint
 
 from auv_lowlevel.ppo_config import EncoderConfig
 
 from .encoded_policy import DualHorizonEncoder, _activation, _coerce_encoder_config, _mlp
 from .pc_path import (
-    PC_PATH_DEFAULT_BLOCKS,
-    PC_PATH_DIM_ENDPOINT,
+    PC_PATH_DIM_SAFE,
     PC_PATH_DIMS,
-    PC_PATH_ENDPOINT_BLOCKS,
+    pc_path_default_blocks_for_dim,
     pc_path_feature_names_for_dim,
     pc_path_feature_scales_for_dim,
+    pc_path_schema_hash,
     validate_path_blocks,
+)
+from .pc_privileged_schema import (
+    PC_CRITIC_PRIV_BLOCK_NAMES,
+    PC_CRITIC_PRIV_DIM,
+    PC_CRITIC_PRIV_FEATURE_NAMES,
+    PC_CRITIC_PRIV_GROUP_SLICES,
 )
 
 PC_SCHEMA_VERSION = "pc_v1"
+_HISTORY_ENCODER_CHECKPOINT_MIN_TOKENS = 8192
+_POLICY_CHECKPOINT_MIN_BATCH = 8192
 PC_ACTOR_STATE_NAMES = (
     "x",
     "y",
@@ -89,6 +98,7 @@ def pc_schema_hash(
     *,
     path_dim: int = 0,
     path_blocks: Sequence[str] | None = None,
+    critic_path_dim: int = 0,
     dade_history_mode: str = "raw",
     actor_command_dim: int = PC_COMMAND_DIM,
     critic_command_dim: int = PC_COMMAND_DIM,
@@ -103,6 +113,8 @@ def pc_schema_hash(
         raise ValueError("critic_command_dim must be 0, 1, or 3")
     if path_dim not in (0, *PC_PATH_DIMS):
         raise ValueError(f"path_dim must be 0 or one of {PC_PATH_DIMS}")
+    if critic_path_dim not in (0, PC_CRITIC_PRIV_DIM):
+        raise ValueError(f"critic_path_dim must be 0 or {PC_CRITIC_PRIV_DIM}")
     if history_path_dim not in (0, path_dim):
         raise ValueError("history_path_dim must be 0 or equal path_dim")
     if history_path_dim and dade_history_mode != "encoded":
@@ -135,17 +147,19 @@ def pc_schema_hash(
         payload["history_path_dim"] = history_path_dim
     if path_dim:
         blocks = validate_path_blocks(
-            (
-                PC_PATH_ENDPOINT_BLOCKS
-                if path_dim == PC_PATH_DIM_ENDPOINT
-                else PC_PATH_DEFAULT_BLOCKS
-            )
+            pc_path_default_blocks_for_dim(path_dim)
             if path_blocks is None
             else path_blocks
         )
-        if path_dim == 8 and "endpoint_context" in blocks:
-            raise ValueError("endpoint_context requires path_dim=12")
-        if path_dim == 8:
+        if path_dim == PC_PATH_DIM_SAFE:
+            payload["path"] = {
+                "version": "pc_path_v3_safe",
+                "dim": path_dim,
+                "features": pc_path_feature_names_for_dim(path_dim),
+                "scales": pc_path_feature_scales_for_dim(path_dim),
+                "blocks": sorted(blocks),
+            }
+        elif path_dim == 8:
             payload["path"] = {
                 "dim": path_dim,
                 "features": pc_path_feature_names_for_dim(path_dim),
@@ -159,6 +173,16 @@ def pc_schema_hash(
                 "scales": pc_path_feature_scales_for_dim(path_dim),
                 "blocks": sorted(blocks),
             }
+    if critic_path_dim:
+        payload["critic_path"] = {
+            "version": "pc_critic_priv_v1",
+            "dim": critic_path_dim,
+            "features": PC_CRITIC_PRIV_FEATURE_NAMES,
+            "groups": {
+                name: list(PC_CRITIC_PRIV_GROUP_SLICES[name])
+                for name in PC_CRITIC_PRIV_BLOCK_NAMES
+            },
+        }
     if actor_current_encoder_enabled:
         payload["actor_current_encoder"] = {
             "enabled": True,
@@ -463,6 +487,10 @@ class PCActorCritic(nn.Module):
         history_path_dim: int = 0,
         path_dim: int = 0,
         path_blocks: Sequence[str] | None = None,
+        critic_path_dim: int = 0,
+        critic_path_encoder_hidden_dims: Sequence[int] = (64,),
+        critic_path_encoder_alpha: float = 1.0,
+        critic_path_encoder_zero_init: bool = False,
         path_encoder_hidden_dims: Sequence[int] = (64,),
         path_encoder_alpha: float = 0.01,
         path_encoder_zero_init: bool = True,
@@ -503,6 +531,7 @@ class PCActorCritic(nn.Module):
         )
         self.critic_layout = PCPolicyLayout(
             state_dim=critic_state_dim,
+            path_dim=critic_path_dim,
             short_window=history_short_window,
             long_window=history_long_window,
             command_dim=critic_command_dim,
@@ -529,22 +558,24 @@ class PCActorCritic(nn.Module):
         self.actor_state_mode = str(actor_state_mode)
         if path_dim not in (0, *PC_PATH_DIMS):
             raise ValueError(f"path_dim must be 0 or one of {PC_PATH_DIMS}")
+        if critic_path_dim not in (0, PC_CRITIC_PRIV_DIM):
+            raise ValueError(f"critic_path_dim must be 0 or {PC_CRITIC_PRIV_DIM}")
+        self.critic_path_dim = int(critic_path_dim)
         if path_dim == 0:
             if path_blocks is not None:
                 raise ValueError("path_blocks must be omitted when path_dim=0")
             self.path_blocks = ()
         else:
             self.path_blocks = validate_path_blocks(
-                (
-                    PC_PATH_ENDPOINT_BLOCKS
-                    if path_dim == PC_PATH_DIM_ENDPOINT
-                    else PC_PATH_DEFAULT_BLOCKS
-                )
+                pc_path_default_blocks_for_dim(path_dim)
                 if path_blocks is None
                 else path_blocks
             )
-            if path_dim == 8 and "endpoint_context" in self.path_blocks:
-                raise ValueError("endpoint_context requires path_dim=12")
+            if path_dim == PC_PATH_DIM_SAFE and set(self.path_blocks) != {
+                "path_geom",
+                "path_lookahead",
+            }:
+                raise ValueError("path_dim=5 requires path_geom and path_lookahead blocks")
         self.bc_path_dim = (
             int(path_dim) if bc_path_dim is None else int(bc_path_dim)
         )
@@ -559,6 +590,19 @@ class PCActorCritic(nn.Module):
             int(value) <= 0 for value in path_encoder_hidden_dims
         ):
             raise ValueError("path_encoder_hidden_dims must be non-empty and positive")
+        self.critic_path_encoder_hidden_dims = tuple(
+            int(value) for value in critic_path_encoder_hidden_dims
+        )
+        if not self.critic_path_encoder_hidden_dims or any(
+            value <= 0 for value in self.critic_path_encoder_hidden_dims
+        ):
+            raise ValueError(
+                "critic_path_encoder_hidden_dims must be non-empty and positive"
+            )
+        if not math.isfinite(critic_path_encoder_alpha) or critic_path_encoder_alpha <= 0.0:
+            raise ValueError("critic_path_encoder_alpha must be finite and positive")
+        self.critic_path_encoder_alpha = float(critic_path_encoder_alpha)
+        self.critic_path_encoder_zero_init = bool(critic_path_encoder_zero_init)
         if path_encoder_alpha <= 0.0:
             raise ValueError("path_encoder_alpha must be positive")
         self.path_encoder_alpha = float(path_encoder_alpha)
@@ -682,6 +726,7 @@ class PCActorCritic(nn.Module):
             schema_hash=pc_schema_hash(
                 path_dim=path_dim,
                 path_blocks=self.path_blocks,
+                critic_path_dim=self.critic_path_dim,
                 dade_history_mode=self.dade_history_mode,
                 actor_command_dim=actor_command_dim,
                 critic_command_dim=critic_command_dim,
@@ -750,12 +795,29 @@ class PCActorCritic(nn.Module):
             schema_hash=pc_schema_hash(
                 path_dim=path_dim,
                 path_blocks=self.path_blocks,
+                critic_path_dim=self.critic_path_dim,
                 dade_history_mode=self.dade_history_mode,
                 actor_command_dim=actor_command_dim,
                 critic_command_dim=critic_command_dim,
                 history_path_dim=history_path_dim,
             ),
         )
+        self.critic_path_encoder: nn.Sequential | None = None
+        if self.critic_path_dim:
+            self.critic_path_encoder = _mlp(
+                self.critic_path_dim,
+                self.critic_path_encoder_hidden_dims,
+                self.critic_encoder.d_z_total,
+                _activation(activation),
+            )
+            if self.critic_path_encoder_zero_init:
+                final = [
+                    layer
+                    for layer in self.critic_path_encoder.modules()
+                    if isinstance(layer, nn.Linear)
+                ][-1]
+                nn.init.zeros_(final.weight)
+                nn.init.zeros_(final.bias)
         if self.dade_history_mode == "encoded":
             self.actor_dade_observation_dim = d_z_total + self.actor_layout.side_channel_dim
         elif self.dade_state_mode == "full":
@@ -764,6 +826,12 @@ class PCActorCritic(nn.Module):
             self.actor_dade_observation_dim = (
                 len(PC_DADE_POSE_STATE_INDICES) + self.actor_layout.side_channel_dim
             )
+        self.actor_hidden_dims = tuple(int(value) for value in actor_hidden_dims)
+        self.critic_hidden_dims = tuple(int(value) for value in critic_hidden_dims)
+        if not self.actor_hidden_dims or any(value <= 0 for value in self.actor_hidden_dims):
+            raise ValueError("actor_hidden_dims must be non-empty and positive")
+        if not self.critic_hidden_dims or any(value <= 0 for value in self.critic_hidden_dims):
+            raise ValueError("critic_hidden_dims must be non-empty and positive")
         self.actor_dade = (
             DualHorizonEncoder(
                 observation_dim=self.actor_dade_observation_dim,
@@ -939,13 +1007,33 @@ class PCActorCritic(nn.Module):
             side = history[..., state_dim:]
         batch, window, _ = state.shape
         flat_state = self._trainable_actor_state(state.reshape(batch * window, state_dim))
-        encoded = self.actor_encoder(flat_state)
-        if path_dim:
-            assert path is not None
-            encoded = self._fuse_actor_path(
-                path.reshape(batch * window, path_dim),
-                encoded,
-            )
+        flat_path = path.reshape(batch * window, path_dim) if path_dim else None
+
+        def encode_window(
+            window_state: Tensor,
+            window_path: Tensor | None = None,
+        ) -> Tensor:
+            encoded_window = self.actor_encoder(window_state)
+            if window_path is not None:
+                encoded_window = self._fuse_actor_path(window_path, encoded_window)
+            return encoded_window
+
+        if (
+            self.training
+            and torch.is_grad_enabled()
+            and flat_state.shape[0] >= _HISTORY_ENCODER_CHECKPOINT_MIN_TOKENS
+        ):
+            if flat_path is None:
+                encoded = checkpoint(encode_window, flat_state, use_reentrant=False)
+            else:
+                encoded = checkpoint(
+                    encode_window,
+                    flat_state,
+                    flat_path,
+                    use_reentrant=False,
+                )
+        else:
+            encoded = encode_window(flat_state, flat_path)
         encoded = encoded.reshape(batch, window, -1)
         return torch.cat([encoded, side], dim=-1)
 
@@ -1178,8 +1266,14 @@ class PCActorCritic(nn.Module):
         return base + residual
 
     def _critic_features(self, observation: Tensor) -> Tensor:
-        state, command, short, long = self.critic_layout.split(observation)
+        state, path, command, short, long = self.critic_layout.split_with_path(observation)
         z = self.critic_encoder(state)
+        if self.critic_path_encoder is not None:
+            if path is None:
+                raise ValueError("critic path observations are missing from the critic layout")
+            z = z + self.critic_path_encoder_alpha * self.critic_path_encoder(path)
+        elif path is not None:
+            raise ValueError("critic path observations require a critic path encoder")
         c_hat = (
             self.critic_dade(long[:, -1, :], short, long)
             if self.critic_dade is not None
@@ -1241,7 +1335,14 @@ class PCActorCritic(nn.Module):
         return self.distribution.entropy().sum(dim=-1)
 
     def update_distribution(self, observations: Tensor) -> None:
-        mean = self._actor_mean(observations)
+        if (
+            self.training
+            and torch.is_grad_enabled()
+            and observations.shape[0] >= _POLICY_CHECKPOINT_MIN_BATCH
+        ):
+            mean = checkpoint(self._actor_mean, observations, use_reentrant=False)
+        else:
+            mean = self._actor_mean(observations)
         if self.noise_std_type == "scalar":
             std = self.std.expand_as(mean)
         else:
@@ -1261,17 +1362,78 @@ class PCActorCritic(nn.Module):
     def act_inference(self, observations: Tensor) -> Tensor:
         return self._actor_mean(observations)
 
+    def _critic_value(self, observation: Tensor) -> Tensor:
+        return self.critic(self._critic_features(observation))
+
     def evaluate(self, critic_observations: Tensor, **kwargs: Any) -> Tensor:
         del kwargs
-        return self.critic(self._critic_features(critic_observations))
+        if (
+            self.training
+            and torch.is_grad_enabled()
+            and critic_observations.shape[0] >= _POLICY_CHECKPOINT_MIN_BATCH
+        ):
+            return checkpoint(
+                self._critic_value,
+                critic_observations,
+                use_reentrant=False,
+            )
+        return self._critic_value(critic_observations)
+
+    def parameter_counts(self) -> dict[str, int]:
+        """Count parameters used by the actor and critic inference paths."""
+
+        actor_modules = (
+            self.actor_encoder,
+            self.path_encoder,
+            self.path_endpoint_encoder,
+            self.actor_current_encoder,
+            self.actor_dade,
+            self.actor_current_head,
+            self.actor_dade_head,
+            self.actor,
+        )
+        if self.frozen_bc_residual_enabled:
+            actor_modules = actor_modules + (
+                self.frozen_bc_actor_encoder,
+                self.frozen_bc_actor,
+                self.frozen_bc_path_encoder,
+                self.frozen_bc_current_encoder,
+            )
+        critic_modules = (
+            self.critic_encoder,
+            self.critic_path_encoder,
+            self.critic_dade,
+            self.critic,
+        )
+        return {
+            "actor_parameter_count": sum(
+                parameter.numel()
+                for module in actor_modules
+                if module is not None
+                for parameter in module.parameters()
+            ),
+            "critic_parameter_count": sum(
+                parameter.numel()
+                for module in critic_modules
+                if module is not None
+                for parameter in module.parameters()
+            ),
+        }
 
     def metadata(self) -> dict[str, Any]:
+        parameter_counts = self.parameter_counts()
         return {
             "policy_kind": self.policy_kind,
+            "actor_architecture": "mlp",
+            "critic_architecture": "mlp",
+            "actor_hidden_dims": list(self.actor_hidden_dims),
+            "critic_hidden_dims": list(self.critic_hidden_dims),
+            **parameter_counts,
             "dade_enabled": self.dade_enabled,
             "schema_hash": pc_schema_hash(
                 path_dim=self.actor_layout.path_dim,
                 path_blocks=self.path_blocks,
+                critic_path_dim=self.critic_path_dim,
                 dade_history_mode=self.dade_history_mode,
                 actor_command_dim=self.actor_layout.command_dim,
                 critic_command_dim=self.critic_layout.command_dim,
@@ -1292,6 +1454,7 @@ class PCActorCritic(nn.Module):
             },
             "critic_layout": {
                 "state_dim": self.critic_layout.state_dim,
+                "path_dim": self.critic_layout.path_dim,
                 "command_dim": self.critic_layout.command_dim,
                 "side_channel_dim": self.critic_layout.side_channel_dim,
                 "token_dim": self.critic_layout.token_dim,
@@ -1299,6 +1462,16 @@ class PCActorCritic(nn.Module):
                 "short_window": self.critic_layout.short_window,
                 "long_window": self.critic_layout.long_window,
             },
+            "actor_path_dim": self.actor_layout.path_dim,
+            "critic_path_dim": self.critic_layout.path_dim,
+            "path_schema_hash": (
+                None
+                if not self.actor_layout.path_dim
+                else pc_path_schema_hash(
+                    self.path_blocks,
+                    path_dim=self.actor_layout.path_dim,
+                )
+            ),
             "actor_encoder": self.actor_encoder.metadata().as_dict(),
             "path_encoder": (
                 None
@@ -1337,6 +1510,26 @@ class PCActorCritic(nn.Module):
                 }
             ),
             "critic_encoder": self.critic_encoder.metadata().as_dict(),
+            "critic_path_encoder": (
+                None
+                if self.critic_path_encoder is None
+                else {
+                    "input_dim": self.critic_path_dim,
+                    "hidden_dims": list(self.critic_path_encoder_hidden_dims),
+                    "output_dim": self.critic_encoder.d_z_total,
+                    "alpha": self.critic_path_encoder_alpha,
+                    "initialization": (
+                        "zero_final_linear"
+                        if self.critic_path_encoder_zero_init
+                        else "default"
+                    ),
+                    "feature_names": list(PC_CRITIC_PRIV_FEATURE_NAMES),
+                    "groups": {
+                        name: list(PC_CRITIC_PRIV_GROUP_SLICES[name])
+                        for name in PC_CRITIC_PRIV_BLOCK_NAMES
+                    },
+                }
+            ),
             "dade": self.dade_config.as_dict(),
             "aux_current_coef": self.aux_current_coef,
             "aux_current_steps": self.aux_current_steps,

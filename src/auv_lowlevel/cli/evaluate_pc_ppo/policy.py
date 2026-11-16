@@ -23,6 +23,112 @@ from .common import _resolve
 from .validation import _final_path_blocks
 
 
+class _InferenceEmpiricalNormalization(torch.nn.Module):
+    """Inference-only copy of the rsl_rl empirical observation normalizer.
+
+    rsl_rl stores the running statistics in the checkpoint as
+    ``obs_norm_state_dict``. The evaluator must apply the same transform that
+    the actor saw during PPO training; otherwise a valid policy is evaluated on
+    a different observation distribution.
+    """
+
+    def __init__(self, size: int, eps: float = 1e-2) -> None:
+        super().__init__()
+        if size <= 0:
+            raise ValueError("normalizer size must be positive")
+        self.eps = float(eps)
+        self.register_buffer("_mean", torch.zeros(1, size))
+        self.register_buffer("_var", torch.ones(1, size))
+        self.register_buffer("_std", torch.ones(1, size))
+        self.register_buffer("count", torch.tensor(0, dtype=torch.long))
+
+    def forward(self, observations: torch.Tensor) -> torch.Tensor:
+        return (observations - self._mean) / (self._std + self.eps)
+
+
+class _ObservationNormalizedPolicy:
+    """Apply the checkpoint's empirical normalizer before every actor call."""
+
+    def __init__(
+        self,
+        policy: PCActorCritic,
+        normalizer: _InferenceEmpiricalNormalization,
+    ) -> None:
+        object.__setattr__(self, "_policy", policy)
+        object.__setattr__(self, "_normalizer", normalizer)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._policy, name)
+
+    def _normalize(self, observations: torch.Tensor) -> torch.Tensor:
+        return self._normalizer(observations)
+
+    def act(self, observations: torch.Tensor, **kwargs: Any) -> torch.Tensor:
+        return self._policy.act(self._normalize(observations), **kwargs)
+
+    def act_inference(self, observations: torch.Tensor) -> torch.Tensor:
+        return self._policy.act_inference(self._normalize(observations))
+
+    def base_action(self, observations: torch.Tensor) -> torch.Tensor | None:
+        return self._policy.base_action(self._normalize(observations))
+
+    def residual_action(self, observations: torch.Tensor) -> torch.Tensor:
+        return self._policy.residual_action(self._normalize(observations))
+
+
+def _load_observation_normalizer(
+    checkpoint: dict[str, Any],
+    training: Any,
+    *,
+    num_actor_obs: int,
+    num_critic_obs: int,
+    device: torch.device,
+) -> _InferenceEmpiricalNormalization | None:
+    """Load and validate the empirical normalizer stored with a PPO checkpoint."""
+
+    enabled = bool(training.runner["empirical_normalization"])
+    actor_state = checkpoint.get("obs_norm_state_dict")
+    critic_state = checkpoint.get("privileged_obs_norm_state_dict")
+    if not enabled:
+        if actor_state is not None or critic_state is not None:
+            raise ValueError(
+                "checkpoint contains empirical observation normalizers but the "
+                "training config disables empirical_normalization"
+            )
+        return None
+    if not isinstance(actor_state, dict):
+        raise ValueError(
+            "empirical_normalization is enabled but checkpoint has no obs_norm_state_dict"
+        )
+    if not isinstance(critic_state, dict):
+        raise ValueError(
+            "empirical_normalization is enabled but checkpoint has no "
+            "privileged_obs_norm_state_dict"
+        )
+
+    def _validate_state(name: str, state: dict[str, Any], expected_dim: int) -> None:
+        for key in ("_mean", "_var", "_std"):
+            value = state.get(key)
+            if not torch.is_tensor(value):
+                raise ValueError(f"{name} is missing tensor {key!r}")
+            if tuple(value.shape) != (1, expected_dim):
+                raise ValueError(
+                    f"{name} {key!r} has shape {tuple(value.shape)}, expected {(1, expected_dim)}"
+                )
+            if not bool(torch.isfinite(value).all()):
+                raise ValueError(f"{name} {key!r} contains non-finite values")
+        count = state.get("count")
+        if not torch.is_tensor(count) or count.numel() != 1:
+            raise ValueError(f"{name} must contain a scalar count tensor")
+
+    _validate_state("obs_norm_state_dict", actor_state, num_actor_obs)
+    _validate_state("privileged_obs_norm_state_dict", critic_state, num_critic_obs)
+    normalizer = _InferenceEmpiricalNormalization(num_actor_obs).to(device)
+    normalizer.load_state_dict(actor_state, strict=True)
+    normalizer.eval()
+    return normalizer
+
+
 def _restore_residual_norm_projection(
     policy: PCActorCritic,
     checkpoint: dict[str, Any],
@@ -57,7 +163,7 @@ def _build_policy(
     num_actor_obs: int,
     num_critic_obs: int,
     device: torch.device,
-) -> tuple[PCActorCritic, dict[str, Any]]:
+) -> tuple[Any, dict[str, Any]]:
     training = load_training_config(training_config_path)
     if training.pc is None:
         raise ValueError("evaluation requires a PC training config")
@@ -70,6 +176,7 @@ def _build_policy(
         expected_schema_hash=pc_schema_hash(
             path_dim=training.pc.path_dim,
             path_blocks=path_blocks,
+            critic_path_dim=training.pc.critic_path_dim,
             dade_history_mode=training.pc.dade_history_mode,
             actor_command_dim=training.pc.actor_command_dim,
             critic_command_dim=training.pc.critic_command_dim,
@@ -139,7 +246,16 @@ def _build_policy(
                 raise ValueError("checkpoint and BC base disagree on frozen current encoder alpha")
     elif metadata.get("pc", {}).get("frozen_bc_current_encoder") is not None:
         raise ValueError("checkpoint metadata declares a missing frozen BC current encoder")
+    normalizer = _load_observation_normalizer(
+        checkpoint,
+        training,
+        num_actor_obs=num_actor_obs,
+        num_critic_obs=num_critic_obs,
+        device=device,
+    )
     policy.eval()
+    if normalizer is not None:
+        policy = _ObservationNormalizedPolicy(policy, normalizer)
     return policy, metadata
 
 

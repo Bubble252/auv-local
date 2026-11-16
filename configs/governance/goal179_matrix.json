@@ -1,0 +1,163 @@
+{
+  "schema_version": "auv_goal_matrix.v1",
+  "goal_id": "Goal179",
+  "repo": "settled_局部规划器_反应式",
+  "arms": [
+    {
+      "arm": "H_S1_ALL",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "all",
+      "bc_authority": 0.75,
+      "ppo_head_scale": 1.0,
+      "rate_aware_residual_enabled": true,
+      "split_residual_mode": "separate_bc_ppo_authority",
+      "residual_contract": "ALOS + 0.75*r_BC + s_head*r_PPO; r_BC and r_PPO must have separate authority",
+      "actuator_residual_channel_gains": [1.0, 1.0, 1.0]
+    },
+    {
+      "arm": "H_S4_ALL",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "all",
+      "bc_authority": 0.75,
+      "ppo_head_scale": 4.0,
+      "rate_aware_residual_enabled": true,
+      "split_residual_mode": "separate_bc_ppo_authority",
+      "residual_contract": "ALOS + 0.75*r_BC + s_head*r_PPO; r_BC and r_PPO must have separate authority",
+      "actuator_residual_channel_gains": [1.0, 1.0, 1.0]
+    },
+    {
+      "arm": "H_S8_ALL",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "all",
+      "bc_authority": 0.75,
+      "ppo_head_scale": 8.0,
+      "rate_aware_residual_enabled": true,
+      "split_residual_mode": "separate_bc_ppo_authority",
+      "residual_contract": "ALOS + 0.75*r_BC + s_head*r_PPO; r_BC and r_PPO must have separate authority",
+      "actuator_residual_channel_gains": [1.0, 1.0, 1.0]
+    },
+    {
+      "arm": "H_S16_ALL",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "all",
+      "bc_authority": 0.75,
+      "ppo_head_scale": 16.0,
+      "rate_aware_residual_enabled": true,
+      "split_residual_mode": "separate_bc_ppo_authority",
+      "residual_contract": "ALOS + 0.75*r_BC + s_head*r_PPO; r_BC and r_PPO must have separate authority",
+      "actuator_residual_channel_gains": [1.0, 1.0, 1.0]
+    }
+  ],
+  "levels": [
+    "nominal",
+    "current10",
+    "noise_n2",
+    "plant20"
+  ],
+  "radii": {
+    "default": 2.0,
+    "strict125": 1.25
+  },
+  "seeds": {
+    "start": 20,
+    "count": 8
+  },
+  "checkpoint_seeds": [
+    86201
+  ],
+  "baselines": [
+    "zero_bc50",
+    "zero_alos_comp"
+  ],
+  "baseline_seed": 86201,
+  "expected_cells": {
+    "policy": 32,
+    "zero": 16,
+    "total": 48
+  },
+  "artifacts_root": "artifacts/lowlevel/goal179_head_only_credit_20261114",
+  "manifest_path": "run_manifest.json",
+  "metrics": [
+    "route_three_d_rmse_m",
+    "route_cross_abs_p90_m",
+    "route_vertical_abs_p90_m",
+    "preterminal_three_d_rmse_m",
+    "path_completion_ratio_mean",
+    "head_applied_share_vertical",
+    "head_applied_share_cross",
+    "head_applied_share_forward",
+    "head_residual_to_action_std",
+    "bc_ppo_cosine_vertical",
+    "bc_ppo_cosine_cross",
+    "bc_ppo_cosine_forward",
+    "bc_ppo_cancellation_rate_vertical",
+    "bc_ppo_cancellation_rate_cross",
+    "bc_ppo_cancellation_rate_forward",
+    "bc_ppo_net_gain_ratio_vertical",
+    "bc_ppo_net_gain_ratio_cross",
+    "bc_ppo_net_gain_ratio_forward",
+    "head_reward_jacobian_cosine",
+    "head_vertical_gradient_cosine",
+    "head_cross_gradient_cosine",
+    "head_forward_gradient_cosine",
+    "head_reward_gradient_norm",
+    "head_gradient_update_cosine",
+    "head_policy_gradient_norm",
+    "head_update_norm",
+    "late_kl",
+    "clip_fraction",
+    "reward_slope",
+    "actuator_residual_magnitude_clip_rate",
+    "actuator_residual_rate_clip_rate",
+    "success",
+    "timeout",
+    "safety",
+    "speed_max_mps",
+    "overspeed_steps"
+  ],
+  "gates": [
+    {
+      "check": "BC/PPO authority separation",
+      "threshold": "observed BC authority is fixed at 0.75 and PPO-only scale equals s_head; shared-authority application invalidates the cell",
+      "failure_label": "MIXED_AUTHORITY_INTERVENTION"
+    },
+    {
+      "check": "head-only scale sweep reaches usable amplitude",
+      "threshold": "at least one s_head>=4 reaches head_residual/action_std>=0.20, or action_std<=0.05",
+      "failure_label": "HEAD_AMPLITUDE_STILL_NULL"
+    },
+    {
+      "check": "head-only dose response",
+      "threshold": "head applied share and at least one of cross/vertical/forward route metrics respond monotonically across s_head=1/4/8/16",
+      "failure_label": "HEAD_DOSE_RESPONSE_MISSING"
+    },
+    {
+      "check": "BC/PPO cancellation",
+      "threshold": "median cosine >= -0.20 and cancellation rate < 0.50 in vertical/cross/forward",
+      "failure_label": "BC_PPO_CANCELLATION"
+    },
+    {
+      "check": "reward credit direction",
+      "threshold": "median reward-Jacobian/head cosine > 0.0 and must be measurable; missing instrumentation is INVALID_METRIC_CONTRACT, not PASS",
+      "failure_label": "HEAD_REWARD_CREDIT_MISALIGNED"
+    },
+    {
+      "check": "PPO update credit",
+      "threshold": "cosine(delta_theta_head, policy_gradient_head)>0.0 on the diagnostic batch; missing instrumentation is INVALID_METRIC_CONTRACT, not PASS",
+      "failure_label": "PPO_UPDATE_CREDIT_MISALIGNED"
+    },
+    {
+      "check": "clip and stability",
+      "threshold": "magnitude/rate clip not above s_head=1 by more than 0.10 absolute; no safety/timeout regression; speed<=2.5 m/s",
+      "failure_label": "HEAD_SCALE_UNSTABLE"
+    }
+  ],
+  "heldout": {
+    "enabled": false,
+    "seeds": []
+  }
+}

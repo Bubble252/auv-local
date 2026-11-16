@@ -748,8 +748,14 @@ class RewardConfig:
     w_cmd_speed: float = 1.0
     w_hold: float = 5.0
     w_action_pc: float = 0.5
+    w_action_smooth_pc: float = 0.0
+    w_action_clip_attempt_pc: float = 0.0
     w_sat_pc: float = 0.1
     w_route_speed_pc: float = 0.0
+    w_route_ground_speed_stall: float = 0.0
+    route_ground_speed_stall_threshold_mps: float = 0.25
+    route_ground_speed_stall_gate_low_mps: float = 0.2
+    route_ground_speed_stall_gate_high_mps: float = 0.4
     route_speed_floor_ratio: float = 0.75
     w_material_sat_pc: float = 0.0
     w_path_speed_smooth: float = 0.0
@@ -757,10 +763,14 @@ class RewardConfig:
     w_path_3d: float = 0.0
     w_path_cross: float = 0.0
     w_path_vertical: float = 0.0
+    w_path_pitch: float = 0.0
     w_path_progress: float = 0.0
     route_middle_gate: float = 0.0
     path_cross_huber_delta_m: float = 0.5
     path_vertical_huber_delta_m: float = 0.5
+    path_heading_std_rad: float | None = None
+    cmd_heading_std_rad: float | None = None
+    cmd_speed_std_mps: float | None = None
     w_approach_vertical: float = 0.0
     w_approach_pitch: float = 0.0
     w_vertical_potential: float = 0.0
@@ -790,12 +800,16 @@ class RewardConfig:
             raise ValueError("reward.pc_ppo_scale must be finite and positive")
         for name, value in (
             ("w_route_speed_pc", self.w_route_speed_pc),
+            ("w_route_ground_speed_stall", self.w_route_ground_speed_stall),
             ("w_material_sat_pc", self.w_material_sat_pc),
+            ("w_action_smooth_pc", self.w_action_smooth_pc),
+            ("w_action_clip_attempt_pc", self.w_action_clip_attempt_pc),
             ("w_path_speed_smooth", self.w_path_speed_smooth),
             ("w_path_energy", self.w_path_energy),
             ("w_path_3d", self.w_path_3d),
             ("w_path_cross", self.w_path_cross),
             ("w_path_vertical", self.w_path_vertical),
+            ("w_path_pitch", self.w_path_pitch),
             ("w_path_progress", self.w_path_progress),
             ("route_middle_gate", self.route_middle_gate),
             ("w_approach_vertical", self.w_approach_vertical),
@@ -808,6 +822,9 @@ class RewardConfig:
         for name, value in (
             ("path_cross_huber_delta_m", self.path_cross_huber_delta_m),
             ("path_vertical_huber_delta_m", self.path_vertical_huber_delta_m),
+            ("route_ground_speed_stall_threshold_mps", self.route_ground_speed_stall_threshold_mps),
+            ("route_ground_speed_stall_gate_low_mps", self.route_ground_speed_stall_gate_low_mps),
+            ("route_ground_speed_stall_gate_high_mps", self.route_ground_speed_stall_gate_high_mps),
             ("vertical_potential_huber_delta_m", self.vertical_potential_huber_delta_m),
             ("heave_potential_huber_delta_mps", self.heave_potential_huber_delta_mps),
         ):
@@ -827,6 +844,21 @@ class RewardConfig:
             0.0 < self.route_speed_floor_ratio <= 1.0
         ):
             raise ValueError("reward.route_speed_floor_ratio must lie in (0, 1]")
+        if not (
+            0.0 <= self.route_ground_speed_stall_gate_low_mps
+            < self.route_ground_speed_stall_gate_high_mps
+        ):
+            raise ValueError(
+                "reward route-ground-speed stall gate bounds must satisfy 0 <= low < high"
+            )
+        for name in (
+            "path_heading_std_rad",
+            "cmd_heading_std_rad",
+            "cmd_speed_std_mps",
+        ):
+            value = getattr(self, name)
+            if value is not None and (not math.isfinite(value) or value <= 0.0):
+                raise ValueError(f"reward.{name} must be finite and positive when set")
 
     @property
     def resolved_pc_ppo_scale(self) -> float:
@@ -1983,19 +2015,30 @@ def _parse_reward(value: Any) -> RewardConfig:
             "w_cmd_speed",
             "w_hold",
             "w_action_pc",
+            "w_action_smooth_pc",
+            "w_action_clip_attempt_pc",
             "w_sat_pc",
             "w_route_speed_pc",
+            "w_route_ground_speed_stall",
+            "route_ground_speed_stall_threshold_mps",
+            "route_ground_speed_stall_gate_low_mps",
+            "route_ground_speed_stall_gate_high_mps",
             "route_speed_floor_ratio",
             "w_material_sat_pc",
+            "w_actuator_material_sat_pc",
             "w_path_speed_smooth",
             "w_path_energy",
             "w_path_3d",
             "w_path_cross",
             "w_path_vertical",
+            "w_path_pitch",
             "w_path_progress",
             "route_middle_gate",
             "path_cross_huber_delta_m",
             "path_vertical_huber_delta_m",
+            "path_heading_std_rad",
+            "cmd_heading_std_rad",
+            "cmd_speed_std_mps",
             "w_approach_vertical",
             "w_approach_pitch",
             "w_vertical_potential",
@@ -2031,6 +2074,16 @@ def _parse_reward(value: Any) -> RewardConfig:
         raise ValueError("reward roll thresholds must satisfy dead < soft < strong")
     if not p_dead < p_soft:
         raise ValueError("reward roll-rate thresholds must satisfy dead < soft")
+    material_weight = (
+        data["w_actuator_material_sat_pc"]
+        if "w_actuator_material_sat_pc" in data
+        else data.get("w_material_sat_pc", 0.0)
+    )
+    clip_attempt_weight = (
+        data["w_action_clip_attempt_pc"]
+        if "w_action_clip_attempt_pc" in data
+        else data.get("w_sat_pc", 0.1)
+    )
     return RewardConfig(
         w_prog=_non_negative(data["w_prog"], "reward.w_prog"),
         w_3d=_non_negative(data["w_3d"], "reward.w_3d"),
@@ -2054,17 +2107,37 @@ def _parse_reward(value: Any) -> RewardConfig:
         w_cmd_speed=_non_negative(data.get("w_cmd_speed", 1.0), "reward.w_cmd_speed"),
         w_hold=_non_negative(data.get("w_hold", 5.0), "reward.w_hold"),
         w_action_pc=_non_negative(data.get("w_action_pc", 0.5), "reward.w_action_pc"),
-        w_sat_pc=_non_negative(data.get("w_sat_pc", 0.1), "reward.w_sat_pc"),
+        w_action_smooth_pc=_non_negative(
+            data.get("w_action_smooth_pc", 0.0), "reward.w_action_smooth_pc"
+        ),
+        w_action_clip_attempt_pc=_non_negative(
+            clip_attempt_weight, "reward.w_action_clip_attempt_pc"
+        ),
+        w_sat_pc=_non_negative(clip_attempt_weight, "reward.w_sat_pc"),
         w_route_speed_pc=_non_negative(
             data.get("w_route_speed_pc", 0.0), "reward.w_route_speed_pc"
+        ),
+        w_route_ground_speed_stall=_non_negative(
+            data.get("w_route_ground_speed_stall", 0.0),
+            "reward.w_route_ground_speed_stall",
+        ),
+        route_ground_speed_stall_threshold_mps=_positive(
+            data.get("route_ground_speed_stall_threshold_mps", 0.25),
+            "reward.route_ground_speed_stall_threshold_mps",
+        ),
+        route_ground_speed_stall_gate_low_mps=_non_negative(
+            data.get("route_ground_speed_stall_gate_low_mps", 0.2),
+            "reward.route_ground_speed_stall_gate_low_mps",
+        ),
+        route_ground_speed_stall_gate_high_mps=_positive(
+            data.get("route_ground_speed_stall_gate_high_mps", 0.4),
+            "reward.route_ground_speed_stall_gate_high_mps",
         ),
         route_speed_floor_ratio=_positive(
             data.get("route_speed_floor_ratio", 0.75),
             "reward.route_speed_floor_ratio",
         ),
-        w_material_sat_pc=_non_negative(
-            data.get("w_material_sat_pc", 0.0), "reward.w_material_sat_pc"
-        ),
+        w_material_sat_pc=_non_negative(material_weight, "reward.w_material_sat_pc"),
         w_path_speed_smooth=_non_negative(
             data.get("w_path_speed_smooth", 0.0),
             "reward.w_path_speed_smooth",
@@ -2085,6 +2158,10 @@ def _parse_reward(value: Any) -> RewardConfig:
             data.get("w_path_vertical", 0.0),
             "reward.w_path_vertical",
         ),
+        w_path_pitch=_non_negative(
+            data.get("w_path_pitch", 0.0),
+            "reward.w_path_pitch",
+        ),
         w_path_progress=_non_negative(
             data.get("w_path_progress", 0.0),
             "reward.w_path_progress",
@@ -2100,6 +2177,21 @@ def _parse_reward(value: Any) -> RewardConfig:
         path_vertical_huber_delta_m=_positive(
             data.get("path_vertical_huber_delta_m", 0.5),
             "reward.path_vertical_huber_delta_m",
+        ),
+        path_heading_std_rad=(
+            None
+            if "path_heading_std_rad" not in data
+            else _positive(data["path_heading_std_rad"], "reward.path_heading_std_rad")
+        ),
+        cmd_heading_std_rad=(
+            None
+            if "cmd_heading_std_rad" not in data
+            else _positive(data["cmd_heading_std_rad"], "reward.cmd_heading_std_rad")
+        ),
+        cmd_speed_std_mps=(
+            None
+            if "cmd_speed_std_mps" not in data
+            else _positive(data["cmd_speed_std_mps"], "reward.cmd_speed_std_mps")
         ),
         w_approach_vertical=_non_negative(
             data.get("w_approach_vertical", 0.0),

@@ -28,7 +28,7 @@ from auv_lowlevel.batch.pc_bc import (
     train_pc_bc,
 )
 from auv_lowlevel.batch.pc_normalization import PCNormalization
-from auv_lowlevel.batch.pc_path import pc_path_feature_names_for_dim
+from auv_lowlevel.batch.pc_path import pc_path_feature_names_for_dim, pc_path_schema_hash
 from auv_lowlevel.batch.pc_policy import PCActorCritic, PCPolicyLayout
 
 
@@ -259,7 +259,7 @@ def test_pc_bc_training_and_dataset_roundtrip(tmp_path: Path) -> None:
     assert torch.isfinite(actual).all()
 
 
-@pytest.mark.parametrize("path_dim", (8, 12))
+@pytest.mark.parametrize("path_dim", (5, 8, 12))
 def test_pc_bc_path_dimension_roundtrip(tmp_path: Path, path_dim: int) -> None:
     dataset = _dataset(samples_per_episode=32)
     rng = np.random.default_rng(100 + path_dim)
@@ -288,6 +288,10 @@ def test_pc_bc_path_dimension_roundtrip(tmp_path: Path, path_dim: int) -> None:
     assert metadata["path_feature_names"] == list(
         pc_path_feature_names_for_dim(path_dim)
     )
+    assert metadata["path_schema_hash"] == pc_path_schema_hash(
+        metadata["path_blocks"], path_dim=path_dim
+    )
+    assert len(metadata["path_feature_scales"]) == path_dim
     assert metadata["actor_top_level_input_dim"] == 12 + 3 + 64
     policy = PCBCPolicy(checkpoint, device="cpu")
     prediction = policy.act_inference(
@@ -297,6 +301,31 @@ def test_pc_bc_path_dimension_roundtrip(tmp_path: Path, path_dim: int) -> None:
     )
     assert prediction.shape == (4, 3)
     assert torch.isfinite(prediction).all()
+
+
+def test_dataset_loader_selects_5d_from_8d_with_explicit_columns(tmp_path: Path) -> None:
+    dataset = _dataset(samples_per_episode=4)
+    rng = np.random.default_rng(55)
+    actor_path = rng.normal(size=(dataset.sample_count, 8)).astype(np.float32)
+    dataset = replace(dataset, actor_path=actor_path)
+    path = tmp_path / "demos.npz"
+    np.savez_compressed(
+        path,
+        actor_state=dataset.actor_state,
+        command=dataset.command,
+        action=dataset.action,
+        episode_id=dataset.episode_id,
+        seed=dataset.seed,
+        step=dataset.step,
+        actual_actuator=dataset.actual_actuator,
+        reward=dataset.reward,
+        actor_path=dataset.actor_path,
+    )
+    loaded, metadata = load_pc_demonstration_dataset(path, path_dim=5)
+    assert loaded.path_dim == 5
+    assert metadata["path_source_dim"] == 8
+    assert metadata["path_selection_indices"] == [0, 1, 2, 3, 7]
+    assert np.array_equal(loaded.actor_path, actor_path[:, [0, 1, 2, 3, 7]])
 
 
 def test_pc_bc_dataset_rejects_unknown_path_dimension() -> None:
@@ -651,7 +680,6 @@ def test_pc_frozen_bc_residual_nonzero_output_init_breaks_zero_symmetry(
     assert float(actor_layers[-1].bias.abs().sum()) == 0.0
 
     raw_state = torch.linspace(-0.4, 0.6, 12).reshape(1, 12)
-    command = torch.tensor([[0.7, -0.2, 1.4]])
     normalized_state = normalization.normalize_actor_state(raw_state)
     normalized_command = torch.tensor(
         [[0.7 / torch.pi, -0.2 / (torch.pi / 2.0), 1.4 / 2.5]]

@@ -10,7 +10,7 @@ import numpy as np
 import torch
 
 from auv_lowlevel.batch.pc_command_residual import smooth_terminal_gate
-from auv_lowlevel.batch.pc_path import PC_PATH_DEFAULT_BLOCKS
+from auv_lowlevel.batch.pc_path import pc_path_default_blocks_for_dim
 
 from .common import DIVERSITY_REFERENCE_OVERRIDE_FIELDS
 
@@ -205,9 +205,7 @@ def _validate_environment_override(
             override.guidance.current_compensation_source,
         )
         if mode not in {(True, False, "estimated"), (False, False, "none")}:
-            raise ValueError(
-                "ALOS current-mode override must be canonical ALOS-COMP or ALOS-NONE"
-            )
+            raise ValueError("ALOS current-mode override must be canonical ALOS-COMP or ALOS-NONE")
         guidance_allowed = replace(
             guidance_allowed,
             compensate_current=override.guidance.compensate_current,
@@ -322,7 +320,7 @@ def _final_path_blocks(training: Any) -> tuple[str, ...]:
     if training.pc is None or training.pc.path_dim == 0:
         return ()
     if not training.pc.path_curriculum:
-        return tuple(PC_PATH_DEFAULT_BLOCKS)
+        return tuple(pc_path_default_blocks_for_dim(training.pc.path_dim))
     return tuple(block for block in training.pc.path_curriculum[-1][1] if block != "state_base")
 
 

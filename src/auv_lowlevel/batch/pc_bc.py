@@ -18,9 +18,13 @@ from torch.nn import functional as F
 from .encoded_policy import _activation, _mlp
 from .pc_normalization import PCNormalization
 from .pc_path import (
+    PC_PATH_DIM_SAFE,
     PC_PATH_DIMS,
     normalize_path_features,
+    pc_path_default_blocks_for_dim,
     pc_path_feature_names_for_dim,
+    pc_path_feature_scales_for_dim,
+    pc_path_schema_hash,
 )
 from .pc_policy import (
     PC_ACTOR_STATE_NAMES,
@@ -91,6 +95,35 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _select_path_features(
+    actor_path: np.ndarray | None,
+    path_dim: int | None,
+) -> tuple[np.ndarray | None, tuple[int, ...]]:
+    """Select an explicit canonical path schema from a stored dataset."""
+
+    if actor_path is None:
+        if path_dim not in (None, 0):
+            raise ValueError("path_dim was requested but actor_path is missing")
+        return None, ()
+    source_dim = int(actor_path.shape[1])
+    if source_dim not in PC_PATH_DIMS:
+        raise ValueError(f"actor_path width must be one of {PC_PATH_DIMS}, got {source_dim}")
+    if path_dim is None or int(path_dim) == source_dim:
+        return actor_path, tuple(range(source_dim))
+    target_dim = int(path_dim)
+    if target_dim == 0:
+        return None, ()
+    if target_dim == PC_PATH_DIM_SAFE and source_dim in (8, 12):
+        indices = (0, 1, 2, 3, 7)
+    elif target_dim == 8 and source_dim == 12:
+        indices = tuple(range(8))
+    else:
+        raise ValueError(
+            f"cannot select actor_path from source path_dim={source_dim} to path_dim={target_dim}"
+        )
+    return np.ascontiguousarray(actor_path[:, indices]), indices
 
 
 def _command_tensor(command: Tensor, command_dim: int = PC_COMMAND_DIM) -> Tensor:
@@ -614,6 +647,8 @@ class PCBCTrainableActor(nn.Module):
 
 def load_pc_demonstration_dataset(
     path: Path | str,
+    *,
+    path_dim: int | None = None,
 ) -> tuple[PCDemonstrationDataset, dict[str, Any]]:
     dataset_path = Path(path)
     with np.load(dataset_path) as payload:
@@ -630,6 +665,13 @@ def load_pc_demonstration_dataset(
         missing = sorted(required - set(payload.files))
         if missing:
             raise ValueError(f"PC demonstration dataset is missing arrays: {missing}")
+        actor_path = (
+            np.asarray(payload["actor_path"], dtype=np.float32)
+            if "actor_path" in payload.files
+            else None
+        )
+        path_source_dim = 0 if actor_path is None else int(actor_path.shape[1])
+        actor_path, path_selection_indices = _select_path_features(actor_path, path_dim)
         dataset = PCDemonstrationDataset(
             actor_state=np.asarray(payload["actor_state"], dtype=np.float32),
             command=np.asarray(payload["command"], dtype=np.float32),
@@ -644,11 +686,7 @@ def load_pc_demonstration_dataset(
                 if "current_estimate_body" in payload.files
                 else None
             ),
-            actor_path=(
-                np.asarray(payload["actor_path"], dtype=np.float32)
-                if "actor_path" in payload.files
-                else None
-            ),
+            actor_path=actor_path,
             observation_schema=str(
                 payload["observation_schema"]
                 if "observation_schema" in payload.files
@@ -674,6 +712,26 @@ def load_pc_demonstration_dataset(
             "action_envelope": dataset.action_envelope,
             "actor_command_dim": dataset.actor_command_dim,
             "path_dim": dataset.path_dim,
+            "path_source_dim": path_source_dim,
+            "path_selection_indices": list(path_selection_indices),
+            "path_feature_names": (
+                list(pc_path_feature_names_for_dim(dataset.path_dim))
+                if dataset.path_dim
+                else []
+            ),
+            "path_feature_scales": (
+                list(pc_path_feature_scales_for_dim(dataset.path_dim))
+                if dataset.path_dim
+                else []
+            ),
+            "path_schema_hash": (
+                pc_path_schema_hash(
+                    pc_path_default_blocks_for_dim(dataset.path_dim),
+                    path_dim=dataset.path_dim,
+                )
+                if dataset.path_dim
+                else None
+            ),
         }
     )
     return dataset, metadata
@@ -1098,6 +1156,24 @@ def train_pc_bc(
                 if config.path_dim
                 else []
             ),
+            "path_feature_scales": (
+                list(pc_path_feature_scales_for_dim(config.path_dim))
+                if config.path_dim
+                else []
+            ),
+            "path_schema_hash": (
+                pc_path_schema_hash(
+                    pc_path_default_blocks_for_dim(config.path_dim),
+                    path_dim=config.path_dim,
+                )
+                if config.path_dim
+                else None
+            ),
+            "path_blocks": (
+                list(pc_path_default_blocks_for_dim(config.path_dim))
+                if config.path_dim
+                else []
+            ),
             "path_encoder_hidden_dims": (
                 list(config.path_encoder_hidden_dims) if config.path_dim else []
             ),
@@ -1244,6 +1320,38 @@ def read_pc_bc_checkpoint_metadata(path: Path | str) -> dict[str, Any]:
     )
     if path_dim and tuple(path_feature_names) != tuple(expected_path_feature_names):
         raise ValueError("PC BC checkpoint path feature names are not canonical")
+    expected_path_scales = (
+        pc_path_feature_scales_for_dim(path_dim) if path_dim else ()
+    )
+    declared_path_scales = checkpoint.get("path_feature_scales")
+    if path_dim:
+        if declared_path_scales is None:
+            if path_dim == PC_PATH_DIM_SAFE:
+                raise ValueError("PC BC 5D checkpoint is missing path_feature_scales")
+            path_feature_scales = tuple(expected_path_scales)
+        else:
+            path_feature_scales = tuple(float(value) for value in declared_path_scales)
+            if not np.allclose(
+                np.asarray(path_feature_scales, dtype=np.float64),
+                np.asarray(expected_path_scales, dtype=np.float64),
+            ):
+                raise ValueError("PC BC checkpoint path feature scales are not canonical")
+        expected_path_hash = pc_path_schema_hash(
+            pc_path_default_blocks_for_dim(path_dim),
+            path_dim=path_dim,
+        )
+        declared_path_hash = checkpoint.get("path_schema_hash")
+        if declared_path_hash is None:
+            if path_dim == PC_PATH_DIM_SAFE:
+                raise ValueError("PC BC 5D checkpoint is missing path_schema_hash")
+            path_schema_hash = expected_path_hash
+        else:
+            path_schema_hash = str(declared_path_hash)
+            if path_schema_hash != expected_path_hash:
+                raise ValueError("PC BC checkpoint path_schema_hash is not canonical")
+    else:
+        path_feature_scales = ()
+        path_schema_hash = None
     path_encoder_hidden_dims = tuple(
         int(value) for value in checkpoint.get("path_encoder_hidden_dims", (64,) if path_dim else ())
     )
@@ -1348,6 +1456,14 @@ def read_pc_bc_checkpoint_metadata(path: Path | str) -> dict[str, Any]:
         "actor_command_dim": actor_command_dim,
         "path_dim": path_dim,
         "path_feature_names": list(path_feature_names) if path_dim else [],
+        "path_feature_scales": list(path_feature_scales) if path_dim else [],
+        "path_schema_hash": path_schema_hash,
+        "path_blocks": list(
+            checkpoint.get(
+                "path_blocks",
+                pc_path_default_blocks_for_dim(path_dim) if path_dim else (),
+            )
+        ),
         "path_encoder_hidden_dims": list(path_encoder_hidden_dims) if path_dim else [],
         "path_encoder_alpha": path_encoder_alpha,
         "actor_current_encoder": actor_current_encoder,
@@ -1478,11 +1594,9 @@ class PCBCPolicy:
                 metadata.get("actor_current_encoder_hidden_dims", ())
             ),
             actor_current_encoder_alpha=float(
-                (
                     1.0
                     if metadata.get("actor_current_encoder_alpha") is None
                     else float(metadata["actor_current_encoder_alpha"])
-                )
             ),
             action_head=str(metadata["action_head"]),
             sign_deadband=float(metadata["sign_deadband"]),

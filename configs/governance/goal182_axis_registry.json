@@ -1,0 +1,790 @@
+{
+  "schema_version": "auv_matrix_axis_registry.v1",
+  "registry_id": "G182-CORE-COMP-AXES",
+  "goal_id": "Goal182",
+  "status": "DRAFT_FOR_APPROVAL",
+  "core_matrix": {
+    "human_id": "G182-CORE-COMP",
+    "status": "APPROVED_NAMING_AND_FILES",
+    "approved_at": "2026-11-16",
+    "index_path": "configs/governance/goal182_core_composition_index.json",
+    "index_schema_version": "auv_core_composition_index.v1",
+    "matrix_schema_version": "auv_core_composition_matrix.v1",
+    "axis_file": "configs/governance/goal182_axis_registry.json",
+    "matrix_files_created": false,
+    "program_matrices": [
+      {
+        "matrix_id": "G182-CORE-PE2E",
+        "program_group_id": "G-PATH-CONDITIONED-POLICY",
+        "control_contract": "CC_PE2E",
+        "path": "configs/governance/goal182_core_pe2e_matrix.json",
+        "schema_version": "auv_core_composition_matrix.v1",
+        "first_wave_arms": 2
+      },
+      {
+        "matrix_id": "G182-CORE-ALOSB",
+        "program_group_id": "G-ALOS-BODY-RL",
+        "control_contract": "CC_ALOS_BODY",
+        "path": "configs/governance/goal182_core_alosb_matrix.json",
+        "schema_version": "auv_core_composition_matrix.v1",
+        "first_wave_arms": 4
+      }
+    ],
+    "cross_program_pooling": false,
+    "arm_id_template": "G182_INT_STACK_<ACTOR>_<CONTROL>_<LEARN>_<MODULE>",
+    "arm_id_grammar": {
+      "canonical_template": "G182_<PHASE>_<DOMAIN>_<TREATMENT>",
+      "phase_levels": [
+        "P0",
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "P5",
+        "P6",
+        "ALOS",
+        "BC",
+        "INT"
+      ],
+      "domain_levels": [
+        "AUTH",
+        "CHAN",
+        "NORM",
+        "TR",
+        "EXPL",
+        "CRIT",
+        "CURR",
+        "REW",
+        "ROUTE",
+        "STACK"
+      ],
+      "treatment_regex": "^[A-Z0-9]+(?:_[A-Z0-9]+)*$",
+      "core_treatment_axes": {
+        "actor": [
+          "MLP",
+          "TA"
+        ],
+        "control": [
+          "PE2E",
+          "ALOSB"
+        ],
+        "learning": [
+          "BCFT",
+          "BCRES",
+          "TRRES_CMD",
+          "TRRES_ACT"
+        ],
+        "module": [
+          "MOD0",
+          "MOD1",
+          "MOD2",
+          "MOD3",
+          "MOD4"
+        ]
+      }
+    },
+    "retired_arm_id_templates": [
+      "G182C_<ARCH>_<CONTROL>_<LEARN>_<MODULE>"
+    ],
+    "required_metadata": [
+      "schema_version",
+      "goal_id",
+      "matrix_family_id",
+      "matrix_id",
+      "program_group_id",
+      "control_contract",
+      "matrix_status",
+      "axis_registry",
+      "axis_registry_sha256",
+      "training_profile",
+      "cross_program_pooling"
+    ],
+    "first_wave": {
+      "module_set_priority": [
+        "MS_FULL",
+        "MS_TEMP_CURRENT",
+        "MS_TEMP_PRIV",
+        "MS_TEMP",
+        "MS_NONE"
+      ],
+      "treatment_priority": [
+        "MS_FULL",
+        "MS_TEMP_PRIV"
+      ],
+      "screen_a": {
+        "actor_backend": "AB_MLP_M",
+        "module_set": "MS_FULL",
+        "module_short_code": "MOD4",
+        "role": "priority_treatment_1",
+        "valid_arms": 6,
+        "gate": "Requires compatible current-encoder BC before launch.",
+        "arm_ids": [
+          "G182_INT_STACK_MLP_PE2E_BCFT_MOD4",
+          "G182_INT_STACK_MLP_PE2E_BCRES_MOD4",
+          "G182_INT_STACK_MLP_ALOSB_BCFT_MOD4",
+          "G182_INT_STACK_MLP_ALOSB_BCRES_MOD4",
+          "G182_INT_STACK_MLP_ALOSB_TRRES_CMD_MOD4",
+          "G182_INT_STACK_MLP_ALOSB_TRRES_ACT_MOD4"
+        ]
+      },
+      "paired_control": {
+        "actor_backend": "AB_MLP_M",
+        "module_set": "MS_TEMP_CURRENT",
+        "module_short_code": "MOD3",
+        "role": "paired_control_1",
+        "valid_arms": 6,
+        "rule": "Run immediately after MOD4 for the same six families; same current-encoder BC, only critic_path_dim changes 30 to 0."
+      },
+      "next_priority": {
+        "treatment": {
+          "module_set": "MS_TEMP_PRIV",
+          "module_short_code": "MOD2",
+          "role": "priority_treatment_2",
+          "valid_arms": 6
+        },
+        "control": {
+          "module_set": "MS_TEMP",
+          "module_short_code": "MOD1",
+          "role": "paired_control_2",
+          "valid_arms": 6
+        },
+        "gate": "Requires the shared history BC; run after the MOD4/MOD3 pair.",
+        "rule": "Run after MOD4/MOD3; same history BC, only critic_path_dim changes 30 to 0; do not mix with the first pair."
+      },
+      "lowest_priority_baseline": {
+        "module_set": "MS_NONE",
+        "module_short_code": "MOD0",
+        "valid_arms": 6,
+        "gate": "Requires a no-history BC checkpoint.",
+        "rule": "Run last; it is a baseline, not the primary treatment."
+      },
+      "deferred": [
+        "AB_TA_M"
+      ],
+      "max_first_pair_mlp_arms": 12,
+      "max_first_two_pairs_mlp_arms": 24
+    }
+  },
+  "axes": {
+    "core": {
+      "AX_ACTOR_BACKEND": {
+        "role": "core_factor",
+        "multiplicative": true,
+        "status": "APPROVED_CM2",
+        "approved_at": "2026-11-16",
+        "description": "Actor 本体的网络后端；不是历史 encoder 类型。",
+        "metadata_required": [
+          "actor_kind",
+          "actor_input_contract",
+          "token_contract",
+          "pooling"
+        ],
+        "levels": {
+          "AB_MLP_M": {
+            "short_code": "MLP",
+            "description": "M 档 MLP-family actor；无 actor 级 attention。",
+            "backend_family": "mlp",
+            "allowed_actor_kinds": [
+              "mlp",
+              "token_mlp"
+            ],
+            "input_contracts": {
+              "mlp": "fused",
+              "token_mlp": "token_mean"
+            },
+            "requirements": [
+              "actor/critic capacity must follow the Goal181 M pairing rule",
+              "encoder.kind must not be used as an actor backend substitute",
+              "token_mlp must use the same token set, order, width, and pooling as its paired transformer arm",
+              "fused mlp is only a fused-token control, not the primary transformer control"
+            ]
+          },
+          "AB_TA_M": {
+            "short_code": "TA",
+            "description": "M 档 Transformer actor；按 Goal181 的 token 与容量契约实现。",
+            "backend_family": "transformer",
+            "allowed_actor_kinds": [
+              "transformer"
+            ],
+            "input_contracts": {
+              "transformer": "token_attention"
+            },
+            "requirements": [
+              "actor_kind must be explicit",
+              "capacity and forward p95 must be paired with AB_MLP_M",
+              "history encoder kinds must not be relabeled as transformer actor",
+              "DADE/dual-horizon belongs to module_set, not actor backend"
+            ]
+          }
+        },
+        "capacity_pairing": {
+          "class": "M",
+          "mlp_actor_hidden_dims": [
+            512,
+            256,
+            128
+          ],
+          "critic_hidden_dims": [
+            512,
+            256,
+            128
+          ],
+          "transformer_actor": {
+            "d_model": 112,
+            "layers": 2,
+            "heads": 4,
+            "ffn": 224
+          },
+          "parameter_tolerance_fraction": 0.2,
+          "forward_p95_tolerance_fraction": 0.2,
+          "failure_labels": [
+            "CAPACITY_MISMATCH",
+            "ACTOR_DEPLOYMENT_BUDGET_FAIL",
+            "TOKENIZATION_CONFOUND"
+          ]
+        }
+      },
+      "AX_CONTROL_CONTRACT": {
+        "role": "core_factor",
+        "multiplicative": true,
+        "description": "制导由谁负责，以及本体控制的动作契约。",
+        "levels": {
+          "CC_PE2E": {
+            "short_code": "PE2E",
+            "description": "路径条件端到端；策略内部隐式包含制导，无外部 ALOS。",
+            "implementation": {
+              "pc_control_mode_primary": "path_fixed_speed",
+              "pc_control_mode_secondary": "path_learned_speed",
+              "actor_command_dim": 0,
+              "external_alos": false
+            }
+          },
+          "CC_ALOS_BODY": {
+            "short_code": "ALOSB",
+            "description": "外部 ALOS 提供制导命令，学习器负责本体控制或残差。",
+            "implementation": {
+              "pc_control_mode": "alos",
+              "external_alos": true
+            }
+          }
+        }
+      },
+      "AX_LEARNING_COMPOSITION": {
+        "role": "core_factor",
+        "multiplicative": true,
+        "status": "APPROVED_CM3",
+        "approved_at": "2026-11-16",
+        "description": "BC、传统控制与 PPO 的组合方式。",
+        "formal_families": [
+          "BCFT",
+          "BCRES",
+          "TRRES"
+        ],
+        "formal_arms_per_backend_module_set": 6,
+        "scratch_policy": {
+          "role": "optional_diagnostic",
+          "formal": false,
+          "core_matrix_eligible": false,
+          "first_wave": false,
+          "counts_toward_design_space": false,
+          "winner_eligible": false,
+          "collection_eligible": false,
+          "can_replace_bcft": false
+        },
+        "levels": {
+          "LC_BC_FINETUNE": {
+            "short_code": "BCFT",
+            "description": "BC actor warm start，随后全量 PPO 微调。",
+            "formal": true,
+            "counts_toward_design_space": true,
+            "implementation": {
+              "base_policy_mode": "none",
+              "warmstart_actor": "required_and_manifested",
+              "bc_checkpoint": "shared_canonical_5d_bc"
+            }
+          },
+          "LC_BC_RESIDUAL": {
+            "short_code": "BCRES",
+            "description": "冻结 BC actor，PPO 只训练执行器残差；当前仅 RI_ACT。",
+            "formal": true,
+            "counts_toward_design_space": true,
+            "implementation": {
+              "base_policy_mode": "frozen_pc_bc_residual",
+              "bc_checkpoint": "shared_canonical_5d_bc",
+              "residual_interface": "RI_ACT",
+              "action_interface": "AI_ACT_RES"
+            }
+          },
+          "LC_TRAD_RESIDUAL": {
+            "short_code": "TRRES",
+            "description": "无 BC；传统 ALOS/PD-PI base + PPO 残差；按残差接口展开为 TRRES_CMD / TRRES_ACT。",
+            "formal": true,
+            "counts_toward_design_space": true,
+            "family_alias_only": true,
+            "implementation": {
+              "base_policy_mode": "none",
+              "base_control": "alos_pd_pi",
+              "action_interface_by_residual_interface": {
+                "RI_CMD": "AI_CMD_RES",
+                "RI_ACT": "AI_ACT_RES"
+              },
+              "arm_short_code_by_residual_interface": {
+                "RI_CMD": "TRRES_CMD",
+                "RI_ACT": "TRRES_ACT"
+              },
+              "bare_short_code_role": "family_alias_only"
+            }
+          },
+          "LC_SCRATCH": {
+            "short_code": "SCRATCH",
+            "description": "无 BC、无传统 base 的直接 RL 诊断基线；不进入正式矩阵。",
+            "role": "optional_diagnostic",
+            "formal": false,
+            "counts_toward_design_space": false,
+            "core_matrix_eligible": false,
+            "first_wave": false,
+            "winner_eligible": false,
+            "implementation": {
+              "base_policy_mode": "none",
+              "warmstart_actor": null
+            }
+          }
+        }
+      },
+      "AX_MODULE_SET": {
+        "role": "core_factor",
+        "multiplicative": true,
+        "status": "APPROVED_CM4",
+        "approved_at": "2026-11-16",
+        "description": "预注册的辅助模块组合；不是任意模块开关的笛卡尔积。",
+        "active_level_count": 5,
+        "priority_order": [
+          "MS_FULL",
+          "MS_TEMP_CURRENT",
+          "MS_TEMP_PRIV",
+          "MS_TEMP",
+          "MS_NONE"
+        ],
+        "paired_priority": [
+          {
+            "treatment": "MS_FULL",
+            "control": "MS_TEMP_CURRENT",
+            "isolates": "privileged_critic_under_direct_current_encoder"
+          },
+          {
+            "treatment": "MS_TEMP_PRIV",
+            "control": "MS_TEMP",
+            "isolates": "privileged_critic"
+          }
+        ],
+        "implementation_fields": {
+          "temporal_or_history": "dade_enabled=true; short/long history tokens enter DualHorizonEncoder",
+          "direct_current_encoder": "actor_current_encoder_enabled=true; current estimate side channel is encoded and added to z_t",
+          "privileged_critic": "pc.critic_path_dim=30"
+        },
+        "privileged_critic_contract": {
+          "field": "pc.critic_path_dim",
+          "off_value": 0,
+          "on_value": 30,
+          "all_or_nothing_groups": [
+            "route_truth",
+            "actuator",
+            "disturbance",
+            "sensor_safety"
+          ],
+          "legacy_flag_note": "training.privileged_current_critic is not the PC module-set switch",
+          "d7_scope": "When privileged critic is enabled, all four groups are on; MOD0/MOD1 intentionally set it off."
+        },
+        "levels": {
+          "MS_NONE": {
+            "short_code": "MOD0",
+            "description": "不额外启用时序、current 或 privileged-critic 模块。",
+            "priority": 5,
+            "components": {
+              "temporal_or_history": false,
+              "direct_current_encoder": false,
+              "privileged_critic": false
+            }
+          },
+          "MS_TEMP": {
+            "short_code": "MOD1",
+            "description": "启用时序/历史输入（当前 canonical 为 DADE dual-horizon transformer，不是 GRU/LSTM）；不启用直接 current encoder 或 privileged critic。",
+            "priority": 4,
+            "components": {
+              "temporal_or_history": true,
+              "direct_current_encoder": false,
+              "privileged_critic": false
+            }
+          },
+          "MS_TEMP_PRIV": {
+            "short_code": "MOD2",
+            "description": "时序/历史输入 + privileged critic。",
+            "priority": 3,
+            "components": {
+              "temporal_or_history": true,
+              "direct_current_encoder": false,
+              "privileged_critic": true
+            }
+          },
+          "MS_TEMP_CURRENT": {
+            "short_code": "MOD3",
+            "description": "时序/历史输入 + 直接 current side-channel encoder；不启用 privileged critic。",
+            "priority": 2,
+            "components": {
+              "temporal_or_history": true,
+              "direct_current_encoder": true,
+              "privileged_critic": false
+            }
+          },
+          "MS_FULL": {
+            "short_code": "MOD4",
+            "description": "时序/历史 + 直接 current side-channel encoder + privileged critic。",
+            "priority": 1,
+            "components": {
+              "temporal_or_history": true,
+              "direct_current_encoder": true,
+              "privileged_critic": true
+            }
+          }
+        }
+      }
+    },
+    "conditional": {
+      "AX_RESIDUAL_INTERFACE": {
+        "role": "conditional_factor",
+        "multiplicative": false,
+        "description": "只在 residual learning composition 上展开；BCFT 不乘此轴。",
+        "levels": {
+          "RI_ACT": {
+            "action_interface": "AI_ACT_RES",
+            "legal_compositions": [
+              "LC_BC_RESIDUAL",
+              "LC_TRAD_RESIDUAL"
+            ]
+          },
+          "RI_CMD": {
+            "action_interface": "AI_CMD_RES",
+            "legal_compositions": [
+              "LC_TRAD_RESIDUAL"
+            ]
+          }
+        },
+        "invalid_combinations": [
+          "CC_PE2E × RI_CMD",
+          "LC_BC_RESIDUAL × RI_CMD until a command-output BC checkpoint exists"
+        ]
+      }
+    },
+    "derived": {
+      "AX_ACTION_INTERFACE": {
+        "role": "derived_protocol_axis",
+        "multiplicative": false,
+        "description": "由 control contract、learning composition 与 AX_RESIDUAL_INTERFACE 推导；必须写入 manifest。",
+        "levels": {
+          "AI_ABS": "actor 直接输出归一化绝对执行器动作",
+          "AI_ACT_RES": "在传统/BC 执行器动作上叠加残差",
+          "AI_CMD_RES": "在 ALOS heading/pitch/speed 指令上叠加残差",
+          "AI_GAIN_RES": "修改传统控制器增益；当前 PPO 未接线",
+          "AI_RESOLVED_ENV": "由 environment 接口解析出的实际动作接口，只能写入 resolved metadata"
+        }
+      }
+    },
+    "evaluation": {
+      "matrix_contract": {
+        "status": "APPROVED_M2",
+        "approved_at": "2026-11-16",
+        "schema_version": "auv_goal_matrix.v2",
+        "one_matrix_per_tier": true,
+        "coverage_entry": "evaluation_set",
+        "cell_definition": [
+          "training_run",
+          "stage",
+          "route_profile",
+          "pressure_profile",
+          "radius"
+        ],
+        "episode_definition": [
+          "cell",
+          "eval_seed"
+        ],
+        "eval_seed_encoding": "explicit_integer_list",
+        "eval_seed_multiplies_cell_count": false,
+        "expected_counts": [
+          "expected_cells",
+          "expected_episodes"
+        ],
+        "completeness_failure_labels": [
+          "INVALID_INCOMPLETE_EVAL",
+          "INVALID_UNREGISTERED_CELL",
+          "INVALID_MATRIX_ARITHMETIC",
+          "INVALID_HELDOUT_LEAK"
+        ],
+        "heldout": "closed"
+      },
+      "metric_policy": {
+        "terminal_capture": {
+          "usage": "descriptive_only",
+          "allowed_as_metric": false,
+          "allowed_as_gate": false,
+          "allowed_as_winner_criterion": false,
+          "allowed_as_top3_selector": false,
+          "allowed_as_early_stop": false,
+          "allowed_as_collection_selector": false,
+          "allowed_in_matrix_completeness": false,
+          "report_label": "DESCRIPTIVE_ONLY_NOT_A_METRIC",
+          "note": "Terminal capture/goal reached events may be logged for debugging but must never be used for evaluation, ranking, promotion, or selection."
+        }
+      },
+      "AX_EVAL_STAGE": {
+        "role": "evaluation_axis",
+        "levels": [
+          "EVS_C0",
+          "EVS_C1",
+          "EVS_C2",
+          "EVS_C3",
+          "EVS_C4",
+          "EVS_C5",
+          "EVS_C6",
+          "EVS_C3_FIXED"
+        ],
+        "tier_policy": {
+          "SCREEN": {
+            "required_levels": ["EVS_C3"],
+            "c3_scope": "initial_screen_only",
+            "formal_comparison": false
+          },
+          "FORMAL_CORE": {
+            "required_levels": ["EVS_C2", "EVS_C3", "EVS_C4", "EVS_C6"],
+            "c3_role": "formal_core_stage",
+            "cells_per_arm": 48,
+            "episodes_per_arm": 144
+          },
+          "SPEED_EVAL": {
+            "required_levels": ["EVS_C2", "EVS_C3", "EVS_C4", "EVS_C6"],
+            "speed_levels_mps": [1.0, 1.5, 2.0, 2.5],
+            "pressures": ["EVP_NOMINAL"],
+            "eval_seeds": 3,
+            "cells_per_arm": 48,
+            "episodes_per_arm": 144
+          }
+        }
+      },
+      "AX_EVAL_ROUTE": {
+        "role": "evaluation_axis",
+        "levels": [
+          "EVR_STAGE_MATCH",
+          "EVR_P0",
+          "EVR_P1",
+          "EVR_P2",
+          "EVR_P3",
+          "EVR_P4",
+          "EVR_LEGACY_SINE",
+          "EVR_VERT_S",
+          "EVR_VERT_M",
+          "EVR_VERT_L",
+          "EVR_LENGTH_30",
+          "EVR_LENGTH_35",
+          "EVR_LENGTH_45",
+          "EVR_SPEED_0P9",
+          "EVR_SPEED_1P0",
+          "EVR_SPEED_1P5",
+          "EVR_SPEED_2P0",
+          "EVR_SPEED_2P5"
+        ],
+        "speed_policy": {
+          "within_episode_variation": false,
+          "command_speed_resample_period_s": null,
+          "fixed_speed_eval_levels_mps": [1.0, 1.5, 2.0, 2.5],
+          "ood_speed_levels_mps": [0.9],
+          "speed_eval_stages": ["EVS_C2", "EVS_C3", "EVS_C4", "EVS_C6"],
+          "speed_eval_pressures": ["EVP_NOMINAL"],
+          "speed_eval_eval_seeds": 3,
+          "speed_eval_cells_per_arm": 48,
+          "speed_eval_episodes_per_arm": 144,
+          "screen_required_stage": "EVS_C3",
+          "screen_pressures": ["EVP_NOMINAL"],
+          "screen_eval_seeds": 3,
+          "formal_core_speed_axis": "single_frozen_stage_matched_value",
+          "reporting_rule": "Report each fixed speed separately; never pool speed levels into one formal mean."
+        }
+      },
+      "AX_EVAL_PRESSURE": {
+        "role": "evaluation_axis",
+        "levels": [
+          "EVP_NOMINAL",
+          "EVP_CURRENT05",
+          "EVP_CURRENT10",
+          "EVP_CURRENT15",
+          "EVP_NOISE_N2",
+          "EVP_PLANT20",
+          "EVP_COMBINED20"
+        ]
+      },
+      "AX_EVAL_RADIUS": {
+        "role": "evaluation_axis",
+        "levels": [
+          "EVRAD_2P0"
+        ]
+      },
+      "AX_EVAL_SEED": {
+        "role": "evaluation_axis",
+        "levels": "pre_registered_dev_seed_set",
+        "encoding": "explicit_integer_list",
+        "formal_core_values": [
+          20,
+          21,
+          22
+        ],
+        "heldout": []
+      }
+    },
+    "training": {
+      "AX_TRAIN_SEED": {
+        "role": "training_axis",
+        "levels": "pre_registered_train_seed_set"
+      },
+      "AX_CURRICULUM_REGIME": {
+        "role": "shared_training_protocol",
+        "multiplicative": false,
+        "levels": [
+          "CURR_FULL_C0_C6",
+          "CURR_FIXED_C3_DIAGNOSTIC"
+        ]
+      },
+      "AX_TRAIN_SPEED_PROFILE": {
+        "role": "shared_training_protocol",
+        "multiplicative": false,
+        "description": "Goal182 center-out training speed curriculum. Start near 1.5 m/s, expand high/low sides in alternating 0.2 m/s steps, and resample the training speed target every 5 s. See Goal182 §4.12.7.2.",
+        "level": "SPEED_V3_CENTER_OUT_5S",
+        "reference_center_mps": 1.5,
+        "resample_period_s": 5.0,
+        "resample_scope": "training_only",
+        "resample_schedule": "episode start, then t=5,10,...,55 s; hold the target within each 5 s segment; no terminal resample",
+        "within_stage_distribution": "uniform_inclusive_range",
+        "stage_ranges_mps": {
+          "C0": [1.4, 1.6],
+          "C1": [1.4, 1.8],
+          "C2": [1.2, 1.8],
+          "C3": [1.2, 2.0],
+          "C4": [1.0, 2.0],
+          "C5": [1.0, 2.2],
+          "C6": [1.0, 2.5]
+        },
+        "expansion_rule": "C0 baseline; C1 high +0.2; C2 low -0.2; C3 high +0.2; C4 low -0.2; C5 high +0.2; C6 high +0.3 to physical max",
+        "runtime_clamp": {
+          "lower": "vehicle.min_speed_mps",
+          "upper": "min(vehicle.max_speed_mps, vehicle.max_speed_mps - current_variation_speed_amplitude_mps)",
+          "instantaneous_true_current_must_not_modify_speed_target": true,
+          "nominal_c6_max_mps": 2.5,
+          "example_c6_max_with_variation_reserve_0p1_mps": 2.4
+        },
+        "eval_rule": "Evaluation and collection routes use fixed route speed and command_speed_resample_period_s=null.",
+        "low_speed_ood_mps": 0.9,
+        "calibration": {
+          "mode": "eval_only",
+          "routes": ["R_STRAIGHT", "one_moderate_turn_route"],
+          "pressures": ["nominal"],
+          "speeds_mps": [1.0, 1.5, 2.0, 2.5],
+          "eval_seeds": 3,
+          "metrics": [
+            "speed_tracking",
+            "heading_yaw_tracking",
+            "material_saturation",
+            "cross_track_rmse",
+            "vertical_rmse",
+            "safety",
+            "timeout"
+          ],
+          "participates_in_winner_selection": false
+        },
+        "provenance_fields": [
+          "speed_profile_id",
+          "stage",
+          "speed_range_mps",
+          "speed_segment_index",
+          "speed_segment_start_s",
+          "speed_resample_period_s",
+          "speed_target_mps",
+          "speed_target_min_mps",
+          "speed_target_max_mps"
+        ],
+        "compatibility_rule": "The old v1 narrow speed band and v2 monotonic high-speed table are historical_only and must not be reported as SPEED_V3_CENTER_OUT_5S.",
+        "invalid_if": [
+          "training speed target is fixed for the whole episode",
+          "training resamples at a period other than 5 s",
+          "evaluation or collection route resamples speed",
+          "speed target is changed from instantaneous true current",
+          "episode_command_speed_mps alone is used as provenance for a time-varying target",
+          "the static speed plus current plus variation feasibility check is missing"
+        ]
+      },
+      "AX_TRAIN_VERTICAL_ROUTE": {
+        "role": "shared_training_protocol",
+        "multiplicative": false,
+        "description": "C0-C6 vertical route profile; C2 is axis-isolated, C3-C6 add vertical sine. See Goal182 §4.12.7.1.",
+        "stage_profiles": {
+          "C0": {
+            "status": "legacy_near_planar"
+          },
+          "C1": {
+            "status": "legacy_near_planar"
+          },
+          "C2": {
+            "route_axis_mix": {
+              "RA_VERT_ONLY": 0.5,
+              "RA_HORIZ_ONLY": 0.5
+            },
+            "vertical_amplitude_m": 1.75,
+            "horizontal_amplitude_m": 1.75,
+            "cycles": 1.0
+          },
+          "C3": {
+            "route_axis": "RA_COUPLED",
+            "vertical_amplitude_m": 2.0,
+            "vertical_cycles": 2.0
+          },
+          "C4": {
+            "route_axis": "RA_COUPLED",
+            "vertical_amplitude_m": 2.0,
+            "vertical_cycles": 2.0
+          },
+          "C5": {
+            "route_axis": "RA_COUPLED",
+            "vertical_amplitude_m": 3.0,
+            "vertical_cycles": 1.5
+          },
+          "C6": {
+            "route_axis": "RA_COUPLED",
+            "vertical_amplitude_m": 5.0,
+            "vertical_cycles": 1.0
+          }
+        }
+      }
+    }
+  },
+  "validity": {
+    "rule": "PE2E has BCFT and BCRES(RI_ACT); ALOSB has BCFT, BCRES(RI_ACT), TRRES_CMD(RI_CMD), and TRRES_ACT(RI_ACT). PE2E×TRRES and BCRES×RI_CMD are invalid.",
+    "valid_combinations_per_module_set": 12,
+    "base_defined_combinations_formula": "2 * 2 * 3 * N_module_sets",
+    "valid_arm_count_formula": "2 * (2 + 4) * N_module_sets = 12N",
+    "active_module_set_count": 5,
+    "base_defined_combinations_at_N5": 60,
+    "active_valid_arm_count": 60,
+    "screen_a_valid_arm_count": 6,
+    "screen_a_rule": "MS_NONE × AB_MLP_M only; 2 PE2E + 4 ALOSB learning compositions.",
+    "note": "The base 12N design space removes PE2E×TRRES as invalid; the conditional residual interface adds the second ALOSB×TRRES arm, so valid arm count is also 12N. The 60-arm space is not a run list: CORE-SCREEN-A starts with 6 MLP arms, then adds MOD1 for surviving families up to 12; Transformer and MOD2–MOD4 are deferred."
+  },
+  "legacy_aliases": {
+    "encoder.kind=dual_horizon_transformer": "history encoder, not AX_ACTOR_BACKEND",
+    "pc_control_mode=path_fixed_speed": "CC_PE2E",
+    "pc_control_mode=path_learned_speed": "CC_PE2E secondary speed variant",
+    "pc_control_mode=alos": "CC_ALOS_BODY",
+    "base_policy.mode=frozen_pc_bc_residual": "LC_BC_RESIDUAL",
+    "TRRES": "family alias for TRRES_CMD and TRRES_ACT; not an active arm suffix",
+    "BCRES": "actuator-residual variant; command variant must be named BCRES_CMD",
+    "--warmstart-actor": "LC_BC_FINETUNE initialization channel",
+    "M0/M1/M2/M3/M4": "deprecated module-set aliases; use MOD0/MOD1/MOD2/MOD3/MOD4",
+    "MOD0/MOD1/MOD2/MOD3/MOD4": "module-set short codes, not model capacity tiers",
+    "M tier": "actor/critic capacity tier; never a module-set short code"
+  }
+}

@@ -21,9 +21,18 @@ from torch import Tensor
 from .geometry import wrap_angle
 from .path import BatchedPathProjection
 
+PC_PATH_DIM_SAFE = 5
 PC_PATH_DIM_V1 = 8
 PC_PATH_DIM_ENDPOINT = 12
-PC_PATH_DIMS = (PC_PATH_DIM_V1, PC_PATH_DIM_ENDPOINT)
+PC_PATH_DIMS = (PC_PATH_DIM_SAFE, PC_PATH_DIM_V1, PC_PATH_DIM_ENDPOINT)
+PC_PATH_SAFE_FEATURE_INDICES = (0, 1, 2, 3, 7)
+PC_PATH_SAFE_FEATURE_NAMES = (
+    "signed_cross_track_m",
+    "signed_vertical_error_m",
+    "tangent_heading_error_rad",
+    "tangent_pitch_error_rad",
+    "lookahead_heading_delta_rad",
+)
 PC_PATH_FEATURE_NAMES_V1 = (
     "signed_cross_track_m",
     "signed_vertical_error_m",
@@ -42,9 +51,17 @@ PC_PATH_ENDPOINT_FEATURE_NAMES = (
 )
 PC_PATH_FEATURE_NAMES = PC_PATH_FEATURE_NAMES_V1
 PC_PATH_FEATURE_NAMES_BY_DIM = {
+    PC_PATH_DIM_SAFE: PC_PATH_SAFE_FEATURE_NAMES,
     PC_PATH_DIM_V1: PC_PATH_FEATURE_NAMES_V1,
     PC_PATH_DIM_ENDPOINT: PC_PATH_FEATURE_NAMES_V1 + PC_PATH_ENDPOINT_FEATURE_NAMES,
 }
+PC_PATH_SAFE_FEATURE_SCALES = (
+    5.0,
+    5.0,
+    math.pi,
+    math.pi / 2.0,
+    math.pi,
+)
 PC_PATH_FEATURE_SCALES_V1 = (
     5.0,
     5.0,
@@ -63,6 +80,7 @@ PC_PATH_ENDPOINT_FEATURE_SCALES = (
 )
 PC_PATH_FEATURE_SCALES = PC_PATH_FEATURE_SCALES_V1
 PC_PATH_FEATURE_SCALES_BY_DIM = {
+    PC_PATH_DIM_SAFE: PC_PATH_SAFE_FEATURE_SCALES,
     PC_PATH_DIM_V1: PC_PATH_FEATURE_SCALES_V1,
     PC_PATH_DIM_ENDPOINT: PC_PATH_FEATURE_SCALES_V1 + PC_PATH_ENDPOINT_FEATURE_SCALES,
 }
@@ -70,6 +88,7 @@ PC_PATH_DIM = PC_PATH_DIM_V1
 PC_PATH_BLOCK_NAMES = (
     "path_geom",
     "path_context",
+    "path_lookahead",
     "path_velocity",
     "endpoint_context",
 )
@@ -81,13 +100,82 @@ PC_PATH_BLOCK_FEATURE_INDICES: dict[str, tuple[int, ...]] = {
     "path_velocity": (),
     "endpoint_context": (8, 9, 10, 11),
 }
+PC_PATH_BLOCK_FEATURE_INDICES_BY_DIM: dict[int, dict[str, tuple[int, ...]]] = {
+    PC_PATH_DIM_SAFE: {
+        "path_geom": (0, 1, 2, 3),
+        "path_lookahead": (4,),
+    },
+    PC_PATH_DIM_V1: {
+        "path_geom": (0, 1, 2, 3),
+        "path_context": (4, 5, 6, 7),
+        "path_velocity": (),
+    },
+    PC_PATH_DIM_ENDPOINT: {
+        "path_geom": (0, 1, 2, 3),
+        "path_context": (4, 5, 6, 7),
+        "path_velocity": (),
+        "endpoint_context": (8, 9, 10, 11),
+    },
+}
+PC_PATH_SAFE_BLOCKS = ("path_geom", "path_lookahead")
 PC_PATH_DEFAULT_BLOCKS = ("path_geom", "path_context")
 PC_PATH_ENDPOINT_BLOCKS = ("path_geom", "path_context", "endpoint_context")
 
 
 def pc_path_dim_for_blocks(blocks: Iterable[str]) -> int:
     active = set(validate_path_blocks(blocks))
+    if "path_lookahead" in active:
+        if active & {"path_context", "endpoint_context"}:
+            raise ValueError("path_lookahead cannot be combined with 8D or endpoint blocks")
+        return PC_PATH_DIM_SAFE
     return PC_PATH_DIM_ENDPOINT if "endpoint_context" in active else PC_PATH_DIM_V1
+
+
+def pc_path_default_blocks_for_dim(path_dim: int) -> tuple[str, ...]:
+    dim = int(path_dim)
+    if dim == PC_PATH_DIM_SAFE:
+        return PC_PATH_SAFE_BLOCKS
+    if dim == PC_PATH_DIM_V1:
+        return PC_PATH_DEFAULT_BLOCKS
+    if dim == PC_PATH_DIM_ENDPOINT:
+        return PC_PATH_ENDPOINT_BLOCKS
+    raise ValueError(f"path_dim must be one of {PC_PATH_DIMS}")
+
+
+def _validate_path_blocks_for_dim(
+    blocks: Iterable[str],
+    path_dim: int,
+) -> tuple[str, ...]:
+    validated = validate_path_blocks(blocks)
+    allowed = set(PC_PATH_BLOCK_FEATURE_INDICES_BY_DIM[int(path_dim)])
+    unknown = sorted(set(validated) - allowed)
+    if unknown:
+        if path_dim == PC_PATH_DIM_V1 and "endpoint_context" in unknown:
+            raise ValueError("endpoint_context requires path_dim=12")
+        raise ValueError(f"path blocks {unknown} do not match path_dim={path_dim}")
+    return validated
+
+
+def _resolve_path_schema(
+    *,
+    path_dim: int | None,
+    path_blocks: Iterable[str] | None,
+) -> tuple[int, tuple[str, ...]]:
+    if path_dim is None:
+        if path_blocks is None:
+            return PC_PATH_DIM_V1, PC_PATH_DEFAULT_BLOCKS
+        blocks = validate_path_blocks(path_blocks)
+        dim = pc_path_dim_for_blocks(blocks)
+    else:
+        dim = int(path_dim)
+        if dim not in PC_PATH_DIMS:
+            raise ValueError(f"path_dim must be one of {PC_PATH_DIMS}")
+        blocks = (
+            pc_path_default_blocks_for_dim(dim)
+            if path_blocks is None
+            else validate_path_blocks(path_blocks)
+        )
+    return dim, _validate_path_blocks_for_dim(blocks, dim)
 
 
 def pc_path_feature_names_for_dim(path_dim: int) -> tuple[str, ...]:
@@ -122,10 +210,9 @@ def path_block_column_mask(blocks: Iterable[str], *, path_dim: int | None = None
     dim = inferred_dim if path_dim is None else int(path_dim)
     if dim not in PC_PATH_DIMS:
         raise ValueError(f"path_dim must be one of {PC_PATH_DIMS}")
-    if dim == PC_PATH_DIM_V1 and "endpoint_context" in active:
-        raise ValueError("endpoint_context requires path_dim=12")
+    active = set(_validate_path_blocks_for_dim(active, dim))
     columns = [False] * dim
-    for name, indices in PC_PATH_BLOCK_FEATURE_INDICES.items():
+    for name, indices in PC_PATH_BLOCK_FEATURE_INDICES_BY_DIM[dim].items():
         if name in active:
             for index in indices:
                 columns[index] = True
@@ -137,14 +224,14 @@ def pc_path_schema_hash(
     *,
     path_dim: int | None = None,
 ) -> str:
-    validated = validate_path_blocks(blocks)
-    dim = pc_path_dim_for_blocks(validated) if path_dim is None else int(path_dim)
-    if dim not in PC_PATH_DIMS:
-        raise ValueError(f"path_dim must be one of {PC_PATH_DIMS}")
-    if dim == PC_PATH_DIM_V1 and "endpoint_context" in validated:
-        raise ValueError("endpoint_context requires path_dim=12")
+    dim, validated = _resolve_path_schema(path_dim=path_dim, path_blocks=blocks)
+    version = {
+        PC_PATH_DIM_SAFE: "pc_path_v3_safe",
+        PC_PATH_DIM_V1: "pc_path_v1",
+        PC_PATH_DIM_ENDPOINT: "pc_path_v2_endpoint",
+    }[dim]
     payload = {
-        "version": "pc_path_v1" if dim == PC_PATH_DIM_V1 else "pc_path_v2_endpoint",
+        "version": version,
         "dim": dim,
         "features": pc_path_feature_names_for_dim(dim),
         "scales": pc_path_feature_scales_for_dim(dim),
@@ -171,14 +258,15 @@ def build_pc_path_features(
     attitude: Tensor,
     path: Any,
     position_ned_m: Tensor | None = None,
-    path_blocks: Iterable[str] = PC_PATH_DEFAULT_BLOCKS,
+    path_blocks: Iterable[str] | None = None,
+    path_dim: int | None = None,
     endpoint_enter_m: float = 20.0,
     endpoint_full_m: float = 5.0,
     lookahead_m: float = 3.0,
 ) -> Tensor:
     """Build the versioned path block from ``p_nav`` projection and sensor attitude."""
 
-    blocks = validate_path_blocks(path_blocks)
+    dim, blocks = _resolve_path_schema(path_dim=path_dim, path_blocks=path_blocks)
     tangent = torch.as_tensor(projection.tangent_ned)
     position = torch.as_tensor(attitude)
     if tangent.ndim != 2 or tangent.shape[1] != 3:
@@ -211,7 +299,7 @@ def build_pc_path_features(
     )
     lookahead_delta = wrap_angle(lookahead_heading - tangent_heading)
 
-    features = [
+    base_features = [
         projection.horizontal_error_m,
         projection.vertical_error_m,
         heading_error,
@@ -221,7 +309,11 @@ def build_pc_path_features(
         projection.curvature_1_per_m,
         lookahead_delta,
     ]
-    if "endpoint_context" in blocks:
+    if dim == PC_PATH_DIM_SAFE:
+        features = [base_features[index] for index in PC_PATH_SAFE_FEATURE_INDICES]
+    else:
+        features = list(base_features)
+    if dim == PC_PATH_DIM_ENDPOINT:
         if position_ned_m is None:
             raise ValueError("endpoint_context requires position_ned_m")
         if not math.isfinite(endpoint_enter_m) or endpoint_enter_m <= 0.0:
@@ -270,10 +362,12 @@ def build_pc_path_features(
 
 __all__ = [
     "PC_PATH_BLOCK_FEATURE_INDICES",
+    "PC_PATH_BLOCK_FEATURE_INDICES_BY_DIM",
     "PC_PATH_BLOCK_NAMES",
     "PC_PATH_DEFAULT_BLOCKS",
     "PC_PATH_DIM",
     "PC_PATH_DIM_ENDPOINT",
+    "PC_PATH_DIM_SAFE",
     "PC_PATH_DIM_V1",
     "PC_PATH_DIMS",
     "PC_PATH_ENDPOINT_BLOCKS",
@@ -285,9 +379,14 @@ __all__ = [
     "PC_PATH_FEATURE_SCALES",
     "PC_PATH_FEATURE_SCALES_BY_DIM",
     "PC_PATH_FEATURE_SCALES_V1",
+    "PC_PATH_SAFE_BLOCKS",
+    "PC_PATH_SAFE_FEATURE_INDICES",
+    "PC_PATH_SAFE_FEATURE_NAMES",
+    "PC_PATH_SAFE_FEATURE_SCALES",
     "build_pc_path_features",
     "normalize_path_features",
     "path_block_column_mask",
+    "pc_path_default_blocks_for_dim",
     "pc_path_dim_for_blocks",
     "pc_path_feature_names_for_dim",
     "pc_path_feature_scales_for_dim",

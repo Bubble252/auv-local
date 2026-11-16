@@ -89,3 +89,22 @@ def test_frozen_residual_optimizer_keeps_separate_head_group() -> None:
     assert {id(parameter) for parameter in head_group["params"]} == {
         id(parameter) for parameter in policy.actor_dade_head.parameters()
     }
+
+
+def test_frozen_residual_shared_adaptive_lr_keeps_native_optimizer() -> None:
+    policy = _Policy(dade_head=False)
+    runner = _runner(policy)
+    training = _training(dade_head_lr=None)
+    training.algorithm.update(
+        {
+            "learning_rate_actor": 3e-4,
+            "learning_rate_critic": 3e-4,
+            "critic_warmup_iterations": 0,
+            "schedule": "adaptive",
+        }
+    )
+
+    MODULE._configure_optimizer_learning_rates(runner, training, is_pc=True)
+
+    assert runner.alg.optimizer is None
+    assert runner.alg.learning_rate is None

@@ -33,6 +33,7 @@ from ..geometry import (
     body_to_world,
     quaternion_from_direction,
     quaternion_from_euler,
+    world_to_body,
     wrap_angle,
 )
 from ..guidance import BatchedAlosSolution, BatchedThreeDAlosGuidance
@@ -52,10 +53,9 @@ from ..pc import (
     pc_route_health_terms,
 )
 from ..pc_path import (
-    PC_PATH_DEFAULT_BLOCKS,
     PC_PATH_DIMS,
-    PC_PATH_ENDPOINT_BLOCKS,
     path_block_column_mask,
+    pc_path_default_blocks_for_dim,
     validate_path_blocks,
 )
 from ..plant_randomization import sample_plant_scale_factors
@@ -115,7 +115,7 @@ class BatchedPCLowLevelEnv:
             self.path_blocks = ()
         else:
             blocks = (
-                (PC_PATH_ENDPOINT_BLOCKS if path_dim == 12 else PC_PATH_DEFAULT_BLOCKS)
+                pc_path_default_blocks_for_dim(path_dim)
                 if path_blocks is None
                 else validate_path_blocks(path_blocks)
             )
@@ -393,6 +393,7 @@ class BatchedPCLowLevelEnv:
         self.episode_seed: Tensor | None = None
         self.plant_scales: Tensor | None = None
         self.previous_actuator: Tensor | None = None
+        self._previous_previous_actuator: Tensor | None = None
         self.previous_action_normalized: Tensor | None = None
         self.previous_hold_fraction: Tensor | None = None
         self.hold_fraction: Tensor | None = None
@@ -1255,6 +1256,18 @@ class BatchedPCLowLevelEnv:
             command,
             speed_mps=torch.maximum(command.speed_mps, minimum_speed),
         )
+        reference_ground_velocity = solution.reference_ground_velocity_ned
+        reference_ground_norm = torch.linalg.norm(reference_ground_velocity, dim=1)
+        reference_ground_speed = torch.clamp(
+            reference_ground_norm,
+            min=float(self.vehicle.min_speed_mps),
+            max=float(self.vehicle.max_speed_mps),
+        )
+        reference_ground_velocity = (
+            reference_ground_velocity
+            / torch.clamp(reference_ground_norm[:, None], min=1e-9)
+            * reference_ground_speed[:, None]
+        )
         command_direction = torch.stack(
             (
                 torch.cos(command.pitch_rad) * torch.cos(command.heading_rad),
@@ -1270,6 +1283,7 @@ class BatchedPCLowLevelEnv:
             desired_body_direction_ned=command_direction,
             command_speed_mps=command.speed_mps,
             reference_speed_mps=command.speed_mps,
+            reference_ground_velocity_ned=reference_ground_velocity,
             reference_quat_xyzw=quaternion_from_direction(command_direction),
         )
         self._projection_hint = projection.segment_index
@@ -1330,10 +1344,15 @@ class BatchedPCLowLevelEnv:
         heading = torch.atan2(tangent[:, 1], tangent[:, 0])
         horizontal = torch.linalg.norm(tangent[:, :2], dim=1)
         pitch = torch.atan2(-tangent[:, 2], torch.clamp(horizontal, min=1e-9))
+        speed = torch.clamp(
+            self._episode_command_speed_mps,
+            min=float(self.vehicle.min_speed_mps),
+            max=float(self.vehicle.max_speed_mps),
+        )
         command = PCCommand(
             heading_rad=heading,
             pitch_rad=pitch,
-            speed_mps=self._episode_command_speed_mps,
+            speed_mps=speed,
         )
         self._projection_hint = projection.segment_index
         self._guidance_diagnostics = {}
@@ -1354,9 +1373,12 @@ class BatchedPCLowLevelEnv:
         actuator = self.actuator
         if eta is None or actuator is None:
             raise RuntimeError("path reward requires initialized state")
-        heading = wrap_angle(
-            torch.atan2(projection.tangent_ned[:, 1], projection.tangent_ned[:, 0]) - eta[:, 5]
-        )
+        tangent = projection.tangent_ned
+        tangent_heading = torch.atan2(tangent[:, 1], tangent[:, 0])
+        tangent_horizontal = torch.linalg.norm(tangent[:, :2], dim=1)
+        tangent_pitch = torch.atan2(-tangent[:, 2], torch.clamp(tangent_horizontal, min=1e-9))
+        heading = wrap_angle(tangent_heading - eta[:, 5])
+        pitch = wrap_angle(tangent_pitch - eta[:, 4])
         cross = projection.horizontal_error_m
         vertical = projection.vertical_error_m
         progress = projection.progress_m - previous_progress_m
@@ -1365,9 +1387,20 @@ class BatchedPCLowLevelEnv:
         energy_penalty = (actuator[:, 2] / self.config.actuator.policy_max_propeller_rpm).square()
         cfg = self.config.reward
         w_3d = cfg.w_path_3d if self.pc_control_mode == "alos" else cfg.w_3d
+        if cfg.path_heading_std_rad is None:
+            heading_penalty = cfg.w_yaw * torch.abs(heading) / math.pi
+            pitch_penalty = torch.zeros_like(heading)
+        else:
+            heading_penalty = cfg.w_yaw * (
+                1.0 - torch.exp(-((heading / cfg.path_heading_std_rad).square()))
+            )
+            pitch_penalty = cfg.w_path_pitch * (
+                1.0 - torch.exp(-((pitch / cfg.path_heading_std_rad).square()))
+            )
         path_reward = (
             -w_3d * torch.sqrt(cross.square() + vertical.square()) / 5.0
-            - cfg.w_yaw * torch.abs(heading) / math.pi
+            - heading_penalty
+            - pitch_penalty
             + cfg.w_prog * progress
             - cfg.w_path_speed_smooth * speed_smooth_penalty
             - cfg.w_path_energy * energy_penalty
@@ -1379,7 +1412,7 @@ class BatchedPCLowLevelEnv:
             normalized_progress=projection.progress_m / torch.clamp(
                 self.path.total_length_m_tensor, min=1e-9
             ),
-            reference_speed_mps=self._episode_command_speed_mps,
+            reference_speed_mps=observation.command.speed_mps,
             dt_s=self.config.plant.dt_s,
             reward=cfg,
         )
@@ -1396,6 +1429,7 @@ class BatchedPCLowLevelEnv:
             ppo_scaled=total * cfg.resolved_pc_ppo_scale,
             path_cross=cross,
             path_vertical=vertical,
+            path_pitch=pitch,
             path_progress=progress,
             path_heading=heading,
             speed_smooth=speed_smooth_penalty,
@@ -1947,6 +1981,7 @@ class BatchedPCLowLevelEnv:
             dtype=self.dtype,
         )
         self.previous_actuator = self.actuator.clone()
+        self._previous_previous_actuator = self.actuator.clone()
         self.previous_action_normalized = torch.zeros_like(self.actuator)
         self.hold_fraction = torch.zeros(self.num_envs, device=self.device, dtype=self.dtype)
         self.previous_hold_fraction = torch.zeros_like(self.hold_fraction)
@@ -2095,6 +2130,11 @@ class BatchedPCLowLevelEnv:
             torch.zeros((selected_count, 3), device=self.device, dtype=self.dtype),
             mask,
         )
+        self._previous_previous_actuator = self._merge_rows(
+            self._previous_previous_actuator,
+            torch.zeros((selected_count, 3), device=self.device, dtype=self.dtype),
+            mask,
+        )
         self.previous_action_normalized = self._merge_rows(
             self.previous_action_normalized,
             torch.zeros_like(self.previous_action_normalized),
@@ -2188,6 +2228,7 @@ class BatchedPCLowLevelEnv:
             or self.t_s is None
             or self.step_count is None
             or self.previous_action_normalized is None
+            or self._previous_previous_actuator is None
             or self.previous_hold_fraction is None
             or self.hold_fraction is None
             or self.sensor_output is None
@@ -2291,6 +2332,28 @@ class BatchedPCLowLevelEnv:
         )
         goal_plane_miss = decision.kind == int(PCTerminalKind.GOAL_PLANE_MISS)
         route_ground_speed = self._ground_route_speed(observation)
+        if observation.solution is not None:
+            reference_ground_velocity = observation.solution.reference_ground_velocity_ned
+        elif observation.projection is not None:
+            reference_ground_velocity = (
+                torch.clamp(
+                    observation.command.speed_mps,
+                    min=float(self.vehicle.min_speed_mps),
+                    max=float(self.vehicle.max_speed_mps),
+                )[:, None]
+                * observation.projection.tangent_ned
+            )
+        else:
+            reference_ground_velocity = None
+        if reference_ground_velocity is None:
+            reward_reference_ground_speed = observation.command.speed_mps
+        else:
+            attitude_quat = quaternion_from_euler(
+                self.eta[:, 3], self.eta[:, 4], self.eta[:, 5]
+            )
+            reward_reference_ground_speed = world_to_body(
+                reference_ground_velocity, attitude_quat
+            )[:, 0]
         reward = self.reward_computer.compute(
             heading_error_rad=heading_error,
             pitch_error_rad=pitch_error,
@@ -2300,8 +2363,11 @@ class BatchedPCLowLevelEnv:
             roll_rate_rad_s=self.nu[:, 3],
             actual_actuator=self.actuator,
             previous_actuator=previous_actuator,
+            previous_previous_actuator=self._previous_previous_actuator,
             requested_normalized=applied.normalized,
             previous_requested_normalized=previous_requested,
+            reward_ground_surge_mps=observation.ground_velocity_body_mps[:, 0],
+            reference_ground_speed_mps=reward_reference_ground_speed,
             hold_fraction=self.hold_fraction,
             previous_hold_fraction=previous_hold,
             safety_terminal=decision.safety_event,
@@ -2344,6 +2410,7 @@ class BatchedPCLowLevelEnv:
             route_ground_speed_mps=route_ground_speed,
         )
         self.previous_actuator = self.actuator
+        self._previous_previous_actuator = previous_actuator
         self.previous_action_normalized = applied.normalized
         self.previous_hold_fraction = self.hold_fraction
         self._previous_ground_surge_mps = observation.ground_velocity_body_mps[:, 0].to(

@@ -178,6 +178,13 @@
 | Goal172 | settled_局部规划器_反应式 | P6 | landed (FULL_MATRIX_COMPLETE / DIAGNOSTIC_NOT_GATE / HELDOUT_CLOSED / NO_TRAINING) | 1 | 1 | 0 | - |
 | Goal173 | settled_局部规划器_反应式 | P6 | paused (SCREEN_CANDIDATE_PASS_NOT_FORMAL / USER_REQUESTED_PAUSE_AFTER_SCREEN / HELDOUT_CLOSED) | 2 | 1 | 0 | - |
 | Goal174 | settled_局部规划器_反应式 | P6 | draft (PROTOCOL_IMPLEMENTED_NOT_RUN / HELDOUT_CLOSED) | 1 | 0 | 0 | - |
+| Goal175 | settled_局部规划器_反应式 | P7_PLAN | failed (A2_COMPLETE / GATE175_FAIL / VERTICAL_GUARD_FAIL / H175C_NOT_SUPPORTED / HELDOUT_CLOSED) | 1 | 2 | 0 | configs/governance/goal175_matrix.json |
+| Goal176 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (STAGE_A_COMPLETE / PROBE_PASS / RESIDUAL_ACTION_ATTENUATED / PPO_SIGNAL_WEAK_PARTIAL / H176C_NOT_SUPPORTED / HELDOUT_CLOSED) | 1 | 1 | 0 | - |
+| Goal177 | settled_局部规划器_反应式 | P7_PLAN | failed (STAGE_A_COMPLETE / GATE_A_FAIL / RESIDUAL_TOO_SMALL_FOR_PPO / STAGE_B_BLOCKED / HELDOUT_CLOSED) | 1 | 1 | 0 | configs/governance/goal177_matrix.json |
+| Goal178 | settled_局部规划器_反应式 | UNCLASSIFIED | landed (RESULT_COMPLETE / BC_AUTHORITY_CONFOUND / HEAD_GAIN_NOT_CAUSAL) | 1 | 1 | 0 | - |
+| Goal179 | settled_局部规划器_反应式 | P7_DIAGNOSTIC | draft (DRAFT_FOR_APPROVAL / NO_TRAINING_STARTED / HELDOUT_CLOSED) | 1 | 0 | 0 | configs/governance/goal179_matrix.json |
+| Goal180 | settled_局部规划器_反应式 | P7_PATH_CONDITIONED_POLICY | draft (DRAFT_FOR_APPROVAL) | 1 | 0 | 0 | - |
+| Goal181 | settled_局部规划器_反应式 | P7_ACTOR_ARCHITECTURE | draft (DRAFT_FOR_APPROVAL) | 1 | 0 | 0 | - |
 
 ## Documents
 
@@ -1109,3 +1116,36 @@
 ### Goal174
 
 - `doc/goals/goal174_alos_current_compensation_paradigm_20261112.md`
+
+### Goal175
+
+- `doc/goals/goal175_alos_comp_mlp_route_matrix_20261114.md`
+- `doc/goals/goal175_a1_result_20261114.md`
+- `doc/goals/goal175_result_20261114.md`
+
+### Goal176
+
+- `doc/goals/goal176_residual_head_signal_audit_20261114.md`
+- `doc/goals/goal176_result_20261114.md`
+
+### Goal177
+
+- `doc/goals/goal177_residual_head_action_interface_3d_20261114.md`
+- `doc/goals/goal177_result_20261114.md`
+
+### Goal178
+
+- `doc/goals/goal178_bc_authority_confound_20261114.md`
+- `doc/goals/goal178_result_20261114.md`
+
+### Goal179
+
+- `doc/goals/goal179_head_only_credit_diagnostics_20261114.md`
+
+### Goal180
+
+- `doc/goals/goal180_path_conditioned_policy_20261114.md`
+
+### Goal181
+
+- `doc/goals/goal181_transformer_actor_architecture_20261114.md`

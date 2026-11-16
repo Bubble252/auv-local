@@ -15,6 +15,7 @@ from typing import Any
 import torch
 from torch import Tensor, nn
 from torch.distributions import Normal
+from torch.utils.checkpoint import checkpoint
 
 from auv_lowlevel.ppo_config import EncoderConfig
 
@@ -67,6 +68,37 @@ MULTISCALE_KINDS = frozenset(
         "dual_horizon_transformer_uniform40",
     }
 )
+
+
+# PPO updates evaluate a 4096 x 48 rollout in four mini-batches.  The long
+# Transformer window then holds thousands of sequence tokens at once.  Keep
+# the full logical batch and profile, but recompute layer activations during
+# backward for these large training forwards.
+_TRANSFORMER_CHECKPOINT_MIN_BATCH = 8192
+
+
+def _checkpointed_transformer_layer(
+    layer: nn.TransformerEncoderLayer,
+    src: Tensor,
+) -> Tensor:
+    """Run one post-norm Transformer layer with sub-block checkpoints."""
+
+    x = src
+    x = layer.norm1(
+        x
+        + checkpoint(
+            layer._sa_block,
+            x,
+            None,
+            None,
+            False,
+            use_reentrant=False,
+        )
+    )
+    x = layer.norm2(
+        x + checkpoint(layer._ff_block, x, use_reentrant=False)
+    )
+    return x
 
 
 def _long_window_sample_indices(
@@ -240,7 +272,22 @@ class _WindowEncoder(nn.Module):
         if self.kind == "dual_horizon_mlp":
             return self.encoder(history.flatten(start_dim=1))
         else:
-            encoded = self.encoder(self.input(history) + self.position)
+            tokens = self.input(history) + self.position
+            if (
+                self.training
+                and torch.is_grad_enabled()
+                and self.token_window >= 32
+                and tokens.shape[0] >= _TRANSFORMER_CHECKPOINT_MIN_BATCH
+            ):
+                for layer in self.encoder.layers:
+                    tokens = _checkpointed_transformer_layer(layer, tokens)
+                encoded = (
+                    self.encoder.norm(tokens)
+                    if self.encoder.norm is not None
+                    else tokens
+                )
+            else:
+                encoded = self.encoder(tokens)
             encoded = self.norm(encoded)
         if self.pooling == "mean":
             return encoded.mean(dim=1)

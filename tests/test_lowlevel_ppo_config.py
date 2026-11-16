@@ -139,6 +139,24 @@ def test_i1_config_freezes_the_dagger_bc_policy() -> None:
     assert train_cfg["algorithm"]["class_name"] == "PPO"
 
 
+def test_training_profile_binding_is_optional_and_preserved() -> None:
+    legacy = parse_training_config(_raw())
+    assert legacy.training_profile is None
+
+    payload = _raw()
+    payload["training_profile"] = "PPO-FLAT-4096x48-E5-MB4"
+    bound = parse_training_config(payload)
+    assert bound.training_profile == "PPO-FLAT-4096x48-E5-MB4"
+
+
+def test_training_profile_binding_must_be_a_non_empty_string() -> None:
+    payload = _raw()
+    payload["training_profile"] = ""
+
+    with pytest.raises(ValueError, match="training_profile"):
+        parse_training_config(payload)
+
+
 def test_actor_decision_stride_exponentiates_discount_for_decision_level_ppo() -> None:
     path = (
         Path(__file__).resolve().parents[1]

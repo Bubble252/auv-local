@@ -11,10 +11,11 @@ import numpy as np
 
 from ._json import load_json_value
 from .config import LowLevelConfig
+from .batch.pc_privileged_schema import PC_CRITIC_PRIV_DIM
 
 SCHEMA_VERSION = "auv_odarrl_control_ppo.v1"
 PC_PATH_BLOCK_NAMES = frozenset(
-    {"state_base", "path_geom", "path_context", "path_velocity"}
+    {"state_base", "path_geom", "path_context", "path_lookahead", "path_velocity"}
 )
 
 
@@ -180,6 +181,10 @@ class PCConfig:
     actor_command_dim: int = 3
     critic_command_dim: int = 3
     path_dim: int = 0
+    critic_path_dim: int = 0
+    critic_path_encoder_hidden_dims: tuple[int, ...] = (64,)
+    critic_path_encoder_alpha: float = 1.0
+    critic_path_encoder_zero_init: bool = False
     path_encoder_hidden_dims: tuple[int, ...] = (64,)
     path_encoder_alpha: float = 0.01
     path_encoder_zero_init: bool = True
@@ -251,6 +256,17 @@ class PCConfig:
             raise ValueError("pc.critic_command_dim must be 0, 1, or 3")
         if self.path_dim < 0:
             raise ValueError("pc.path_dim must be non-negative")
+        if self.critic_path_dim not in (0, PC_CRITIC_PRIV_DIM):
+            raise ValueError(f"pc.critic_path_dim must be 0 or {PC_CRITIC_PRIV_DIM}")
+        if not self.critic_path_encoder_hidden_dims or any(
+            value <= 0 for value in self.critic_path_encoder_hidden_dims
+        ):
+            raise ValueError("pc.critic_path_encoder_hidden_dims must be positive")
+        if (
+            not np.isfinite(self.critic_path_encoder_alpha)
+            or self.critic_path_encoder_alpha <= 0.0
+        ):
+            raise ValueError("pc.critic_path_encoder_alpha must be finite and positive")
         if not self.path_encoder_hidden_dims or any(
             value <= 0 for value in self.path_encoder_hidden_dims
         ):
@@ -425,6 +441,12 @@ class PCConfig:
             "critic_command_dim": self.critic_command_dim,
             "history_path_dim": self.history_path_dim,
             "path_dim": self.path_dim,
+            "critic_path_dim": self.critic_path_dim,
+            "critic_path_encoder_hidden_dims": list(
+                self.critic_path_encoder_hidden_dims
+            ),
+            "critic_path_encoder_alpha": self.critic_path_encoder_alpha,
+            "critic_path_encoder_zero_init": self.critic_path_encoder_zero_init,
             "path_encoder_hidden_dims": list(self.path_encoder_hidden_dims),
             "path_encoder_alpha": self.path_encoder_alpha,
             "path_encoder_zero_init": self.path_encoder_zero_init,
@@ -510,6 +532,7 @@ def resolve_pc_action_interface(
 @dataclass(frozen=True)
 class PPOTrainingConfig:
     schema_version: str
+    training_profile: str | None
     name: str
     arm: str
     seed: int
@@ -775,10 +798,13 @@ def parse_training_config(
             "encoder",
             "pc",
         },
-        optional={"instrumentation", "history", "encoder", "pc"},
+        optional={"instrumentation", "history", "encoder", "pc", "training_profile"},
     )
     if root["schema_version"] != SCHEMA_VERSION:
         raise ValueError(f"schema_version must be {SCHEMA_VERSION!r}")
+    training_profile = None
+    if "training_profile" in root:
+        training_profile = _string(root["training_profile"], "training_profile")
     experiment = _mapping(
         root["experiment"], "experiment", {"name", "arm", "seed", "output", "device"}
     )
@@ -1009,6 +1035,10 @@ def parse_training_config(
                 "actor_command_dim",
                 "critic_command_dim",
                 "path_dim",
+                "critic_path_dim",
+                "critic_path_encoder_hidden_dims",
+                "critic_path_encoder_alpha",
+                "critic_path_encoder_zero_init",
                 "path_encoder_hidden_dims",
                 "path_encoder_alpha",
                 "path_encoder_zero_init",
@@ -1051,6 +1081,10 @@ def parse_training_config(
                 "actor_command_dim",
                 "critic_command_dim",
                 "path_dim",
+                "critic_path_dim",
+                "critic_path_encoder_hidden_dims",
+                "critic_path_encoder_alpha",
+                "critic_path_encoder_zero_init",
                 "path_encoder_hidden_dims",
                 "path_encoder_alpha",
                 "path_encoder_zero_init",
@@ -1144,6 +1178,21 @@ def parse_training_config(
                 pc_data.get("critic_command_dim", 3), "pc.critic_command_dim"
             ),
             path_dim=_integer(pc_data.get("path_dim", 0), "pc.path_dim"),
+            critic_path_dim=_integer(
+                pc_data.get("critic_path_dim", 0), "pc.critic_path_dim"
+            ),
+            critic_path_encoder_hidden_dims=_integer_tuple(
+                pc_data.get("critic_path_encoder_hidden_dims", [64]),
+                "pc.critic_path_encoder_hidden_dims",
+            ),
+            critic_path_encoder_alpha=_positive_number(
+                pc_data.get("critic_path_encoder_alpha", 1.0),
+                "pc.critic_path_encoder_alpha",
+            ),
+            critic_path_encoder_zero_init=_boolean(
+                pc_data.get("critic_path_encoder_zero_init", False),
+                "pc.critic_path_encoder_zero_init",
+            ),
             path_encoder_hidden_dims=_integer_tuple(
                 pc_data.get("path_encoder_hidden_dims", [64]),
                 "pc.path_encoder_hidden_dims",
@@ -1460,6 +1509,7 @@ def parse_training_config(
 
     result = PPOTrainingConfig(
         schema_version=SCHEMA_VERSION,
+        training_profile=training_profile,
         name=_string(experiment["name"], "experiment.name"),
         arm=_string(experiment["arm"], "experiment.arm"),
         seed=_integer(experiment["seed"], "experiment.seed"),

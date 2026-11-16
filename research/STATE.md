@@ -2,8 +2,52 @@
 
 ```yaml
 scope: settled_局部规划器_反应式
-current_goal: Goal173 已完成 1 seed/1M screen、88/88 完整评价和文档记录；P_RUD_075 是 SCREEN_CANDIDATE_PASS_NOT_FORMAL。按用户要求在此暂停，不扩 3 seeds/3M。
-next_goal: 暂停 Goal173；恢复前先审计 strict125 success/terminal-capture tradeoff，并保持冻结课程、88-cell 矩阵和 PPO/rudder-only/0.75 对照不变。
+current_goal: Goal178 已完成；A_S150 的闭环改善归因于冻结 BC authority 0.75 -> 1.50，不是 PPO head。Goal179 已写成 DRAFT_FOR_APPROVAL，尚未启动实验。
+next_goal: Goal179 Phase A：固定 BC authority 0.75，只扫 s_head=1/4/8/16 的 eval-only head-only 诊断；随后做 BC/PPO 抵消、reward credit 和 PPO update credit 审计。A–C 未通过前不启动 H0/H1 训练。
+goal175_status: A2_COMPLETE / GATE175_FAIL / VERTICAL_GUARD_FAIL / H175C_NOT_SUPPORTED / HELDOUT_CLOSED
+goal175_result: doc/goals/goal175_result_20261114.md
+goal175_a1_result: doc/goals/goal175_a1_result_20261114.md
+goal175_plan: doc/goals/goal175_alos_comp_mlp_route_matrix_20261114.md
+goal175_valid_run: /data/yhx/underwater-robotics/runs/auv-local/goal175/20261114-goal175-c186c74-a2
+goal175_a1_valid_run: /data/yhx/underwater-robotics/runs/auv-local/goal175/20261114-goal175-c186c74-a1fixed
+goal175_commit: c186c74
+goal175_evidence: A2 6/6 training runs, 72/72 eval cells, training/artifact audits PASS; P_RUD_075 current10 3D route -0.304 m/-13.4%, cross p90 -0.439 m/-12.3%, segments 5/5, keypoints 8/8; vertical p90 +0.034 m and terminal vertical +0.024 to +0.037 m fail the 0.02 m guard in both radii; success/timeout/safety/speed guards pass, speed max 2.053 m/s; zero_alos_comp vs zero_alos_none also shows +0.036 to +0.037 m vertical p90, so the tradeoff is base-level.
+goal175_residual_finding: After 1M training, P_RUD_075_COMP residual_action_abs_mean 0.00292, residual/base L2 1.02%, but route differs from zero_bc50 by only +0.00037 m, cross by +0.00068 m, vertical by -0.00001 m, success by 0; P_RUD_025 improves route by only 0.009-0.010 m; P_ALL_075 worsens route by 0.035-0.036 m and cross by 0.040-0.041 m. COMP/NONE gains come from the ALOS base, not a useful residual head; H175-C NOT SUPPORTED.
+goal175_invalid_run: /data/yhx/underwater-robotics/runs/auv-local/goal175/20261114-goal175-84bf285 is invalid because --curriculum-stage C3 overrode fixed pressure configs; do not aggregate it.
+goal175_next: Pivot to Goal176 residual-head/latent-probe audit. Do not implement or train Transformer, do not open held-out, do not change reward/termination/success/radius. If probe is good but action Jacobian is inert, fix residual head/action interface; if probe is poor, then consider pretraining objective, explicit vertical skip, or DADE history encoding.
+goal176_status: STAGE_A_COMPLETE / PROBE_PASS / RESIDUAL_ACTION_ATTENUATED / PPO_SIGNAL_WEAK_PARTIAL / H176C_NOT_SUPPORTED / HELDOUT_CLOSED
+goal176_plan: doc/goals/goal176_residual_head_signal_audit_20261114.md
+goal176_result: doc/goals/goal176_result_20261114.md
+goal176_valid_run: /data/yhx/underwater-robotics/runs/auv-local/goal175/20261114-goal175-c186c74-a2/goal176
+goal176_evidence: 三条 COMP 臂 z_t probe 的 vertical/pitch/q/w held-out R² 为 0.9967-0.99996；applied residual rudder 只占总动作敏感度的 1e-6-2e-4，P_RUD_075 vertical 为 3.27e-5，P_ALL_075 vertical 为 1.04e-6；late KL 4.31e-5-5.23e-5，仅为 desired_kl 的 0.86%-1.05%，actor head 仍更新但 logged reward slope 为负。H176-B SUPPORTED_ATTENUATED，H176-C NOT_SUPPORTED。
+goal176_next: head-only / last-layer pilot；先验证 residual 输出 scale 和 Jacobian，不先改 encoder、不打开 DADE 或预训练。
+goal177_status: STAGE_A_COMPLETE / GATE_A_FAIL / RESIDUAL_TOO_SMALL_FOR_PPO / STAGE_B_BLOCKED / HELDOUT_CLOSED
+goal177_plan: doc/goals/goal177_residual_head_action_interface_3d_20261114.md
+goal177_result: doc/goals/goal177_result_20261114.md
+goal177_matrix: configs/governance/goal177_matrix.json
+goal177_scope: Stage A eval-only authority sweep 0.25/0.75/1.5/2.5 × channel modes rudder_only/stern_only/rudder_stern/all; perturbations cross/vertical/forward; Stage B H0 head-only vs H1 last-layer with shared PPO bundle, 1 seed/1M, dev20-59 current10 pilot only.
+goal177_gate_a: vertical or cross applied share >=1e-2 or 10x Goal176; forward applied share >=1e-3 or 10x; sign consistency >=0.90; residual_abs/action_std >=0.20 or std <=0.05; no NaN/flew-out/safety/timeout regression.
+goal177_stage_a_run: /data/yhx/underwater-robotics/runs/auv-local/goal177/20261114-goal177-stage-a
+goal177_evidence: 144/144 cells complete (128 policy + 16 zero, dev seeds 20-27, 4 levels x 2 radii x 16 arms); head-only vertical stern max median share 5.05e-3, cross rudder 3.66e-3, forward rpm 2.13e-2; sign consistency 1.0; max head residual/action_std 0.0737 < 0.20. Composed authority 0.4-0.65 is dominated by frozen BC and is diagnostic only. A_S075_RUDDER_ONLY differs from zero_bc50 by +0.0005 m 3D, +0.0008 m cross and +0.00001 m vertical; A_S150_RUDDER_ONLY improves current10/default 3D/cross but is not Gate B. timeout/safety 0, speed max 2.196 m/s.
+goal177_audit_correction: v1 used policy-only units before wrapper scale/gain; v2 used composed BC+PPO actuator_residual_applied and falsely attributed BC authority to the PPO head; v3 head-only metric is official. Superseded artifacts: stage_a_summary.v1_policy_only.* and stage_a_summary.v2_composed_only.*.
+goal177_gate_a_result: FAIL / RESIDUAL_TOO_SMALL_FOR_PPO. Stage B not started; no config, smoke, training, reward/termination/success/radius change, seed extension, or held-out access.
+goal177_blocker: research/blockers/2026-11-14-goal177-head-authority-residual-too-small.md
+goal177_reading: research/paper_reading/2026-11-14-goal177-head-amplitude-and-residual-authority.md
+goal177_next: Before another training goal, run eval-only head-only output gain/scale sweep plus BC/PPO delta correlation and clip diagnostics. Proceed to head-only/last-layer pilot only if head residual/std approaches 0.20 and route responds dose-dependently.
+goal177_deferred: formal full matrix, Transformer actor, encoder pretraining, explicit vertical skip, DADE history encoding all deferred until Gate A/B evidence.
+goal178_status: RESULT_COMPLETE / BC_AUTHORITY_CONFOUND / HEAD_GAIN_NOT_CAUSAL / HELDOUT_CLOSED
+goal178_plan: doc/goals/goal178_bc_authority_confound_20261114.md
+goal178_result: doc/goals/goal178_result_20261114.md
+goal178_evidence: current10/default dev seeds 20-27; BC_ONLY_S150 3D 2.02103 m and cross p90 3.21685 m versus A_S150 2.02286 m / 3.21998 m; PPO rudder increment only 0.31% of composed delta and actual rudder difference 0.00051 rad; only 4/8 seeds improve.
+goal178_next: Do not attribute composed authority gains to the PPO head; run Goal179 with BC and PPO authority separated.
+goal179_status: DRAFT_FOR_APPROVAL / NO_TRAINING_STARTED / HELDOUT_CLOSED
+goal179_plan: doc/goals/goal179_head_only_credit_diagnostics_20261114.md
+goal179_matrix: configs/governance/goal179_matrix.json
+goal179_scope: Phase A eval-only head-only dose sweep s_head=1/4/8/16 with BC authority fixed at 0.75, 4 levels x 2 radii x dev seeds 20-27; Phase B BC/PPO cosine and cancellation; Phase C reward-gradient and one-batch PPO update credit; Phase D H0/H1 pilot only after A-C support.
+goal179_credit_history: Goal92 update scheduling, Goal119 terminal-credit x approach, and Goal128 reward/terminal credit were already tested and must not be rerun as-is. Goal179 adds the missing head-specific reward/update credit and BC/PPO cancellation diagnostics.
+goal179_next: Implement separate BC/PPO authority, run matrix/smoke checks, then execute Phase A.
+goal175_blocker: research/blockers/2026-11-14-goal175-vertical-guard-residual-inert.md
+goal175_decision: research/decisions/2026-11-14-goal175-residual-head-pivot.md
 goal171_status: COMPLETED / SCREEN_NO_CANDIDATE / 88_OF_88_EVAL / CURRICULUM_AUDIT_PASS / HELDOUT_CLOSED
 goal171_result: doc/goals/goal171_result_20261112.md
 goal172_status: COMPLETED / DIAGNOSTIC_NOT_GATE / FULL_MATRIX_COMPLETE / 184_OF_184 / HELDOUT_CLOSED / NO_TRAINING
@@ -401,6 +445,22 @@ goal165_status: PREREGISTERED / GATE165_A_PASS / GATE165_B_PASS / GATE165_C_TRAI
 goal165_evidence: legacy bit-compatible replay 47/47 common fields identical; corrected zero peaks nominal 1.966, current07 1.998, current10 2.003, current15 2.053 m/s; over-2.5 episodes/steps 0; non-terminal and terminal overspeed both 0; normal integral estimate 11.6-13.5 rpm.
 goal165_order: preserve legacy branch; under nu_ground rebuild nu=[linear_velocity,angular_rate] and pass explicit water surge; four independent zero replays; then 3 seeds × 1M gain residual; then paired dev40 default/strict125.
 goal165_speed_contract: REMUS100 hard ceiling 2.5 m/s; every episode speed+current+variation<=2.5; zero replay uses one honest 40-episode dev block per level, not duplicated seed copies.
-last_decision: stop
-last_updated: 2026-11-12
+goal182_plan: doc/goals/goal182_ppo_stack_governance_20261114.md
+goal182_result: doc/goals/goal182_result_20261116.md
+goal182_status: COMPLETED / CORRECTED_3SEED_600IT / C3_DEV4_EVAL / NOT_FORMAL / HELDOUT_CLOSED
+goal182_alos: C3/C4 x A0-A5 x seeds20-23 completed; old 12-arm ALOS remains INVALID_ALOS_ACTION_MODE.
+goal182_bc5d: M-tier 5D BC completed; checkpoint SHA f7103f04fdffe7155d2ab4fe4d1bec3ab19117e3ca798c204016ce66ab7e495c; BC_ONLY legacy 4/4 success, 3D RMSE 1.5376 m; same-protocol endpoint_stop rerun matches exactly (4/4 success, 3D 1.5376 m), so it is the PPO comparison baseline.
+goal182_ppo_contract: canonical PPO-FLAT-4096x48-E5-MB4; contract smoke and residual 5-iteration screen completed; screen only, not formal.
+goal182_module_priority: BC-CURRENT-PREP -> MOD4 -> MOD3 -> MOD2 -> MOD1 -> MOD0; MOD4 is priority treatment #1 and MOD2 is #2; paired controls stay adjacent; MOD0 last; Transformer deferred.
+goal182_warmstart_diagnosis: initial 600-it runs with empirical normalization + actor LR 3e-4 + std 0.3 had iteration-1 KL 34.9-70.4 and collapsed after one update; fixed normalization + actor LR 1e-5 + critic LR 3e-4 + std 0.05 restores 1-iteration 3D RMSE 1.5316 m and 5-iteration 1.5322 m.
+goal182_normalization_conflict: empirical actor normalization still degrades BC warmstart (1-iteration 3D RMSE 9.6319 m, safety 1.0) despite low actor LR; label BC_WARMSTART_NORMALIZATION_CONFLICT_PENDING_REVIEW; current corrected fine-tune uses fixed normalization.
+goal182_corrected_runs: ppo/finetune_5d_m_fixednorm_lr1e5_c3_s86201_600it, s86202_600it, s86203_600it; all status=completed, 600 iterations, 117964800 env steps, canonical PPO-FLAT-4096x48-E5-MB4, fixed normalization, C3-only, warmstart SHA f7103f04fdffe7155d2ab4fe4d1bec3ab19117e3ca798c204016ce66ab7e495c; wall times 21880.31/21580.18/21953.32 s; GPU peak allocated 19088.8/19088.6/19089.3 MiB.
+goal182_final_sha: s86201 2aead4c87d11e1afed42bec442b2913ba4cc35fcf905470eb08e5440647cbe77; s86202 cb0ce41540f3d2f8433c4f1163df778ce21da939f63957f1c18f5a81eb98e5ab; s86203 cba494efe51f83cfac874389a6f5d2c5c4c9f4c49a331f1a6f774957decd37ad.
+goal182_eval: C3, eval seeds 20-23, policy, endpoint_stop, success_frame=both, held-out closed; 86201 4/4 success, 3D 1.1854 m; 86202 4/4, 1.1816 m; 86203 3/4, 1.2349 m; pooled 11/12, 3D 1.2007 m, horizontal 1.1608 m, vertical 0.3059 m, material saturation 0.4830. Same-protocol BC: 4/4, 3D 1.5376 m, saturation 0.4114. NOT_FORMAL (C3/dev only).
+goal182_actor_metadata: policy_kind=pc_actor_critic; pc.actor_architecture=mlp; pc.actor_layout.kind=mlp; actor_hidden_dims=[512,256,128]; path_dim=5; critic_hidden_dims=[512,256,128]; critic_path_dim=30. policy_config.kind=dual_horizon_transformer is the DADE encoder metadata, not the actor.
+goal182_trace: single-env CPU/float64 C3 seed20; 86202 3D 0.9657 m success; 86203 3D 1.0445 m GOAL_PLANE_MISS. Trace is diagnostic only; 4-seed trace protocol differs from formal eval.
+goal182_next: resolve BC_WARMSTART_NORMALIZATION_CONFLICT_PENDING_REVIEW; if moving to formal, run full levels x radii x zero-baseline matrix; do not treat C3/dev 3x4 as formal PASS.
+goal182_invalid_runs: ppo/finetune_5d_m_c3_s86201_600it, s86202_600it, s86203_600it stopped and preserved as INVALID_WARMSTART_CONTRACT; do not resume or use for conclusions.
+last_decision: continue
+last_updated: 2026-11-16
 ```

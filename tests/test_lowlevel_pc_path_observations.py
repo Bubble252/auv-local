@@ -13,8 +13,11 @@ from auv_lowlevel.batch.pc_history_ablation import ablate_pc_path
 from auv_lowlevel.batch.pc_path import (
     PC_PATH_DIM,
     PC_PATH_DIM_ENDPOINT,
+    PC_PATH_DIM_SAFE,
     PC_PATH_ENDPOINT_BLOCKS,
     PC_PATH_ENDPOINT_FEATURE_NAMES,
+    PC_PATH_SAFE_BLOCKS,
+    PC_PATH_SAFE_FEATURE_NAMES,
     build_pc_path_features,
     normalize_path_features,
     path_block_column_mask,
@@ -22,6 +25,7 @@ from auv_lowlevel.batch.pc_path import (
     validate_path_blocks,
 )
 from auv_lowlevel.batch.pc_policy import PCActorCritic, PCPolicyLayout
+from auv_lowlevel.batch.pc_privileged_schema import PC_CRITIC_PRIV_DIM
 from auv_lowlevel.batch.pc_vec_env import BatchTorchPCVecEnv
 from auv_lowlevel.config import LowLevelConfig, parse_config
 from auv_lowlevel.ppo_config import PCConfig
@@ -171,6 +175,70 @@ def test_path_features_are_from_nav_projection_and_normalized() -> None:
     assert normalized[0, 1].item() == pytest.approx(-0.1)
     assert normalized[0, 2].item() == pytest.approx(-0.1 / torch.pi)
     assert normalized[0, 4].item() == pytest.approx(0.2)
+
+
+def test_safe_5d_path_selects_only_deployable_features() -> None:
+    path = _straight_path()
+    projection = path.project(torch.tensor([[2.0, 1.0, -0.5]], dtype=torch.float64))
+    attitude = torch.tensor([[0.0, 0.0, 0.1]], dtype=torch.float64)
+    full = build_pc_path_features(projection, attitude=attitude, path=path)
+    safe = build_pc_path_features(
+        projection,
+        attitude=attitude,
+        path=path,
+        path_dim=PC_PATH_DIM_SAFE,
+    )
+    assert safe.shape == (1, PC_PATH_DIM_SAFE)
+    assert PC_PATH_SAFE_FEATURE_NAMES == (
+        "signed_cross_track_m",
+        "signed_vertical_error_m",
+        "tangent_heading_error_rad",
+        "tangent_pitch_error_rad",
+        "lookahead_heading_delta_rad",
+    )
+    assert torch.equal(safe, full[:, [0, 1, 2, 3, 7]])
+    assert torch.equal(
+        path_block_column_mask(PC_PATH_SAFE_BLOCKS, path_dim=PC_PATH_DIM_SAFE),
+        torch.ones(PC_PATH_DIM_SAFE, dtype=torch.bool),
+    )
+    assert pc_path_schema_hash(PC_PATH_SAFE_BLOCKS, path_dim=PC_PATH_DIM_SAFE) != (
+        pc_path_schema_hash(("path_geom", "path_context"))
+    )
+    policy, actor_obs, _ = _path_policy(path_dim=PC_PATH_DIM_SAFE)
+    assert policy.path_encoder[0].in_features == PC_PATH_DIM_SAFE
+    assert policy.act_inference(actor_obs).shape == (4, 3)
+
+
+def test_goal182_vec_env_exposes_5d_actor_path_and_30d_critic_path() -> None:
+    inner = BatchedPCLowLevelEnv(_pc_config(), num_envs=2, path_dim=PC_PATH_DIM_SAFE)
+    env = BatchTorchPCVecEnv(
+        inner,
+        short_window=2,
+        long_window=4,
+        critic_path_dim=PC_CRITIC_PRIV_DIM,
+    )
+    actor_obs, extras = env.get_observations()
+    critic_obs = extras["observations"]["critic"]
+    actor_state, actor_path, actor_command, actor_short, actor_long = (
+        env.actor_layout.split_with_path(actor_obs)
+    )
+    critic_state, critic_path, critic_command, critic_short, critic_long = (
+        env.critic_layout.split_with_path(critic_obs)
+    )
+    assert actor_state.shape == (2, 12)
+    assert actor_path is not None and actor_path.shape == (2, PC_PATH_DIM_SAFE)
+    assert actor_command.shape == (2, 3)
+    assert actor_short.shape == (2, 2, env.actor_layout.token_dim)
+    assert actor_long.shape == (2, 4, env.actor_layout.token_dim)
+    assert critic_state.shape == (2, 15)
+    assert critic_path is not None and critic_path.shape == (2, PC_CRITIC_PRIV_DIM)
+    assert critic_command.shape == (2, 3)
+    assert critic_short.shape == (2, 2, env.critic_layout.token_dim)
+    assert critic_long.shape == (2, 4, env.critic_layout.token_dim)
+    assert env.actor_layout.token_dim == 15
+    assert env.critic_layout.token_dim == 18
+    assert env.cfg["critic_path_dim"] == PC_CRITIC_PRIV_DIM
+    assert torch.isfinite(critic_path).all()
 
 
 def test_path_block_masks_and_schema_hash_are_stable() -> None:

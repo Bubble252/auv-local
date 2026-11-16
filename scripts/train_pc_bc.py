@@ -31,7 +31,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--actor-command-dim", type=int, choices=(0, 3), default=None)
-    parser.add_argument("--path-dim", type=int, choices=(0, 8, 12), default=None)
+    parser.add_argument("--path-dim", type=int, choices=(0, 5, 8, 12), default=None)
     parser.add_argument("--path-encoder-hidden-sizes", default="64")
     parser.add_argument("--path-encoder-alpha", type=float, default=1.0)
     parser.add_argument("--actor-current-encoder-enabled", action="store_true")
@@ -66,7 +66,7 @@ def _parse_sizes(value: str) -> tuple[int, ...]:
 
 def main() -> int:
     args = _parse_args()
-    dataset, demo_metadata = load_pc_demonstration_dataset(args.demos)
+    dataset, demo_metadata = load_pc_demonstration_dataset(args.demos, path_dim=args.path_dim)
     configs = demo_metadata.get("configs")
     normalization_payload = None
     if isinstance(configs, list) and configs:

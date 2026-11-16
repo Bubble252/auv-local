@@ -33,7 +33,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--seed-count", type=int, default=16)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--dtype", choices=("float32", "float64"), default="float64")
-    parser.add_argument("--path-dim", type=int, choices=(0, 8, 12), default=0)
+    parser.add_argument("--path-dim", type=int, choices=(0, 5, 8, 12), default=0)
     parser.add_argument(
         "--termination-mode",
         choices=("legacy", "endpoint_stop"),

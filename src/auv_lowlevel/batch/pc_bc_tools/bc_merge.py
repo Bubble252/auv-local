@@ -31,7 +31,7 @@ _CORE_FIELDS = (
 _INTEGER_FIELDS = frozenset({"episode_id", "seed", "step"})
 _OPTIONAL_2D_WIDTHS = {
     "current_estimate_body": (3,),
-    "actor_path": (8, 12),
+    "actor_path": (5, 8, 12),
 }
 _OPTIONAL_2D_FIELDS = frozenset(_OPTIONAL_2D_WIDTHS)
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import torch
 from torch import nn
 
 from auv_lowlevel.batch.checkpoint import CHECKPOINT_METADATA_KEY, build_checkpoint_infos
+from auv_lowlevel.batch import encoded_policy as encoded_policy_module
 from auv_lowlevel.batch.encoded_policy import DualHorizonEncoder, EncodedActorCritic
 from auv_lowlevel.ppo_config import EncoderConfig, load_training_config, parse_training_config
 from auv_lowlevel.warmstart import load_encoded_actor_prior
@@ -588,3 +590,50 @@ def test_multiscale_and_uniform40_have_matched_parameters() -> None:
     assert not torch.equal(multiscale_indices, uniform_indices)
     assert torch.all(multiscale_indices[1:] > multiscale_indices[:-1])
     assert torch.all(uniform_indices[1:] > uniform_indices[:-1])
+
+
+def test_transformer_activation_checkpointing_matches_eager(monkeypatch) -> None:
+    config = EncoderConfig(
+        kind="dual_horizon_transformer",
+        feature_dim=16,
+        fusion_hidden=(16,),
+        output_dim=8,
+        dropout=0.0,
+        num_layers=2,
+        num_heads=4,
+        feedforward_dim=32,
+    )
+    torch.manual_seed(11)
+    eager = DualHorizonEncoder(
+        observation_dim=6,
+        short_window=10,
+        long_window=50,
+        config=config,
+    ).train()
+    checkpointed = copy.deepcopy(eager).train()
+    current_eager = torch.randn(2, 6, requires_grad=True)
+    current_checkpointed = current_eager.detach().clone().requires_grad_(True)
+    short = torch.randn(2, 10, 6)
+    long = torch.randn(2, 50, 6)
+
+    monkeypatch.setattr(encoded_policy_module, "_TRANSFORMER_CHECKPOINT_MIN_BATCH", 10**9)
+    eager_output = eager(current_eager, short, long)
+    eager_output.square().sum().backward()
+
+    monkeypatch.setattr(encoded_policy_module, "_TRANSFORMER_CHECKPOINT_MIN_BATCH", 2)
+    checkpointed_output = checkpointed(current_checkpointed, short, long)
+    checkpointed_output.square().sum().backward()
+
+    assert torch.allclose(eager_output, checkpointed_output, atol=0.0, rtol=0.0)
+    for eager_parameter, checkpointed_parameter in zip(
+        eager.parameters(), checkpointed.parameters(), strict=True
+    ):
+        if eager_parameter.grad is None:
+            assert checkpointed_parameter.grad is None
+        else:
+            assert torch.allclose(
+                eager_parameter.grad,
+                checkpointed_parameter.grad,
+                atol=0.0,
+                rtol=0.0,
+            )

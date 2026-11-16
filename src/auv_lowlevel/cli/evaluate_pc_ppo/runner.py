@@ -24,7 +24,7 @@ from auv_lowlevel.batch.pc_env import BatchedPCLowLevelEnv
 from auv_lowlevel.batch.pc_frozen_residual_vec_env import BatchTorchPCFrozenBCResidualVecEnv
 from auv_lowlevel.batch.pc_history_ablation import ablate_pc_history, ablate_pc_path
 from auv_lowlevel.batch.pc_normalization import PCNormalization
-from auv_lowlevel.batch.pc_path import PC_PATH_DIM
+from auv_lowlevel.batch.pc_path import PC_PATH_DIMS
 from auv_lowlevel.batch.pc_vec_env import BatchTorchPCVecEnv
 from auv_lowlevel.config import load_config
 from auv_lowlevel.curriculum import curriculum_episode_metadata
@@ -49,6 +49,48 @@ from .validation import (
     _validate_controller_pitch_override,
     _validate_environment_override,
 )
+
+
+def _validate_control_path_dim(pc_control_mode: str, path_dim: int) -> None:
+    """Reject unsupported path schemas for ALOS-free path control."""
+
+    if pc_control_mode.startswith("path_") and path_dim not in PC_PATH_DIMS:
+        raise ValueError(
+            f"ALOS-free path_* PC control requires pc.path_dim in {PC_PATH_DIMS}; got {path_dim}"
+        )
+
+
+def _wrap_alos_command_residual(
+    inner: BatchedPCLowLevelEnv,
+    *,
+    action_mode: str,
+    resolved_action_interface: str,
+) -> Any:
+    """Make ``--action-mode alos`` execute ALOS -> PD/PI for absolute checkpoints.
+
+    The evaluator's ``alos`` mode supplies an all-zero residual.  For a
+    command- or actuator-interface checkpoint the existing wrapper already
+    turns that zero into the ALOS/PD-PI baseline.  An absolute checkpoint has
+    no such wrapper, so without this adapter the zero would be sent directly to
+    the actuator pipeline and the trajectory would be open loop.
+    """
+
+    if action_mode != "alos" or resolved_action_interface != "absolute":
+        return inner
+    command_residual = inner.config.command_residual
+    return BatchedPCCommandResidualEnv(
+        inner,
+        scale_heading_rad=command_residual.scale_heading_rad,
+        scale_pitch_rad=command_residual.scale_pitch_rad,
+        scale_speed_mps=command_residual.scale_speed_mps,
+        rate_heading_rad_s=command_residual.rate_heading_rad_s,
+        rate_pitch_rad_s=command_residual.rate_pitch_rad_s,
+        rate_speed_mps2=command_residual.rate_speed_mps2,
+        controller_state=command_residual.controller_state,
+        terminal_gate_enabled=command_residual.terminal_gate_enabled,
+        terminal_gate_enter_m=command_residual.terminal_gate_enter_m,
+        terminal_gate_full_m=command_residual.terminal_gate_full_m,
+    )
 
 
 def _run(
@@ -163,8 +205,7 @@ def _run(
             allow_diversity_environment_override=(allow_diversity_environment_override),
             allow_start_progress_training_override=(allow_start_progress_training_override),
         )
-    if config.pc_control_mode.startswith("path_") and training.pc.path_dim != PC_PATH_DIM:
-        raise ValueError("ALOS-free path_* PC control requires pc.path_dim=PC_PATH_DIM (8)")
+    _validate_control_path_dim(config.pc_control_mode, training.pc.path_dim)
     if guidance_config_path is not None:
         config = replace(config, guidance=load_config(guidance_config_path).guidance)
     if controller_config_path is not None:
@@ -267,6 +308,11 @@ def _run(
         )
     elif resolved_action_interface != "absolute":
         raise ValueError("unsupported resolved PC action interface")
+    inner = _wrap_alos_command_residual(
+        inner,
+        action_mode=action_mode,
+        resolved_action_interface=resolved_action_interface,
+    )
     if actuator_residual_scale_near is not None and resolved_action_interface != "actuator":
         raise ValueError("actuator residual scale schedule requires the actuator action interface")
     if actuator_residual_channel_gains is not None and resolved_action_interface != "actuator":
@@ -304,6 +350,7 @@ def _run(
         actor_command_dim=training.pc.actor_command_dim,
         critic_command_dim=training.pc.critic_command_dim,
         history_path_dim=training.pc.history_path_dim,
+        critic_path_dim=training.pc.critic_path_dim,
         actor_current_encoder_enabled=training.pc.actor_current_encoder_enabled,
         normalization=PCNormalization(
             position_scale_m=config.normalization.position_scale_m,

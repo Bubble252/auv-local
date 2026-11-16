@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import copy
+
 import pytest
 import torch
 
 from auv_lowlevel.batch.pc_history_ablation import ablate_pc_history
-from auv_lowlevel.batch.pc_path import PC_PATH_DIM
+from auv_lowlevel.batch.pc_path import (
+    PC_PATH_DIM,
+    PC_PATH_DIM_SAFE,
+    PC_PATH_SAFE_BLOCKS,
+    PC_PATH_SAFE_FEATURE_NAMES,
+)
 from auv_lowlevel.batch.pc_policy import (
     PC_ACTOR_STATE_DIM,
     PC_ACTOR_STATE_MODES,
@@ -17,6 +24,12 @@ from auv_lowlevel.batch.pc_policy import (
     PCReservedSlotEncoder,
     pc_schema_hash,
 )
+from auv_lowlevel.batch.pc_privileged_schema import (
+    PC_CRITIC_PRIV_DIM,
+    PC_CRITIC_PRIV_FEATURE_NAMES,
+)
+from auv_lowlevel.batch import pc_policy as pc_policy_module
+from auv_lowlevel.ppo_config import EncoderConfig
 
 
 def test_pc_policy_layout_roundtrip() -> None:
@@ -94,6 +107,125 @@ def test_reserved_slot_encoder_keeps_zero_slots_and_masks_gradients() -> None:
         torch.zeros_like(first_layer.weight.grad[:, PC_ACTOR_STATE_DIM:]),
     )
     assert first_layer.weight.grad[:, :PC_ACTOR_STATE_DIM].abs().sum().item() > 0.0
+
+
+def test_actor_history_encoder_checkpointing_matches_eager(monkeypatch) -> None:
+    encoder_config = EncoderConfig(
+        kind="dual_horizon_transformer",
+        feature_dim=16,
+        fusion_hidden=(16,),
+        output_dim=PC_DADE_FEATURE_DIM,
+        dropout=0.0,
+        num_layers=2,
+        num_heads=4,
+        feedforward_dim=32,
+    )
+    actor_layout = PCPolicyLayout(
+        state_dim=PC_ACTOR_STATE_DIM,
+        path_dim=PC_PATH_DIM_SAFE,
+        history_path_dim=PC_PATH_DIM_SAFE,
+        command_dim=0,
+    )
+    critic_layout = PCPolicyLayout(
+        state_dim=PC_CRITIC_STATE_DIM,
+        path_dim=PC_CRITIC_PRIV_DIM,
+        command_dim=1,
+    )
+    policy_args = dict(
+        num_actor_obs=actor_layout.flat_dim,
+        num_critic_obs=critic_layout.flat_dim,
+        num_actions=3,
+        history_short_window=10,
+        history_long_window=50,
+        d_z_total=32,
+        n_in_reserved=8,
+        n_z_reserved=4,
+        state_encoder_hidden_dims=(16, 16),
+        dade=encoder_config,
+        dade_enabled=True,
+        dade_history_mode="encoded",
+        actor_command_dim=0,
+        critic_command_dim=1,
+        history_path_dim=PC_PATH_DIM_SAFE,
+        path_dim=PC_PATH_DIM_SAFE,
+        critic_path_dim=PC_CRITIC_PRIV_DIM,
+        bc_path_dim=PC_PATH_DIM_SAFE,
+        path_encoder_hidden_dims=(16,),
+        critic_path_encoder_hidden_dims=(16,),
+        actor_hidden_dims=(16, 8),
+        critic_hidden_dims=(16, 8),
+    )
+    torch.manual_seed(19)
+    eager = PCActorCritic(**policy_args).train()
+    checkpointed = copy.deepcopy(eager).train()
+    history = torch.randn(2, 50, actor_layout.token_dim)
+
+    monkeypatch.setattr(
+        pc_policy_module,
+        "_HISTORY_ENCODER_CHECKPOINT_MIN_TOKENS",
+        10**9,
+    )
+    eager_output = eager._encode_actor_history_window(history)
+    eager_output.square().sum().backward()
+
+    monkeypatch.setattr(
+        pc_policy_module,
+        "_HISTORY_ENCODER_CHECKPOINT_MIN_TOKENS",
+        2,
+    )
+    checkpointed_output = checkpointed._encode_actor_history_window(history)
+    checkpointed_output.square().sum().backward()
+
+    assert torch.allclose(eager_output, checkpointed_output, atol=0.0, rtol=0.0)
+    for eager_parameter, checkpointed_parameter in zip(
+        eager.parameters(), checkpointed.parameters(), strict=True
+    ):
+        if eager_parameter.grad is None:
+            assert checkpointed_parameter.grad is None
+        else:
+            assert torch.allclose(
+                eager_parameter.grad,
+                checkpointed_parameter.grad,
+                atol=0.0,
+                rtol=0.0,
+            )
+
+
+def test_policy_forward_checkpointing_matches_eager(monkeypatch) -> None:
+    torch.manual_seed(23)
+    eager = _policy().train()
+    checkpointed = copy.deepcopy(eager).train()
+    actor_observation = torch.randn(2, eager.actor_layout.flat_dim)
+    critic_observation = torch.randn(2, eager.critic_layout.flat_dim)
+
+    monkeypatch.setattr(pc_policy_module, "_POLICY_CHECKPOINT_MIN_BATCH", 10**9)
+    eager.update_distribution(actor_observation)
+    eager_value = eager.evaluate(critic_observation)
+    eager_loss = eager.action_mean.square().sum() + eager_value.square().sum()
+    eager_loss.backward()
+
+    monkeypatch.setattr(pc_policy_module, "_POLICY_CHECKPOINT_MIN_BATCH", 2)
+    checkpointed.update_distribution(actor_observation)
+    checkpointed_value = checkpointed.evaluate(critic_observation)
+    checkpointed_loss = (
+        checkpointed.action_mean.square().sum() + checkpointed_value.square().sum()
+    )
+    checkpointed_loss.backward()
+
+    assert torch.allclose(eager.action_mean, checkpointed.action_mean, atol=0.0, rtol=0.0)
+    assert torch.allclose(eager_value, checkpointed_value, atol=0.0, rtol=0.0)
+    for eager_parameter, checkpointed_parameter in zip(
+        eager.parameters(), checkpointed.parameters(), strict=True
+    ):
+        if eager_parameter.grad is None:
+            assert checkpointed_parameter.grad is None
+        else:
+            assert torch.allclose(
+                eager_parameter.grad,
+                checkpointed_parameter.grad,
+                atol=0.0,
+                rtol=0.0,
+            )
 
 
 def _policy() -> PCActorCritic:
@@ -227,6 +359,113 @@ def test_pc_metadata_records_actor_and_critic_slots_separately() -> None:
     assert metadata["actor_encoder"]["d_z_total"] == 32
     assert metadata["critic_encoder"]["d_z_total"] == 32
     assert metadata["dade"]["output_dim"] == PC_DADE_FEATURE_DIM
+
+
+def _goal182_policy() -> tuple[PCActorCritic, torch.Tensor, torch.Tensor]:
+    actor_layout = PCPolicyLayout(
+        state_dim=PC_ACTOR_STATE_DIM,
+        path_dim=PC_PATH_DIM_SAFE,
+        short_window=3,
+        long_window=5,
+    )
+    critic_layout = PCPolicyLayout(
+        state_dim=PC_CRITIC_STATE_DIM,
+        path_dim=PC_CRITIC_PRIV_DIM,
+        short_window=3,
+        long_window=5,
+    )
+    policy = PCActorCritic(
+        actor_layout.flat_dim,
+        critic_layout.flat_dim,
+        3,
+        history_short_window=3,
+        history_long_window=5,
+        d_z_total=32,
+        n_in_reserved=8,
+        n_z_reserved=4,
+        state_encoder_hidden_dims=(16,),
+        path_dim=PC_PATH_DIM_SAFE,
+        path_blocks=PC_PATH_SAFE_BLOCKS,
+        path_encoder_hidden_dims=(16,),
+        critic_path_dim=PC_CRITIC_PRIV_DIM,
+        critic_path_encoder_hidden_dims=(16,),
+        actor_hidden_dims=(512, 256, 128),
+        critic_hidden_dims=(512, 256, 128),
+        init_noise_std=0.1,
+    )
+    batch = 7
+    command = torch.randn(batch, 3)
+    actor_obs = actor_layout.flatten(
+        state=torch.randn(batch, PC_ACTOR_STATE_DIM),
+        path=torch.randn(batch, PC_PATH_DIM_SAFE),
+        command=command,
+        short=torch.randn(batch, 3, actor_layout.token_dim),
+        long=torch.randn(batch, 5, actor_layout.token_dim),
+    )
+    critic_obs = critic_layout.flatten(
+        state=torch.randn(batch, PC_CRITIC_STATE_DIM),
+        path=torch.randn(batch, PC_CRITIC_PRIV_DIM),
+        command=command,
+        short=torch.randn(batch, 3, critic_layout.token_dim),
+        long=torch.randn(batch, 5, critic_layout.token_dim),
+    )
+    return policy, actor_obs, critic_obs
+
+
+def test_goal182_actor_5d_path_and_critic_30d_path_are_isolated() -> None:
+    policy, actor_obs, critic_obs = _goal182_policy()
+    assert tuple(PC_PATH_SAFE_FEATURE_NAMES) == (
+        "signed_cross_track_m",
+        "signed_vertical_error_m",
+        "tangent_heading_error_rad",
+        "tangent_pitch_error_rad",
+        "lookahead_heading_delta_rad",
+    )
+    assert len(PC_CRITIC_PRIV_FEATURE_NAMES) == PC_CRITIC_PRIV_DIM
+    assert policy.actor_layout.path_dim == PC_PATH_DIM_SAFE
+    assert policy.critic_layout.path_dim == PC_CRITIC_PRIV_DIM
+    assert policy.actor_layout.history_path_dim == 0
+    assert policy.critic_layout.token_dim == PC_CRITIC_STATE_DIM + PC_SIDE_CHANNEL_DIM
+    assert policy.path_encoder is not None
+    assert policy.critic_path_encoder is not None
+    assert policy.path_encoder[0].in_features == PC_PATH_DIM_SAFE
+    assert policy.critic_path_encoder[0].in_features == PC_CRITIC_PRIV_DIM
+    actor_parameters = {id(parameter) for parameter in policy.path_encoder.parameters()}
+    critic_parameters = {
+        id(parameter) for parameter in policy.critic_path_encoder.parameters()
+    }
+    assert actor_parameters.isdisjoint(critic_parameters)
+    assert policy.act_inference(actor_obs).shape == (7, 3)
+    assert policy.evaluate(critic_obs).shape == (7, 1)
+    metadata = policy.metadata()
+    assert metadata["actor_architecture"] == "mlp"
+    assert metadata["critic_architecture"] == "mlp"
+    assert metadata["actor_hidden_dims"] == [512, 256, 128]
+    assert metadata["critic_hidden_dims"] == [512, 256, 128]
+    assert metadata["actor_path_dim"] == PC_PATH_DIM_SAFE
+    assert metadata["critic_path_dim"] == PC_CRITIC_PRIV_DIM
+    assert metadata["path_schema_hash"]
+    assert metadata["actor_parameter_count"] > 0
+    assert metadata["critic_parameter_count"] > 0
+    assert metadata["critic_path_encoder"]["input_dim"] == PC_CRITIC_PRIV_DIM
+
+
+def test_goal182_schema_separates_actor_and_critic_path_privilege() -> None:
+    safe_hash = pc_schema_hash(
+        path_dim=PC_PATH_DIM_SAFE,
+        path_blocks=PC_PATH_SAFE_BLOCKS,
+        critic_path_dim=0,
+    )
+    privileged_hash = pc_schema_hash(
+        path_dim=PC_PATH_DIM_SAFE,
+        path_blocks=PC_PATH_SAFE_BLOCKS,
+        critic_path_dim=PC_CRITIC_PRIV_DIM,
+    )
+    assert safe_hash != privileged_hash
+    assert "progress_ratio" not in PC_PATH_SAFE_FEATURE_NAMES
+    assert "remaining_ratio" not in PC_PATH_SAFE_FEATURE_NAMES
+    assert "curvature_1_per_m" not in PC_PATH_SAFE_FEATURE_NAMES
+    assert "endpoint_context" not in PC_PATH_SAFE_BLOCKS
 
 
 def test_pc_policy_can_disable_dade_without_changing_top_level_width() -> None:

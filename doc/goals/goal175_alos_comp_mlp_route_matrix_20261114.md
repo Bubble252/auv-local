@@ -1,20 +1,20 @@
 # Goal175：ALOS-COMP 旧 MLP 路线矩阵与 Transformer 前置门
 
 **日期**：2026-11-14<br>
-**状态**：`PROTOCOL_LOCKED / A1_PENDING`<br>
+**状态**：`A2_COMPLETE / GATE175_FAIL / VERTICAL_GUARD_FAIL / H175C_NOT_SUPPORTED / HELDOUT_CLOSED`<br>
 **仓库**：`settled_局部规划器_反应式`
 
 ```yaml
 goal_id: Goal175
 repo: settled_局部规划器_反应式
-status: PROTOCOL_LOCKED
+status: A2_COMPLETE_GATE_FAIL
 phase: P7_PLAN
 created: 2026-11-14
 updated: 2026-11-14
 parents:
   - Goal173
   - Goal174
-result_doc: null
+result_doc: doc/goals/goal175_result_20261114.md
 matrix: configs/governance/goal175_matrix.json
 legacy: false
 ```
@@ -189,16 +189,19 @@ completion/progress、success、timeout、safety、速度峰值和 actuator satu
       guidance、四个压力档、两个 radius 和 seeds；写 `configs/governance/goal175_matrix.json`；
 - [x] Step 1：生成 COMP/NONE configs、A1 评价启动器、协议检查器和 artifact 审计器；
       只允许复用现有 MLP actor，不改 actor 类；
-- [ ] Step 2：先跑 1–2 个 seed 的 COMP/NONE smoke，再跑 A1 的 **40 cells**；
+- [x] Step 2：先跑 1–2 个 seed 的 COMP/NONE smoke，再跑 A1 的 **40 cells**；
       A1 固定 5 arms × 8 scenarios × seeds `20–59`，确认 COMP/NONE 只改变 ALOS 命令，
       crab=0、estimated current、无 true-current 泄漏；A1 runner 结束后自动审计和分析；
-- [ ] Step 3：**A1 完成后暂停并汇报，不自动进入 A2**。只有用户明确恢复后，才跑 A2
+- [x] Step 3：**A1 已完成并暂停汇报，不自动进入 A2**。只有用户明确恢复后，才跑 A2
       的 6 个 1M training runs；
-- [ ] Step 4：A2 完成后跑 72-cell formal 评价、协议检查和产物审计；进入 formal 前再次暂停；
-- [ ] Step 5：按 Gate175 分析 cross-track、五段、keypoints、vertical guard 和速度；
-- [ ] Step 6：若 Gate175 通过，只写 Transformer actor 的独立 design dossier，
-      不实现、不训练；若失败，写 blocker 并停止架构替换；
-- [ ] Step 7：写 result、ledger、更新 STATE；按 Git 规则提交，不自动 push。
+- [x] Step 4：A2 的 6 个 1M training run 完成；72/72 formal cells 已跑完，协议检查、
+      training audit 和 artifact audit 均通过；
+- [x] Step 5：A1 pre-gate 与 A2 Gate175 都已完成 cross-track、五段、keypoints、
+      vertical guard 和速度分析；A1 见 `doc/goals/goal175_a1_result_20261114.md`，
+      A2 见 `doc/goals/goal175_result_20261114.md`；Gate175 为 `VERTICAL_GUARD_FAIL`；
+- [x] Step 6：Gate175 未通过；已写 blocker，停止 Transformer actor 替换，下一步转向
+      residual head / latent probe / Jacobian 敏感性审计；
+- [x] Step 7：写 result、ledger、更新 STATE；本轮不自动 commit / push。
 
 建议命令骨架：
 
@@ -256,8 +259,9 @@ python ../scripts/check_research_ledger.py --goal Goal175 \
 
 - A1 开始前先在服务器做 1–2 个 seed 的 COMP/NONE smoke；smoke 只验证配置加载、
   estimated current、crab=0、trace/summary 字段和 GPU 并发，不进入正式结果；
-- smoke 通过后才跑完整 A1 40 cells；A1 结束后暂停，不跑 A2、不跑 72-cell formal；
-- A2/formal 启动前再次暂停，等待用户确认预算、checkpoint seed 和服务器资源。
+- smoke 通过后才跑完整 A1 40 cells；A1 结束后按用户要求暂停并汇报；
+- 用户恢复后，A2 的 6 个 1M training run 和 72-cell formal 已完成；
+- Gate175 结果为 `VERTICAL_GUARD_FAIL`，因此不扩 3 seeds/3M，不进入 Transformer。
 
 后续 Transformer Goal 仍需用户单独裁决：token 来源、短/长历史窗、是否蒸馏初始化、
 actor 参数量/延迟上限、是否只换 actor、以及正式 Gate 阈值。不要在 Goal175 内提前
@@ -274,9 +278,13 @@ python ../scripts/check_research_ledger.py --goal Goal175 \
   --goal-doc doc/goals/goal175_alos_comp_mlp_route_matrix_20261114.md --strict
 ```
 
-不自动 push。训练完成前不修改 Gate 阈值、seed split 或 held-out。
+不自动 commit / push。结果已按冻结的 Gate 阈值、seed split 和 held-out 记录；
+不因 Gate 失败而修改这些契约。
 
-## 10. 给后续 AI 的提示词
+## 10. 给后续 AI 的提示词（历史）
+
+> 以下是 Goal175 启动时的提示词；A1/A2 已执行，当前结果见
+> `doc/goals/goal175_result_20261114.md`。
 
 ```text
 你现在执行 Goal175：先用现有 MLP actor 跑 A1 eval-only pre-gate，A1 完成后暂停。

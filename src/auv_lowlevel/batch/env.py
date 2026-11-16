@@ -645,6 +645,10 @@ class BatchedLowLevelEnv:
             reference_speed_mps=merged_tensor(
                 base_solution.reference_speed_mps, replacement_solution.reference_speed_mps
             ),
+            reference_ground_velocity_ned=merged_tensor(
+                base_solution.reference_ground_velocity_ned,
+                replacement_solution.reference_ground_velocity_ned,
+            ),
             reference_position_ned_m=merged_tensor(
                 base_solution.reference_position_ned_m,
                 replacement_solution.reference_position_ned_m,

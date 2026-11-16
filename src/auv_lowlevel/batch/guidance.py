@@ -28,6 +28,7 @@ class BatchedAlosSolution:
     desired_body_direction_ned: Tensor
     command_speed_mps: Tensor
     reference_speed_mps: Tensor
+    reference_ground_velocity_ned: Tensor
     reference_position_ned_m: Tensor
     reference_quat_xyzw: Tensor
     terminal_phase: Tensor | None = None
@@ -331,6 +332,11 @@ class BatchedThreeDAlosGuidance:
             terminal_target,
             reference_position,
         )
+        reference_ground_velocity_ned = torch.where(
+            capture[:, None],
+            terminal_ground * terminal_ground_speed[:, None],
+            ground_direction * desired_ground_speed[:, None],
+        )
 
         return BatchedAlosSolution(
             segment_index=projection.segment_index,
@@ -345,6 +351,7 @@ class BatchedThreeDAlosGuidance:
             desired_body_direction_ned=body_direction,
             command_speed_mps=command_speed,
             reference_speed_mps=command_speed,
+            reference_ground_velocity_ned=reference_ground_velocity_ned,
             reference_position_ned_m=reference_position,
             reference_quat_xyzw=quaternion_from_direction(body_direction),
             terminal_phase=capture,

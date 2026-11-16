@@ -62,10 +62,16 @@ class PCRewardBreakdown:
     terminal: Tensor | None = None
     path_cross: Tensor | None = None
     path_vertical: Tensor | None = None
+    path_pitch: Tensor | None = None
     path_progress: Tensor | None = None
     path_heading: Tensor | None = None
     speed_smooth: Tensor | None = None
     energy: Tensor | None = None
+    action_smooth: Tensor | None = None
+    stall_gate: Tensor | None = None
+    stall_ratio: Tensor | None = None
+    reference_ground_speed_mps: Tensor | None = None
+    route_ground_speed_mps: Tensor | None = None
     approach_vertical: Tensor | None = None
     approach_pitch: Tensor | None = None
     vertical_potential: Tensor | None = None
@@ -270,8 +276,11 @@ class BatchedPCRewardComputer:
         roll_rate_rad_s: Tensor,
         actual_actuator: Tensor,
         previous_actuator: Tensor,
+        previous_previous_actuator: Tensor | None = None,
         requested_normalized: Tensor,
         previous_requested_normalized: Tensor,
+        reward_ground_surge_mps: Tensor | None = None,
+        reference_ground_speed_mps: Tensor | None = None,
         hold_fraction: Tensor | None = None,
         previous_hold_fraction: Tensor | None = None,
         safety_terminal: Tensor | None = None,
@@ -313,8 +322,32 @@ class BatchedPCRewardComputer:
                 raise ValueError(f"{name} must have shape ({count},)")
         if actuator.shape != (count, 3) or previous.shape != (count, 3):
             raise ValueError("actual and previous actuator must have shape (N, 3)")
+        if previous_previous_actuator is None:
+            previous_previous = None
+        else:
+            previous_previous = torch.as_tensor(
+                previous_previous_actuator, device=self.device, dtype=self.dtype
+            )
+            if previous_previous.shape != (count, 3):
+                raise ValueError("previous_previous_actuator must have shape (N, 3)")
         if requested.shape != (count, 3) or previous_requested.shape != (count, 3):
             raise ValueError("requested action vectors must have shape (N, 3)")
+        reward_surge = (
+            surge
+            if reward_ground_surge_mps is None
+            else torch.as_tensor(
+                reward_ground_surge_mps, device=self.device, dtype=self.dtype
+            )
+        )
+        reward_reference_speed = (
+            reference_speed
+            if reference_ground_speed_mps is None
+            else torch.as_tensor(
+                reference_ground_speed_mps, device=self.device, dtype=self.dtype
+            )
+        )
+        if reward_surge.shape != expected or reward_reference_speed.shape != expected:
+            raise ValueError("reward ground-speed inputs must have shape (N,)")
 
         if (previous_goal_distance_m is None) != (goal_distance_m is None):
             raise ValueError(
@@ -363,9 +396,31 @@ class BatchedPCRewardComputer:
             )
 
         reward = self.config.reward
-        command_yaw = -reward.w_cmd_yaw * torch.abs(heading) / torch.pi
+        if reward.cmd_heading_std_rad is None:
+            command_yaw = -reward.w_cmd_yaw * torch.abs(heading) / torch.pi
+        else:
+            command_yaw = -reward.w_cmd_yaw * (
+                1.0 - torch.exp(-((heading / reward.cmd_heading_std_rad).square()))
+            )
         command_pitch = -reward.w_cmd_pitch * torch.abs(pitch) / (torch.pi / 2.0)
-        command_speed = -reward.w_cmd_speed * torch.abs(reference_speed - surge) / 2.5
+        if reward.cmd_speed_std_mps is None:
+            command_speed = (
+                -reward.w_cmd_speed
+                * torch.abs(reward_reference_speed - reward_surge)
+                / 2.5
+            )
+        else:
+            command_speed = -reward.w_cmd_speed * (
+                1.0
+                - torch.exp(
+                    -(
+                        (
+                            (reward_reference_speed - reward_surge)
+                            / reward.cmd_speed_std_mps
+                        ).square()
+                    )
+                )
+            )
 
         if reward.hold_bonus:
             if hold_fraction is None or previous_hold_fraction is None:
@@ -395,6 +450,22 @@ class BatchedPCRewardComputer:
         previous_normalized = self._actual_action_normalized(previous)
         action_delta = actual_normalized - previous_normalized
         action_reward = -reward.w_action_pc * torch.sum(action_delta.square(), dim=1)
+        if reward.w_action_smooth_pc > 0.0:
+            if previous_previous is None:
+                raise ValueError(
+                    "second-order action smoothness requires previous_previous_actuator"
+                )
+            previous_previous_normalized = self._actual_action_normalized(previous_previous)
+            second_delta = (
+                actual_normalized[:, :2]
+                - 2.0 * previous_normalized[:, :2]
+                + previous_previous_normalized[:, :2]
+            )
+            action_smooth_reward = -reward.w_action_smooth_pc * torch.sum(
+                second_delta.square(), dim=1
+            )
+        else:
+            action_smooth_reward = torch.zeros_like(heading)
 
         magnitude_excess = _positive_part(torch.abs(requested) - 1.0).mean(dim=1)
         requested_delta = requested - previous_requested
@@ -403,6 +474,8 @@ class BatchedPCRewardComputer:
         )
         saturation_reward = -reward.w_sat_pc * (magnitude_excess + rate_excess)
 
+        stall_gate = torch.zeros_like(heading)
+        stall_ratio = torch.zeros_like(heading)
         if route_ground_speed_mps is None:
             route_reward = torch.zeros_like(heading)
         else:
@@ -411,9 +484,42 @@ class BatchedPCRewardComputer:
             )
             if route_speed.shape != expected:
                 raise ValueError("route_ground_speed_mps must have shape (N,)")
-            floor_speed = reward.route_speed_floor_ratio * reference_speed
-            route_shortfall = _positive_part(floor_speed - route_speed)
-            route_reward = -reward.w_route_speed_pc * route_shortfall / 2.5
+            if reward.w_route_ground_speed_stall > 0.0:
+                gate_t = torch.clamp(
+                    (
+                        reward_reference_speed
+                        - reward.route_ground_speed_stall_gate_low_mps
+                    )
+                    / (
+                        reward.route_ground_speed_stall_gate_high_mps
+                        - reward.route_ground_speed_stall_gate_low_mps
+                    ),
+                    min=0.0,
+                    max=1.0,
+                )
+                stall_gate = gate_t.square() * (3.0 - 2.0 * gate_t)
+                stall_ratio = torch.clamp(
+                    (
+                        reward.route_ground_speed_stall_threshold_mps - route_speed
+                    )
+                    / reward.route_ground_speed_stall_threshold_mps,
+                    min=0.0,
+                    max=1.0,
+                )
+                route_reward = (
+                    -reward.w_route_ground_speed_stall
+                    * stall_gate
+                    * stall_ratio.square()
+                )
+            else:
+                route_reward = torch.zeros_like(heading)
+            if reward.w_route_speed_pc > 0.0:
+                floor_speed = reward.route_speed_floor_ratio * reference_speed
+                route_shortfall = _positive_part(floor_speed - route_speed)
+                route_reward = (
+                    route_reward
+                    - reward.w_route_speed_pc * route_shortfall / 2.5
+                )
 
         if material_saturated is None:
             material_saturation_reward = torch.zeros_like(heading)
@@ -465,6 +571,7 @@ class BatchedPCRewardComputer:
             - reward.w_phi * roll_penalty
             - reward.w_p * rate_penalty
             + action_reward
+            + action_smooth_reward
             + saturation_reward
             + route_reward
             + material_saturation_reward
@@ -565,8 +672,17 @@ class BatchedPCRewardComputer:
             roll_angle=-reward.w_phi * roll_penalty,
             roll_rate=-reward.w_p * rate_penalty,
             action=action_reward,
+            action_smooth=action_smooth_reward,
             saturation=saturation_reward,
             route_speed=route_reward,
+            stall_gate=stall_gate,
+            stall_ratio=stall_ratio,
+            reference_ground_speed_mps=reward_reference_speed,
+            route_ground_speed_mps=(
+                None
+                if route_ground_speed_mps is None
+                else torch.as_tensor(route_ground_speed_mps, device=self.device, dtype=self.dtype)
+            ),
             material_saturation=material_saturation_reward,
             safety=safety_reward,
             goal_plane_miss=goal_plane_miss_reward,

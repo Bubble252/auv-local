@@ -1,0 +1,239 @@
+{
+  "schema_version": "auv_goal_matrix.v1",
+  "goal_id": "Goal177",
+  "repo": "settled_局部规划器_反应式",
+  "arms": [
+    {
+      "arm": "A_S025_RUDDER_ONLY",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_only",
+      "base_residual_scale": 0.25,
+      "authority_scale": 0.25,
+      "actuator_residual_channel_gains": [1.0, 1e-06, 1e-06]
+    },
+    {
+      "arm": "A_S025_STERN_ONLY",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "stern_only",
+      "base_residual_scale": 0.25,
+      "authority_scale": 0.25,
+      "actuator_residual_channel_gains": [1e-06, 1.0, 1e-06]
+    },
+    {
+      "arm": "A_S025_RUDDER_STERN",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_stern",
+      "base_residual_scale": 0.25,
+      "authority_scale": 0.25,
+      "actuator_residual_channel_gains": [1.0, 1.0, 1e-06]
+    },
+    {
+      "arm": "A_S025_ALL",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "all",
+      "base_residual_scale": 0.25,
+      "authority_scale": 0.25,
+      "actuator_residual_channel_gains": [1.0, 1.0, 1.0]
+    },
+    {
+      "arm": "A_S075_RUDDER_ONLY",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_only",
+      "base_residual_scale": 0.25,
+      "authority_scale": 0.75,
+      "actuator_residual_channel_gains": [1.0, 1e-06, 1e-06]
+    },
+    {
+      "arm": "A_S075_STERN_ONLY",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "stern_only",
+      "base_residual_scale": 0.25,
+      "authority_scale": 0.75,
+      "actuator_residual_channel_gains": [1e-06, 1.0, 1e-06]
+    },
+    {
+      "arm": "A_S075_RUDDER_STERN",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_stern",
+      "base_residual_scale": 0.25,
+      "authority_scale": 0.75,
+      "actuator_residual_channel_gains": [1.0, 1.0, 1e-06]
+    },
+    {
+      "arm": "A_S075_ALL",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "all",
+      "base_residual_scale": 0.25,
+      "authority_scale": 0.75,
+      "actuator_residual_channel_gains": [1.0, 1.0, 1.0]
+    },
+    {
+      "arm": "A_S150_RUDDER_ONLY",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_only",
+      "base_residual_scale": 0.25,
+      "authority_scale": 1.5,
+      "actuator_residual_channel_gains": [1.0, 1e-06, 1e-06]
+    },
+    {
+      "arm": "A_S150_STERN_ONLY",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "stern_only",
+      "base_residual_scale": 0.25,
+      "authority_scale": 1.5,
+      "actuator_residual_channel_gains": [1e-06, 1.0, 1e-06]
+    },
+    {
+      "arm": "A_S150_RUDDER_STERN",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_stern",
+      "base_residual_scale": 0.25,
+      "authority_scale": 1.5,
+      "actuator_residual_channel_gains": [1.0, 1.0, 1e-06]
+    },
+    {
+      "arm": "A_S150_ALL",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "all",
+      "base_residual_scale": 0.25,
+      "authority_scale": 1.5,
+      "actuator_residual_channel_gains": [1.0, 1.0, 1.0]
+    },
+    {
+      "arm": "A_S250_RUDDER_ONLY",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_only",
+      "base_residual_scale": 0.25,
+      "authority_scale": 2.5,
+      "actuator_residual_channel_gains": [1.0, 1e-06, 1e-06]
+    },
+    {
+      "arm": "A_S250_STERN_ONLY",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "stern_only",
+      "base_residual_scale": 0.25,
+      "authority_scale": 2.5,
+      "actuator_residual_channel_gains": [1e-06, 1.0, 1e-06]
+    },
+    {
+      "arm": "A_S250_RUDDER_STERN",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "rudder_stern",
+      "base_residual_scale": 0.25,
+      "authority_scale": 2.5,
+      "actuator_residual_channel_gains": [1.0, 1.0, 1e-06]
+    },
+    {
+      "arm": "A_S250_ALL",
+      "stage": "A",
+      "algorithm": "PPO",
+      "channel_mode": "all",
+      "base_residual_scale": 0.25,
+      "authority_scale": 2.5,
+      "actuator_residual_channel_gains": [1.0, 1.0, 1.0]
+    }
+  ],
+  "levels": [
+    "nominal",
+    "current10",
+    "noise_n2",
+    "plant20"
+  ],
+  "radii": {
+    "default": 2.0,
+    "strict125": 1.25
+  },
+  "seeds": {
+    "start": 20,
+    "count": 8
+  },
+  "checkpoint_seeds": [
+    86201
+  ],
+  "baselines": [
+    "zero_bc50",
+    "zero_alos_comp"
+  ],
+  "baseline_seed": 86201,
+  "expected_cells": {
+    "policy": 128,
+    "zero": 16,
+    "total": 144
+  },
+  "artifacts_root": "artifacts/lowlevel/goal177_residual_head_action_interface_20261114",
+  "manifest_path": "run_manifest.json",
+  "metrics": [
+    "route_three_d_rmse_m",
+    "route_cross_abs_p90_m",
+    "route_vertical_abs_p90_m",
+    "preterminal_three_d_rmse_m",
+    "segment_three_d_rmse_m",
+    "keypoint_20_90_three_d_m",
+    "path_completion_ratio_mean",
+    "final_path_progress_m",
+    "pre_goal_3d_rmse_m",
+    "miss_distance_at_plane_m",
+    "terminal_longitudinal_rmse_m",
+    "post_goal_overshoot_m",
+    "ground_route_speed_ratio_mean",
+    "applied_share_vertical",
+    "applied_share_cross",
+    "applied_share_forward",
+    "jacobian_sign_consistency",
+    "residual_abs_mean",
+    "residual_abs_p90",
+    "residual_to_action_std",
+    "success",
+    "timeout",
+    "safety",
+    "flew_out",
+    "speed_max_mps",
+    "overspeed_steps"
+  ],
+  "gates": [
+    {
+      "check": "Gate A vertical or cross applied share",
+      "threshold": ">=1e-2, or >=10x Goal176 same-direction baseline",
+      "failure_label": "ACTION_AUTHORITY_STILL_NULL"
+    },
+    {
+      "check": "Gate A forward/along-track applied share",
+      "threshold": ">=1e-3, or >=10x Goal176 same-direction baseline",
+      "failure_label": "FORWARD_AUTHORITY_NULL"
+    },
+    {
+      "check": "Gate A three-direction Jacobian sign consistency",
+      "threshold": ">=0.90",
+      "failure_label": "ACTION_DIRECTION_UNSTABLE"
+    },
+    {
+      "check": "Gate A residual magnitude versus action noise",
+      "threshold": "residual_abs/action_std >=0.20, or action std <=0.05",
+      "failure_label": "RESIDUAL_TOO_SMALL_FOR_PPO"
+    },
+    {
+      "check": "Gate A stability",
+      "threshold": "0 NaN/Inf, 0 flew-out, no safety regression, no timeout increase versus zero_bc50",
+      "failure_label": "STABILITY_FAIL"
+    }
+  ],
+  "heldout": {
+    "enabled": false,
+    "seeds": []
+  }
+}

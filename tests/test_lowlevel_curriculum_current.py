@@ -216,16 +216,18 @@ def test_ppo_actor_history_current_side_channel_is_zero_when_encoder_disabled() 
     assert env.observation is not None
     disabled_tokens = disabled._tokens(env.observation)
     enabled_tokens = enabled._tokens(env.observation)
+    *_, disabled_actor_token, _ = disabled_tokens
+    *_, enabled_actor_token, _ = enabled_tokens
     assert disabled_tokens[2] is None
     assert enabled_tokens[2] is not None
     side_start = disabled.actor_layout.state_dim
     side_end = side_start + 3
-    assert torch.count_nonzero(disabled_tokens[6][:, side_start:side_end]) == 0
+    assert torch.count_nonzero(disabled_actor_token[:, side_start:side_end]) == 0
     expected_side = enabled.normalization.normalize_current(
         env.observation.actor_current_body
     ).to(dtype=torch.float32)
     torch.testing.assert_close(
-        enabled_tokens[6][:, side_start:side_end],
+        enabled_actor_token[:, side_start:side_end],
         expected_side,
         rtol=0.0,
         atol=1e-6,
