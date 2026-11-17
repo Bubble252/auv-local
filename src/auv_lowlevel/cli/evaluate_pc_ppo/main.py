@@ -27,9 +27,6 @@ def main() -> int:
     args = _parse_args()
     if args.seed_start < 0 or args.seed_count <= 0:
         raise ValueError("seed start must be non-negative and seed count positive")
-    _validate_trace_sensor_ages(args.trace_output, args.trace_sensor_ages)
-    _validate_trace_estimator_state(args.trace_output, args.trace_estimator_state)
-    _validate_trace_reward_breakdown(args.trace_output, args.trace_reward_breakdown)
     training_config_path = _resolve(args.training_config)
     checkpoint_path = _resolve(args.checkpoint)
     training_config = load_training_config(training_config_path)
@@ -45,6 +42,15 @@ def main() -> int:
         if environment_config_path is None
         else environment_config_path
     )
+    output_dir = _resolve(args.output)
+    trace_output = (
+        _resolve(args.trace_output)
+        if args.trace_output is not None
+        else output_dir / "trace.npz"
+    )
+    _validate_trace_sensor_ages(trace_output, args.trace_sensor_ages)
+    _validate_trace_estimator_state(trace_output, args.trace_estimator_state)
+    _validate_trace_reward_breakdown(trace_output, args.trace_reward_breakdown)
     seeds = tuple(args.seed_start + index for index in range(args.seed_count))
     dtype = torch.float32 if args.dtype == "float32" else torch.float64
     if args.curriculum_current_speed_range_mps is not None:
@@ -89,7 +95,7 @@ def main() -> int:
         curriculum_shear_scale=args.curriculum_shear_scale,
         guidance_config_path=guidance_config_path,
         controller_config_path=controller_config_path,
-        trace_output=None if args.trace_output is None else _resolve(args.trace_output),
+        trace_output=trace_output,
         trace_sensor_ages=args.trace_sensor_ages,
         trace_estimator_state=args.trace_estimator_state,
         trace_reward_breakdown=args.trace_reward_breakdown,
@@ -111,6 +117,10 @@ def main() -> int:
         ppo_residual_attenuation_full_m=args.ppo_residual_attenuation_full_m,
         ppo_residual_attenuation_enter_m=args.ppo_residual_attenuation_enter_m,
     )
+    episodes = [
+        {"episode_id": int(episode["seed"]), **episode}
+        for episode in episodes
+    ]
     selected_config = load_config(selected_environment_config)
     selected_stage = str(selected_config.pc_stage)
     effective_guidance = selected_config.guidance
@@ -160,7 +170,8 @@ def main() -> int:
         "guidance_vertical_lookahead_m": effective_guidance.vertical_lookahead_m,
         "controller_pitch_gain": effective_controller.pitch_gain,
         "controller_pitch_rate_gain": effective_controller.pitch_rate_gain,
-        "trace_output": (None if args.trace_output is None else str(_resolve(args.trace_output))),
+        "trace_output": str(trace_output),
+        "episodes_output": str(output_dir / "episodes.jsonl"),
         "trace_reward_breakdown": args.trace_reward_breakdown,
         "checkpoint": str(checkpoint_path),
         "checkpoint_sha256": sha256_file(checkpoint_path),
@@ -261,11 +272,13 @@ def main() -> int:
         "metrics": summary,
         "episodes": episodes,
     }
-    output = _resolve(args.output)
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "summary.json").write_text(
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "summary.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    with (output_dir / "episodes.jsonl").open("w", encoding="utf-8") as handle:
+        for episode in episodes:
+            handle.write(json.dumps(episode, sort_keys=True) + "\n")
     lines = [
         "# PC20 PPO closed-loop evaluation",
         "",
@@ -275,6 +288,6 @@ def main() -> int:
         "- `path_*`: true `eta` position; `alos_projection_*`: navigation-position diagnostic",
     ]
     lines.extend(f"- `{name}`: `{_format_summary_value(value)}`" for name, value in summary.items())
-    (output / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    (output_dir / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0

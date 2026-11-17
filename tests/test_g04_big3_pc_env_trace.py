@@ -15,7 +15,7 @@ from auv_lowlevel.config import load_config
 
 ROOT = Path(__file__).resolve().parents[1]
 ENV_CONFIG = ROOT / "configs" / "lowlevel" / "goal173" / "env_route_health_train_nu_ground.json"
-TRACE_SHA256 = "73c5c7974cc553ae5f9d47dfe2dbb28fcff772e464d7221da42b45dfbff1aebc"
+TRACE_SHA256 = "10d07a5c26fa006e0e3251b0f3b5db5ee1e3a87179cc07332eb673270bb2d694"
 
 
 def _canonical(value: Any) -> Any:

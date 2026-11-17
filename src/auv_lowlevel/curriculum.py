@@ -1091,6 +1091,7 @@ class CurriculumDecisionRecord:
     evaluation: StageEvaluation
     completed_transitions: int | None
     completed_iterations: int | None = None
+    route_gate: Mapping[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -1113,6 +1114,9 @@ class CurriculumDecisionRecord:
             },
             "completed_transitions": self.completed_transitions,
             "completed_iterations": self.completed_iterations,
+            "route_gate": (
+                None if self.route_gate is None else dict(self.route_gate)
+            ),
         }
 
 
@@ -1194,6 +1198,7 @@ class CurriculumPromotionController:
         completed_transitions: int | None,
         next_stage: str | None,
         completed_iterations: int | None = None,
+        route_gate: Mapping[str, Any] | None = None,
     ) -> CurriculumDecision:
         self.history.append(
             CurriculumDecisionRecord(
@@ -1204,11 +1209,20 @@ class CurriculumPromotionController:
                 evaluation=evaluation,
                 completed_transitions=completed_transitions,
                 completed_iterations=completed_iterations,
+                route_gate=route_gate,
             )
         )
         return decision
 
-    def _promote(self, evaluation: StageEvaluation, completed: int | None) -> CurriculumDecision:
+    def _promote(
+        self,
+        evaluation: StageEvaluation,
+        completed: int | None,
+        *,
+        completed_iterations: int | None = None,
+        reason: str = "two consecutive frozen-dev evaluations passed the stage gate",
+        route_gate: Mapping[str, Any] | None = None,
+    ) -> CurriculumDecision:
         index = self._stage_index(self.stage)
         next_stage = (
             CURRICULUM_STAGE_ORDER[index + 1]
@@ -1217,10 +1231,12 @@ class CurriculumPromotionController:
         )
         decision = self._record(
             CurriculumDecision.PROMOTE,
-            "two consecutive frozen-dev evaluations passed the stage gate",
+            reason,
             evaluation,
             completed,
             next_stage,
+            completed_iterations=completed_iterations,
+            route_gate=route_gate,
         )
         if next_stage is not None:
             self.stage = next_stage
@@ -1231,13 +1247,16 @@ class CurriculumPromotionController:
         self._last_default_success = None
         return decision
 
-    def observe(
+    def _budget_decision(
         self,
         evaluation: StageEvaluation,
         *,
-        completed_transitions: int | None = None,
-        completed_iterations: int | None = None,
-    ) -> CurriculumDecision:
+        completed_transitions: int | None,
+        completed_iterations: int | None,
+        route_gate: Mapping[str, Any] | None = None,
+    ) -> CurriculumDecision | None:
+        """Consume the stage clocks and fail closed when a hard cap is reached."""
+
         spec = self.stages[self.stage]
         if completed_iterations is not None:
             if isinstance(completed_iterations, bool) or int(completed_iterations) < 0:
@@ -1254,6 +1273,7 @@ class CurriculumPromotionController:
                     None,
                     None,
                     completed_iterations=int(completed_iterations),
+                    route_gate=route_gate,
                 )
         if completed_transitions is not None:
             if isinstance(completed_transitions, bool) or int(completed_transitions) < 0:
@@ -1266,7 +1286,26 @@ class CurriculumPromotionController:
                     evaluation,
                     int(completed_transitions),
                     None,
+                    completed_iterations=completed_iterations,
+                    route_gate=route_gate,
                 )
+        return None
+
+    def observe(
+        self,
+        evaluation: StageEvaluation,
+        *,
+        completed_transitions: int | None = None,
+        completed_iterations: int | None = None,
+    ) -> CurriculumDecision:
+        spec = self.stages[self.stage]
+        budget = self._budget_decision(
+            evaluation,
+            completed_transitions=completed_transitions,
+            completed_iterations=completed_iterations,
+        )
+        if budget is not None:
+            return budget
 
         degradation = evaluation.current_encoder_constant_degradation
         compensation = evaluation.current_encoder_fast_layer_compensation
@@ -1295,7 +1334,11 @@ class CurriculumPromotionController:
             self._consecutive_unsafe = 0
             self._consecutive_stalls = 0
             if self._consecutive_passes >= 2:
-                return self._promote(evaluation, completed_transitions)
+                return self._promote(
+                    evaluation,
+                    completed_transitions,
+                    completed_iterations=completed_iterations,
+                )
             self._last_default_success = evaluation.default_success
             return self._record(
                 CurriculumDecision.CONTINUE,
@@ -1347,6 +1390,64 @@ class CurriculumPromotionController:
             evaluation,
             completed_transitions,
             self.stage,
+        )
+
+    def promote_after_route_gate(
+        self,
+        evaluation: StageEvaluation,
+        *,
+        completed_transitions: int | None,
+        completed_iterations: int | None,
+        route_gate: Mapping[str, Any],
+    ) -> CurriculumDecision:
+        """Promote after the routine training-rollout 20/3 gate and boundary check.
+
+        The frozen-dev evaluation is a boundary safety/protocol check only.  Its
+        success and route thresholds must not override the routine gate values.
+        """
+
+        budget = self._budget_decision(
+            evaluation,
+            completed_transitions=completed_transitions,
+            completed_iterations=completed_iterations,
+            route_gate=route_gate,
+        )
+        if budget is not None:
+            return budget
+        return self._promote(
+            evaluation,
+            completed_transitions,
+            completed_iterations=completed_iterations,
+            reason=(
+                "routine training-rollout route gate passed 20/3 and the "
+                "frozen-dev boundary check did not veto promotion"
+            ),
+            route_gate=route_gate,
+        )
+
+    def veto_after_route_gate(
+        self,
+        evaluation: StageEvaluation,
+        *,
+        completed_transitions: int | None,
+        completed_iterations: int | None,
+        route_gate: Mapping[str, Any],
+        reason: str,
+    ) -> CurriculumDecision:
+        """Keep the current stage when the boundary check vetoes promotion."""
+
+        self._consecutive_passes = 0
+        self._consecutive_severe_failures = 0
+        self._consecutive_unsafe = 0
+        self._consecutive_stalls = 0
+        return self._record(
+            CurriculumDecision.CONTINUE,
+            reason,
+            evaluation,
+            completed_transitions,
+            self.stage,
+            completed_iterations=completed_iterations,
+            route_gate=route_gate,
         )
 
     def _rollback(

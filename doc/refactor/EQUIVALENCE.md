@@ -583,3 +583,53 @@ skill_usage:
 - 是否新增失败：`no`；
 - 回滚 commit：`94ea92b`；
 - 结论：`PASS`
+
+## 14. Goal182 基础设施 checkpoint
+
+```yaml
+goal: Goal182
+repository: settled_局部规划器_反应式
+base_commit: caad880
+branch: detached
+scope: infrastructure-only
+public_api_change: none
+training_started: false
+```
+
+本轮只关闭正式训练前的基础设施缺口，不改变 reward、termination、success、
+课程内容或实验矩阵：
+
+- StageGate `enforce` 使用训练 rollout 的 20-iteration 滑窗和连续 3 次通过；
+  frozen-dev 只在即将晋级时做一次边界 safety 检查。默认仍为 `shadow`，
+  因此现有行为不变；
+- evaluator 默认落盘 `summary.json`、`summary.md`、`episodes.jsonl` 和
+  `trace.npz`；episode 与 trace 共用 `episode_id`，并保留主指标复算所需的
+  `path_steps` / `pre_goal_path_steps`；
+- 新增 `scripts/audit_goal182_artifacts.py`，校验单 run canonical 产物、
+  episode/trace 对齐和主指标复算；eval-set 模式校验
+  `matrix_manifest.json`、`report_rows.jsonl` 和 `report.md`；
+- current 估计热启动改变了一个 trace digest 和一个 LPF 测试的前置条件；
+  两处测试已按新契约修正，不是放宽断言。
+
+验证命令：
+
+```bash
+cd /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/goal182-infra-detached-20261116
+export PVS_SOURCE_DIR=/home/bubble/水下机器人/python/PythonVehicleSimulator-master/src
+export MSS_SOURCE_DIR=/home/bubble/水下机器人/simulator/MSS-master
+export PYTHONPATH=$PWD/src
+.venv/bin/python -m pytest -q tests
+```
+
+- 全量测试：`2159 passed, 11 skipped`；
+- 本轮受影响回归：`59 passed`；修正后的两个既有测试：`2 passed`；
+  `test_batch_remus100.py`：`5 passed`；
+- matrix checker：`PASS goal182 matrices arms=60`；
+- eval matrix checker：`PASS goal182 eval matrix`；
+- magic-number provenance：`PASS checked=49 findings=0`；
+- research ledger：`PASS (Goal182, entries=2)`；
+- 四份正式 config 的 training-profile checker：全部 `PASS`；
+- experiment matrix/program schema：`PASS`；
+- ruff：改动文件 `All checks passed!`；
+- 是否新增失败：`no`；
+- 结论：`PASS`（仅基础设施；训练与正式评价尚未启动）。

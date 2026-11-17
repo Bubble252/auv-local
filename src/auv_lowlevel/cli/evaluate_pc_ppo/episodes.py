@@ -169,6 +169,8 @@ def _episode_records(
             terminal_steps = int(metrics["terminal_longitudinal_steps"][index])
             row.update(
                 {
+                    "path_steps": path_count,
+                    "pre_goal_path_steps": pre_goal_count,
                     "path_horizontal_rmse_m": float(
                         np.sqrt(metrics["horizontal_error_sq_sum"][index] / path_count)
                     ),

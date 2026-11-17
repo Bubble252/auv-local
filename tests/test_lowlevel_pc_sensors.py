@@ -438,7 +438,12 @@ def _constant_current_estimate_ratio(time_basis: str) -> float:
     suite.reset([901])
     eta = torch.zeros((1, 6), dtype=torch.float64)
     nu = torch.zeros((1, 6), dtype=torch.float64)
+    zero_current = torch.zeros((1, 3), dtype=torch.float64)
     current_ned = torch.tensor([[0.4, 0.2, 0.0]], dtype=torch.float64)
+    # Goal182 hot-starts the estimate from the first valid measurement.  Prime
+    # it at zero before introducing the target so this test still measures the
+    # LPF time-basis attenuation rather than the initialization jump.
+    suite.step(eta_true=eta, nu_true=nu, current_true_ned_mps=zero_current)
     for _ in range(2500):
         output = suite.step(
             eta_true=eta,

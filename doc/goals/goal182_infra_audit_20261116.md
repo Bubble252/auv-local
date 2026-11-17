@@ -67,15 +67,15 @@
 | magic number provenance checker | 支持 `check_magic_number_provenance.py` | 已实现 registry、baseline 和 changed-file ratchet | `FIXED` | schema、unit tests、全仓 baseline 34 条、changed scan 均通过 |
 | 导航 profile | 默认 `unbiased_small_noise_v2`，`nav_noise_m=(0.001,0.1)` | v2 已实现，Goal182 builder/env 已切换 | `FIXED` | v1 保留历史用途；v2-only 测试通过 |
 | 初始状态 | 路线起点、抖动、速度/角速度契约 | pitch/yaw `±10°`、初始三轴角速度、速度比例 `0.8–1.2×`、current 估计首条有效测量热启动、manifest `reset_contract` 均已实现；正式评价默认强制 nominal 起点 | `FIXED` | `tests/test_lowlevel_pc_env.py`、`tests/test_pc_goal85_unbiased_contract.py`、`tests/test_g04_evaluate_pc_ppo_cli_contract.py` 覆盖 |
-| StageGate 评估节奏 | C0–C6 routine 用训练 rollout 20-iteration 滑窗、连续 3 次通过 | 仍为 frozen-dev 评估驱动、连续 2 次通过 | `BLOCKER` | `CurriculumPromotionController` 的 `_consecutive_passes >= 2` 和 `CurriculumTrainerHook.evaluate(...)` 尚未替换/扩展为训练 rollout 20/3；frozen-dev 边界否决也未接线 |
+| StageGate 评估节奏 | C0–C6 routine 用训练 rollout 20-iteration 滑窗、连续 3 次通过 | `enforce` 已接入训练 rollout 20/3：窗口/阈值来自训练 episode metrics，晋级前只跑一次 frozen-dev 边界安全检查；`shadow` 保留旧 frozen-dev 晋级逻辑并逐 iteration 写 route-gate telemetry | `FIXED` | `CurriculumTrainerHook._maybe_update_enforce`、`CurriculumPromotionController.promote_after_route_gate/veto_after_route_gate`；`tests/test_lowlevel_curriculum_trainer.py` 覆盖晋级、safety veto 和缺阈值失败。D13.6 数值与切换点仍待用户冻结 |
 | StageGate 训练 telemetry | 每次 iteration 能输出 cross/vertical RMSE、pre-goal 3D RMSE、completion ratio | `pc_vec_env` 已逐 episode 累积并输出四个 route 指标；`metrics.py` 已纳入 episode keys | `FIXED` | `tests/test_lowlevel_pc_vec_env.py::test_pc_vec_env_logs_route_telemetry_on_episode_end` |
 | BCFT/BCRES composition | `learning_composition` 必须与 base/warmstart 一致 | BCFT 强制 `base_policy.mode=none` + warmstart path/SHA/scope；BCRES 强制 `frozen_pc_bc_residual` + checkpoint/SHA，且禁止 warmstart | `FIXED` | `tests/test_lowlevel_ppo_config.py` 新增 BCFT/BCRES 契约测试 |
 | 正式评价起点 | 正式评价必须使用 nominal 初态 | evaluator 默认把 `guidance.nominal_initial_state` 强制为 true，并在 report 记录 `start_contract`；诊断可用 `--allow-non-nominal-start` 显式退出 | `FIXED` | `tests/test_g04_evaluate_pc_ppo_cli_contract.py` |
 | curriculum iteration hard cap | 按 iteration 而非 transition 计 | 默认 C0–C6 已改为 `72/120 … 420/700`，合计 2600 | `FIXED` | transition 只作遥测；controller 按 stage 消耗 iteration |
 | TRRES fresh init | 不借用 BC/其他 arm 权重 | config parser 和 launcher 已强制 `standard_fresh`、null checkpoint、禁止 `--warmstart-actor` | `FIXED` | manifest 记录 `learning_composition/encoder_init/encoder_init_checkpoint`；测试覆盖借用 BC 和旧 encoder |
 | 正式 TRRES config | `TRRES_CMD` / `TRRES_ACT` 可直接启动 | 已生成 `train_trres_cmd_5d_m_seed86201.json` 与 `train_trres_act_5d_m_seed86201.json`；均为 `standard_fresh`、无 warmstart、`actor/critic_command_dim=3` | `FIXED` | 两份配置通过 profile checker；command/actuator wrapper reset+step smoke 5 passed |
-| 评价 canonical artifacts | 每个 run 固定写 `summary.json`、`episodes.jsonl`、`trace.npz` | evaluator 当前稳定写 `summary.json` / `summary.md`，episodes 只嵌在 summary 内；`trace.npz` 仅显式 `--trace-output` 时写 | `BLOCKER` | 正式评价前把 `episodes.jsonl` 和标准 trace 落盘改为默认契约，并保证 `episode_id` 可对齐 |
-| 评价 artifact auditor | 启动器结束阶段必须审计 canonical 产物并非零退出 | `check_goal182_matrices.py` 与 `check_goal182_eval_matrix.py` 已存在，但 Goal182 专用 artifact auditor 尚未实现 | `BLOCKER` | 正式评价前补 `matrix_manifest/report_rows/report.md` 与每个 run 的 `summary/episodes/trace` 完整性和可复算检查 |
+| 评价 canonical artifacts | 每个 run 固定写 `summary.json`、`episodes.jsonl`、`trace.npz` | evaluator 现在默认写 `summary.json`、`summary.md`、`episodes.jsonl`、`trace.npz`；episode 与 trace 共用 `episode_id`，episodes 增加 `path_steps/pre_goal_path_steps` 供复算 | `FIXED` | `src/auv_lowlevel/cli/evaluate_pc_ppo/main.py`、`episodes.py`、`runner.py`；canonical artifact 与 auditor 已纳入全量回归 |
+| 评价 artifact auditor | 启动器结束阶段必须审计 canonical 产物并非零退出 | 已新增 `scripts/audit_goal182_artifacts.py`：audit 单 run 的 `summary/episodes/trace`、`episode_id` 对齐与主指标复算；eval-set 模式检查 `matrix_manifest/report_rows/report.md` 是否存在 | `FIXED` | `tests/test_goal182_artifact_audit.py` 覆盖通过、缺 episodes、trace id mismatch；正式 launcher 接线仍需在 launcher 实现时调用 |
 | D13.6 StageGate | 阈值和 shadow 切换点冻结 | 仍待用户定夺 | `USER_DECISION` | 只实现 shadow telemetry 和标定入口，不拍数字；冻结前不能启动正式训练 |
 | 服务器 worktree | 从新 commit 建干净 worktree | 旧 Goal182 worktree 全是 `c186c74`，dirty 文件数分别为 12 / 40 / 66 | `LEGACY_ONLY` | 不复用旧 worktree；新 commit 推送后新建 |
 | 服务器 bare main | 与本地待执行文档一致 | 仍为 `c186c74 fix(goal175): keep A1 pressure configs from curriculum override` | `BLOCKER` | 本地 commit/push 经用户批准后再同步 |
@@ -179,6 +179,13 @@ Goal182 远端仍只有 20261116-bc5d-c186c74、20261116-joint-c186c74、2026111
 
 ```bash
 cd settled_局部规划器_反应式
+export PVS_SOURCE_DIR=/home/bubble/水下机器人/python/PythonVehicleSimulator-master/src
+export MSS_SOURCE_DIR=/home/bubble/水下机器人/simulator/MSS-master
+export PYTHONPATH=$PWD/src
+
+.venv/bin/python -m pytest -q tests
+# 2159 passed, 11 skipped (86.16s)
+
 .venv/bin/python -m pytest tests/test_lowlevel_ppo_config.py tests/test_lowlevel_pc_env.py \
   tests/test_lowlevel_pc_vec_env.py tests/test_pc_goal85_unbiased_contract.py \
   tests/test_lowlevel_curriculum_sampler.py tests/test_g04_evaluate_pc_ppo_cli_contract.py \
@@ -189,6 +196,9 @@ cd 总协调
 /home/bubble/水下机器人/.venv/bin/python -m pytest tests/test_training_profile_schema.py tests/test_magic_number_provenance.py -q
 # 20 passed
 ```
+
+本轮受影响回归另含 `59 passed`；`test_batch_remus100.py` 为 `5 passed`。全量跳过的
+11 项均因 clean source checkout 不含 BC checkpoint 或 IsaacLab artifact，与此轮改动无关。
 
 ## 6. 训练门禁状态
 
@@ -204,8 +214,8 @@ cd 总协调
 按顺序执行，每步完成后更新本表：
 
 1. [x] 实现 §4.12.10 reset 契约：pitch 抖动、初始角速度、current 估计热启动、manifest 字段，以及评价名义起点；
-2. 实现 routine StageGate 的训练 rollout 20/3 语义，并保留 frozen-dev 只在 stage 边界/最终评价使用；
-2b. 把 `episodes.jsonl` 和标准 `trace.npz` 设为 evaluator 默认产物，并实现 Goal182 artifact auditor、接入正式评价启动器的非零退出门禁；
+2. [x] 实现 routine StageGate 的训练 rollout 20/3 语义，并保留 frozen-dev 只在 stage 边界/最终评价使用；默认仍为 `shadow`；
+2b. [x] 把 `episodes.jsonl` 和标准 `trace.npz` 设为 evaluator 默认产物，并实现 Goal182 artifact auditor；正式评价 launcher 的非零退出门禁待 launcher 落地时接线；
 3. [x] 生成正式 TRRES config，并让 launcher 自动运行 training-profile checker；
 4. [x] 把 `LC_BC_FINETUNE` 的 warmstart SHA 和可训练范围写成一等字段；
 5. 等 D13.6 阈值和行为决策；
@@ -219,7 +229,7 @@ telemetry，不能把 route gate 切到 enforce。
 
 | 编号 | 问题 | 推荐 | 理由 |
 |---|---|---|---|
-| `D13.6a` | routine gate 是否必须先跑满 stage 的 soft iteration cap？ | **是**：C0–C6 分别至少 `72/108/156/216/252/336/420` iterations | 参考工程每个 stage 都有 `min_iterations`；当前 `soft_budget_iterations` 只存在于配置里，controller 尚未使用。这样可避免 20-iteration window 一填满就过早晋级 |
+| `D13.6a` | routine gate 是否必须先跑满 stage 的 soft iteration cap？ | **是**：C0–C6 分别至少 `72/108/156/216/252/336/420` iterations | 参考工程每个 stage 都有 `min_iterations`；`enforce` 已把 `soft_budget_iterations` 作为 route gate 的 `min_iterations` 使用。该数值仍待用户确认后冻结 |
 | `D13.6b` | 阈值从哪里标定？ | **分开标定**：边界/final 用冻结 5D BC + ALOS reference；routine 用一次专门的 P0 训练 rollout | 遵守“不得用 treatment 结果回调阈值”；不能拿某一个 MOD4 arm 的结果当别人的门槛 |
 | `D13.6c` | 初始 margin 和 completion floor 是否采用文档建议值？ | **采用**：cross/vertical margin `0.10`、pre-goal 3D margin `0.05`、`completion_min=min(0.90, reference_completion-0.05)` 且不低于 `0.80` | 与 §4.9.2 已确认公式一致，只需确认是否按此冻结 |
 | `D13.6d` | shadow 何时切成 enforce？ | **首波先 shadow**：至少覆盖一个完整 stage 边界和一次最终 formal；阈值表冻结后，从下一个 module-set 开始 enforce | 满足 Goal182 “先 shadow 后 enforce”，同时避免同一批 treatment 结果既当标定又当验证 |
@@ -231,3 +241,5 @@ telemetry，不能把 route gate 切到 enforce。
 | 2026-11-16 | actor metadata 显式化 | 用户确认 `actor_kind` 必须写入 config/manifest；扩为 `actor_kind / actor_input_contract / token_contract / pooling` 四项一起显式 | 新 profile-bound config 缺失即 `ACTOR_METADATA_MISSING`；历史 config 标 `historical_only`；首波基线固定 `mlp/fused/none/none` |
 | 2026-11-16 | BCFT/BCRES composition 契约 | BCFT 必须 `base_policy.mode=none` + warmstart path/SHA/scope；BCRES 必须 `frozen_pc_bc_residual` + checkpoint/SHA 且禁止 warmstart | 生成器、两个正式 config 和 parser 同步；避免 CLI 隐藏状态 |
 | 2026-11-16 | 正式评价 nominal 起点 | evaluator 默认强制 `guidance.nominal_initial_state=true`，report 记录 `start_contract`；仅诊断可显式 `--allow-non-nominal-start` | 正式评价不会把训练随机初态混入 ranking；诊断仍保留 |
+| 2026-11-17 | StageGate enforce 接线 | routine 晋级改为训练 rollout 20/3；frozen-dev 只在 20/3 触发晋级时做一次边界 safety 检查，失败则否决并清空窗口；默认仍为 shadow | 只有显式 `--curriculum-route-gate-mode enforce` 且传入冻结阈值才生效；缺阈值直接失败，避免伪 enforce |
+| 2026-11-17 | canonical 评价产物 | evaluator 默认写 `episodes.jsonl` 与 `trace.npz`；episode/trace 共用 `episode_id`，并增加可复算所需的 path-step 权重 | 正式 run 不再依赖显式 `--trace-output`；artifact auditor 可对单 run 和 eval set 做非零退出检查 |

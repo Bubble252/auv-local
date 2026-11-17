@@ -37,6 +37,7 @@ from .metrics import _new_episode_metrics
 from .policy import _build_curriculum_sampler, _build_policy
 from .summary import _summary
 from .validation import (
+    _apply_eval_start_contract,
     _final_path_blocks,
     _ppo_residual_attenuation,
     _record_trace_estimator_state,
@@ -47,9 +48,8 @@ from .validation import (
     _validate_actuator_channel_gain_schedule,
     _validate_actuator_residual_scale_schedule,
     _validate_controller_pitch_override,
-    _apply_eval_start_contract,
-    _validate_eval_start_contract,
     _validate_environment_override,
+    _validate_eval_start_contract,
 )
 
 
@@ -1085,8 +1085,10 @@ def _run(
             record_trace("step", np.full(len(seeds), step_index, dtype=np.int64))
             record_trace("time_s", np.full(len(seeds), step_index * config.plant.dt_s))
             assert inner.episode_seed is not None
+            record_trace("episode_id", inner.episode_seed)
             record_trace("episode_seed", inner.episode_seed)
             record_trace("seed", inner.episode_seed)
+            record_trace("active", np.ones(len(seeds), dtype=bool))
             record_trace("eta", inner.eta)
             record_trace("nu", inner.nu)
             record_trace("current_ned_mps", inner.current_ned_mps)

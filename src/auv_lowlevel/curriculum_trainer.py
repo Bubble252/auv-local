@@ -169,10 +169,19 @@ class CurriculumTrainerHook:
         self.promotion_enabled = bool(promotion_enabled)
         self.routine_gate = routine_gate
         self.route_gate_thresholds = route_gate_thresholds
+        if (
+            routine_gate is not None
+            and routine_gate.mode == "enforce"
+            and route_gate_thresholds is None
+        ):
+            raise ValueError(
+                "route gate enforce mode requires frozen route thresholds"
+            )
         self._next_eval_transition = int(eval_interval_transitions)
         self._mix_ramp: CurriculumMixRamp | None = None
         self._stage_entered_at = 0
         self.decisions_path = self.output_dir / "curriculum_decisions.jsonl"
+        self.route_gate_path = self.output_dir / "curriculum_route_gate.jsonl"
         self.state_path = self.output_dir / "curriculum_state.json"
         self._write_state(0, None)
 
@@ -228,15 +237,18 @@ class CurriculumTrainerHook:
         ):
             raise ValueError("completed_iterations must be a non-negative integer")
         self._apply_mix_ramp(completed_transitions)
+        route_status: dict[str, Any] | None = None
         if self.routine_gate is not None and training_metrics is not None:
             spec = self.controller.stages[self.controller.stage]
-            self.routine_gate.observe(
+            route_status = self.routine_gate.observe(
                 stage=self.controller.stage,
                 iteration=0 if completed_iterations is None else completed_iterations,
                 metrics=training_metrics,
                 min_iterations=int(spec.soft_budget_iterations or 0),
                 thresholds=self.route_gate_thresholds,
             )
+            with self.route_gate_path.open("a") as handle:
+                handle.write(json.dumps(route_status, sort_keys=True) + "\n")
         if not self.promotion_enabled:
             if completed_transitions >= self._next_eval_transition:
                 while completed_transitions >= self._next_eval_transition:
@@ -247,7 +259,21 @@ class CurriculumTrainerHook:
                 completed_iterations=completed_iterations,
             )
             return None
+        if (
+            self.routine_gate is not None
+            and self.routine_gate.mode == "enforce"
+        ):
+            return self._maybe_update_enforce(
+                completed_transitions,
+                completed_iterations,
+                route_status,
+            )
         if completed_transitions < self._next_eval_transition:
+            self._write_state(
+                completed_transitions,
+                None,
+                completed_iterations=completed_iterations,
+            )
             return None
         while completed_transitions >= self._next_eval_transition:
             self._next_eval_transition += self.eval_interval_transitions
@@ -258,6 +284,76 @@ class CurriculumTrainerHook:
             completed_transitions=completed_transitions,
             completed_iterations=completed_iterations,
         )
+        if self.controller.stage != previous_stage:
+            self._stage_entered_at = int(completed_transitions)
+        record = self.controller.history[-1].as_dict()
+        with self.decisions_path.open("a") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        if decision in {
+            CurriculumDecision.PROMOTE,
+            CurriculumDecision.ROLLBACK,
+        }:
+            target_mix = curriculum_stage_mix_target(
+                self.controller.stage,
+                preview_enabled=self.preview_enabled,
+            )
+            if self.mix_ramp_transitions > 0:
+                self._mix_ramp = CurriculumMixRamp(
+                    start_mix=self.sampler.stage_mix,
+                    target_mix=target_mix,
+                    start_transition=int(completed_transitions),
+                    transitions=self.mix_ramp_transitions,
+                )
+                self._apply_mix_ramp(completed_transitions)
+            else:
+                self.sampler.set_stage_mix(target_mix)
+        self._write_state(
+            completed_transitions,
+            decision,
+            completed_iterations=completed_iterations,
+        )
+        return decision
+
+    def _maybe_update_enforce(
+        self,
+        completed_transitions: int,
+        completed_iterations: int | None,
+        route_status: Mapping[str, Any] | None,
+    ) -> CurriculumDecision | None:
+        """Use the training-rollout route window as the routine promotion gate."""
+
+        if route_status is None or route_status.get("should_promote") is not True:
+            self._write_state(
+                completed_transitions,
+                None,
+                completed_iterations=completed_iterations,
+            )
+            return None
+
+        previous_stage = self.controller.stage
+        evaluation = self.evaluate(previous_stage, completed_transitions)
+        spec = self.controller.stages[previous_stage]
+        if evaluation.safety_rate > spec.gate.safety_max:
+            self.routine_gate.reset()
+            decision = self.controller.veto_after_route_gate(
+                evaluation,
+                completed_transitions=completed_transitions,
+                completed_iterations=completed_iterations,
+                route_gate=route_status,
+                reason=(
+                    "frozen-dev boundary safety veto: "
+                    f"{evaluation.safety_rate:.6f} > {spec.gate.safety_max:.6f}"
+                ),
+            )
+        else:
+            decision = self.controller.promote_after_route_gate(
+                evaluation,
+                completed_transitions=completed_transitions,
+                completed_iterations=completed_iterations,
+                route_gate=route_status,
+            )
+            self.routine_gate.reset()
+
         if self.controller.stage != previous_stage:
             self._stage_entered_at = int(completed_transitions)
         record = self.controller.history[-1].as_dict()

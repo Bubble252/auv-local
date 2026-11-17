@@ -9,6 +9,8 @@ from auv_lowlevel.curriculum import (
     CurriculumDecision,
     CurriculumPromotionController,
     CurriculumStageSampler,
+    RouteGateThresholds,
+    RouteGateWindow,
     StageEvaluation,
     curriculum_stage_mix_target,
     default_curriculum_stages,
@@ -203,3 +205,122 @@ def test_forced_zero_current_encoder_alpha_overrides_stage_ramp(tmp_path: Path) 
         assert hook.current_encoder_alpha(completed) == 0.0
     state = json.loads((tmp_path / "curriculum_state.json").read_text())
     assert state["force_current_encoder_alpha_zero"] is True
+
+
+def _training_route_metrics(*, safety: float = 0.0) -> dict[str, float]:
+    return {
+        "/episode/cross_track_rmse_mean": 0.10,
+        "/episode/vertical_rmse_mean": 0.10,
+        "/episode/pre_goal_3d_rmse_mean": 0.15,
+        "/episode/path_completion_mean": 0.95,
+        "/episode/safety_termination_rate": safety,
+    }
+
+
+def _route_thresholds() -> RouteGateThresholds:
+    return RouteGateThresholds(
+        cross_track_rmse_max_m=0.25,
+        vertical_rmse_max_m=0.25,
+        pre_goal_3d_rmse_max_m=0.35,
+        completion_min=0.80,
+        safety_max=0.0,
+    )
+
+
+def test_enforce_route_gate_promotes_on_training_rollout_20_3(tmp_path: Path) -> None:
+    sampler = CurriculumStageSampler(stage_mix=(("C0", 1.0),))
+    evaluations: list[tuple[str, int]] = []
+
+    def evaluate(stage: str, transitions: int) -> StageEvaluation:
+        evaluations.append((stage, transitions))
+        return StageEvaluation(0.95, 0.80, 0.0, 0.0, 0.0)
+
+    hook = CurriculumTrainerHook(
+        controller=CurriculumPromotionController(start_stage="C0"),
+        sampler=sampler,
+        output_dir=tmp_path,
+        eval_interval_transitions=10_000_000,
+        evaluate=evaluate,
+        routine_gate=RouteGateWindow(
+            window_size=2,
+            consecutive_required=2,
+            mode="enforce",
+        ),
+        route_gate_thresholds=_route_thresholds(),
+    )
+
+    decision = None
+    for iteration in range(1, 74):
+        decision = hook.maybe_update(
+            iteration * 1_000,
+            completed_iterations=iteration,
+            training_metrics=_training_route_metrics(),
+        )
+
+    assert decision == CurriculumDecision.PROMOTE
+    assert hook.stage == "C1"
+    assert evaluations == [("C0", 73_000)]
+    record = json.loads(
+        (tmp_path / "curriculum_decisions.jsonl").read_text().splitlines()[-1]
+    )
+    assert record["reason"].startswith("routine training-rollout route gate passed")
+    assert record["route_gate"]["should_promote"] is True
+    assert record["route_gate"]["consecutive_passes"] == 2
+    route_rows = [
+        json.loads(line)
+        for line in (tmp_path / "curriculum_route_gate.jsonl")
+        .read_text()
+        .splitlines()
+    ]
+    assert len(route_rows) == 73
+    assert route_rows[-1]["should_promote"] is True
+
+
+def test_enforce_route_gate_boundary_safety_veto_keeps_stage(tmp_path: Path) -> None:
+    sampler = CurriculumStageSampler(stage_mix=(("C0", 1.0),))
+    evaluations: list[tuple[str, int]] = []
+
+    def evaluate(stage: str, transitions: int) -> StageEvaluation:
+        evaluations.append((stage, transitions))
+        return StageEvaluation(0.95, 0.80, 0.0, 0.0, 0.25)
+
+    gate = RouteGateWindow(window_size=2, consecutive_required=2, mode="enforce")
+    hook = CurriculumTrainerHook(
+        controller=CurriculumPromotionController(start_stage="C0"),
+        sampler=sampler,
+        output_dir=tmp_path,
+        eval_interval_transitions=10_000_000,
+        evaluate=evaluate,
+        routine_gate=gate,
+        route_gate_thresholds=_route_thresholds(),
+    )
+
+    decision = None
+    for iteration in range(1, 74):
+        decision = hook.maybe_update(
+            iteration * 1_000,
+            completed_iterations=iteration,
+            training_metrics=_training_route_metrics(),
+        )
+
+    assert decision == CurriculumDecision.CONTINUE
+    assert hook.stage == "C0"
+    assert evaluations == [("C0", 73_000)]
+    assert gate.last_status["reason"] == "STAGE_RESET"
+    record = json.loads(
+        (tmp_path / "curriculum_decisions.jsonl").read_text().splitlines()[-1]
+    )
+    assert record["reason"].startswith("frozen-dev boundary safety veto")
+    assert record["route_gate"]["should_promote"] is True
+
+
+def test_enforce_route_gate_requires_frozen_thresholds(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="requires frozen route thresholds"):
+        CurriculumTrainerHook(
+            controller=CurriculumPromotionController(start_stage="C0"),
+            sampler=CurriculumStageSampler(stage_mix=(("C0", 1.0),)),
+            output_dir=tmp_path,
+            eval_interval_transitions=100,
+            evaluate=lambda _stage, _steps: StageEvaluation(0.0, 0.0, 0.0, 1.0, 0.0),
+            routine_gate=RouteGateWindow(mode="enforce"),
+        )
