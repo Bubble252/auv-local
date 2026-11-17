@@ -2,7 +2,7 @@
 
 ```yaml
 scope: settled_局部规划器_反应式
-current_goal: Goal182 基础设施收尾。actor metadata、reset/nominal start、TRRES config、route telemetry、composition 契约、StageGate training-rollout 20/3 enforce、canonical episodes/trace、formal evaluation launcher/report 和 artifact auditor 已落地；全量 2165 passed。StageGate 默认仍为 shadow。
+current_goal: Goal182 基础设施收尾。actor metadata、reset/nominal start、TRRES config、route telemetry、composition 契约、StageGate training-rollout 20/3 enforce、canonical episodes/trace、formal evaluation launcher/report、artifact auditor 和 ALOS guidance telemetry 已落地；全量 2166 passed。StageGate 默认仍为 shadow。
 next_goal: 本地 checkpoint commit 后等待 D13.6a–d 数值决策和 A0/A3 选择；用户批准 push 后同步到 8×4090 新建干净 worktree，依次跑 CONTRACT_SMOKE、QUICK_SCREEN 和正式训练。
 goal182_status: ACTIVE / INFRA_VERIFIED / FULL_REGRESSION_PASS / STAGEGATE_ENFORCE_READY_SHADOW_DEFAULT / EVAL_CANONICAL_ARTIFACTS_READY / EVAL_LAUNCHER_READY / ARTIFACT_AUDITOR_READY / D13_6_PENDING / STORAGE_WAIVED_BY_USER / TRAINING_NOT_STARTED
 goal182_plan: doc/goals/goal182_ppo_stack_governance_20261114.md

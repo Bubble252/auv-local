@@ -626,10 +626,11 @@ export PYTHONPATH=$PWD/src
 .venv/bin/python -m pytest -q tests
 ```
 
-- 全量测试：`2165 passed, 11 skipped`；
+- 全量测试：`2166 passed, 11 skipped`；
 - 本轮受影响回归：`59 passed`；修正后的两个既有测试：`2 passed`；
   `test_batch_remus100.py`：`5 passed`；
 - 新增 eval report/launcher/auditor 回归：`16 passed`；
+- 新增 ALOS guidance telemetry 回归：`10 passed`；
 - matrix checker：`PASS goal182 matrices arms=60`；
 - eval matrix checker：`PASS goal182 eval matrix`；
 - magic-number provenance：`PASS checked=3 findings=0`；

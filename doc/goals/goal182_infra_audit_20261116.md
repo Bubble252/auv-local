@@ -199,7 +199,7 @@ export PYTHONPATH=$PWD/src
 
 # 使用主 checkout 的完整 venv；worktree 内的精简 .venv 缺 gymnasium，不能跑全量
 /home/bubble/水下机器人/settled_局部规划器_反应式/.venv/bin/python -m pytest -q tests
-# 2165 passed, 11 skipped (88.10s)
+# 2166 passed, 11 skipped (88.86s)
 
 .venv/bin/python -m pytest tests/test_goal182_eval_report.py \
   tests/test_goal182_eval_launcher.py tests/test_goal182_artifact_audit.py \
