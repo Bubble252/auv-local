@@ -36,12 +36,16 @@ def build_pc_critic_privileged(
     observation: Any,
     projection: Any,
     normalization: PCNormalization,
+    raw_features: bool = False,
 ) -> Tensor:
-    """Build the normalized 30-D privileged critic vector.
+    """Build the 30-D privileged critic vector.
 
     ``projection`` must be the true-``eta`` route projection, not the actor's
     ``p_nav`` projection.  The function is intentionally read-only with respect
-    to environment state.
+    to environment state. When ``raw_features`` is true, dataset-dependent
+    fixed scales are not applied, so an empirical normalizer owns the
+    normalization contract. Unit construction (actuator limits, sensor-age
+    caps, and safety ratios) remains unchanged.
     """
 
     if projection is None:
@@ -58,8 +62,12 @@ def build_pc_critic_privileged(
         path=env.path,
         path_dim=8,
     )
-    route_norm = normalize_path_features(route_v1, path_dim=8)
-    route = route_norm[:, (0, 1, 2, 3, 6, 7)]
+    route_indices = (0, 1, 2, 3, 6, 7)
+    route = (
+        route_v1[:, route_indices]
+        if raw_features
+        else normalize_path_features(route_v1, path_dim=8)[:, route_indices]
+    )
 
     actual = env.actuator
     requested = env.previous_action_normalized
@@ -88,26 +96,30 @@ def build_pc_critic_privileged(
     true_current = env.current_ned_mps
     if true_current is None:
         raise RuntimeError("privileged critic requires true current")
-    true_current_norm = normalization.normalize_current(true_current)
+    true_current_value = (
+        true_current if raw_features else normalization.normalize_current(true_current)
+    )
     current_body = world_to_body(
         true_current,
         quaternion_from_euler(eta[:, 3], eta[:, 4], eta[:, 5]),
     )
-    current_innovation = normalization.normalize_current(
-        current_body - observation.actor_current_body
-    )
-    disturbance = torch.cat((true_current_norm, current_innovation), dim=1)
+    current_innovation = current_body - observation.actor_current_body
+    if not raw_features:
+        current_innovation = normalization.normalize_current(current_innovation)
+    disturbance = torch.cat((true_current_value, current_innovation), dim=1)
 
     sensor = observation.sensor
-    nav_innovation = normalization.normalize_actor_state(
-        torch.cat(
-            (
-                eta[:, :3] - sensor.p_nav,
-                torch.zeros((count, 9), device=eta.device, dtype=eta.dtype),
-            ),
-            dim=1,
-        )
-    )[:, :3]
+    nav_innovation = eta[:, :3] - sensor.p_nav
+    if not raw_features:
+        nav_innovation = normalization.normalize_actor_state(
+            torch.cat(
+                (
+                    nav_innovation,
+                    torch.zeros((count, 9), device=eta.device, dtype=eta.dtype),
+                ),
+                dim=1,
+            )
+        )[:, :3]
     depth_margin = torch.ones((count,), device=eta.device, dtype=eta.dtype)
     termination = env.config.termination
     if termination.min_depth_m is not None and termination.max_depth_m is not None:

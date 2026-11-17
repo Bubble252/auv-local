@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import fields
 from time import perf_counter
 from typing import Any
@@ -12,9 +12,20 @@ from torch import Tensor
 
 from .pc import PC_SAFETY_TERMINAL_KINDS, PCRewardBreakdown, PCTerminalKind
 from .pc_env import BatchedPCLowLevelEnv, BatchedPCObservation
-from .pc_normalization import PCNormalization
+from .pc_normalization import (
+    PCEmpiricalNormalization,
+    PCNormalization,
+    normalize_pc_normalization_mode,
+    pc_normalization_schema_hash,
+)
 from .pc_path import normalize_path_features, path_block_column_mask, validate_path_blocks
-from .pc_policy import PCPolicyLayout
+from .pc_policy import (
+    PCPolicyLayout,
+    build_pc_actor_empirical_normalizer,
+    build_pc_critic_empirical_normalizer,
+    pc_actor_normalization_contract,
+    pc_critic_normalization_contract,
+)
 from .pc_privileged import build_pc_critic_privileged
 from .pc_privileged_schema import PC_CRITIC_PRIV_DIM
 
@@ -44,6 +55,9 @@ class BatchTorchPCVecEnv:
         critic_path_dim: int = 0,
         actor_current_encoder_enabled: bool = False,
         normalization: PCNormalization | None = None,
+        normalization_mode: str | None = None,
+        empirical_actor_state: Mapping[str, Any] | None = None,
+        empirical_actor_schema_hash: str | None = None,
         current_frame_dropout_prob: float = 0.0,
         current_frame_dropout_mode: str = "full",
         path_blocks: Iterable[str] | None = None,
@@ -78,6 +92,18 @@ class BatchTorchPCVecEnv:
         self.max_episode_length = int(env.config.plant.max_episode_steps)
         self.observation_dtype = observation_dtype
         configured = env.config.normalization
+        configured_mode = normalize_pc_normalization_mode(configured.mode)
+        explicit_mode = (
+            configured_mode
+            if normalization_mode is None
+            else normalize_pc_normalization_mode(normalization_mode)
+        )
+        if explicit_mode != configured_mode:
+            raise ValueError(
+                "environment normalization mode and explicit PC mode disagree: "
+                f"config={configured_mode!r}, explicit={explicit_mode!r}"
+            )
+        self.normalization_mode = configured_mode
         self.normalization = normalization or PCNormalization(
             position_scale_m=configured.position_scale_m,
             attitude_scale_rad=configured.attitude_scale_rad,
@@ -102,6 +128,45 @@ class BatchTorchPCVecEnv:
             long_window=long_window,
             command_dim=critic_command_dim,
         )
+        self.actor_empirical_normalizer: PCEmpiricalNormalization | None = None
+        self.critic_empirical_normalizer: PCEmpiricalNormalization | None = None
+        self.actor_normalization_schema: dict[str, Any] | None = None
+        self.critic_normalization_schema: dict[str, Any] | None = None
+        if self.normalization_mode == "empirical":
+            self.actor_empirical_normalizer = build_pc_actor_empirical_normalizer(
+                path_dim=self.actor_layout.path_dim,
+                current_dim=self.actor_layout.current_dim,
+                command_dim=self.actor_layout.command_dim,
+                device=self.device,
+            )
+            self.critic_empirical_normalizer = build_pc_critic_empirical_normalizer(
+                critic_path_dim=self.critic_layout.path_dim,
+                command_dim=self.critic_layout.command_dim,
+                device=self.device,
+            )
+            self.actor_normalization_schema = pc_actor_normalization_contract(
+                path_dim=self.actor_layout.path_dim,
+                current_dim=self.actor_layout.current_dim,
+                command_dim=self.actor_layout.command_dim,
+                mode="empirical",
+            )
+            self.critic_normalization_schema = pc_critic_normalization_contract(
+                critic_path_dim=self.critic_layout.path_dim,
+                command_dim=self.critic_layout.command_dim,
+                mode="empirical",
+            )
+            actor_hash = pc_normalization_schema_hash(self.actor_normalization_schema)
+            if empirical_actor_schema_hash is not None and empirical_actor_schema_hash != actor_hash:
+                raise ValueError(
+                    "BC actor normalization schema does not match the PPO environment: "
+                    f"BC={empirical_actor_schema_hash}, env={actor_hash}"
+                )
+            if empirical_actor_state is not None:
+                self.actor_empirical_normalizer.load_state_payload(empirical_actor_state)
+            self.actor_empirical_normalizer.train()
+            self.critic_empirical_normalizer.train()
+        elif empirical_actor_state is not None or empirical_actor_schema_hash is not None:
+            raise ValueError("fixed normalization must not receive empirical BC statistics")
         self.num_obs = self.actor_layout.flat_dim
         self.num_privileged_obs = self.critic_layout.flat_dim
         self.critic_observation_dim = self.critic_layout.flat_dim
@@ -183,6 +248,19 @@ class BatchTorchPCVecEnv:
             "current_frame_dropout_mode": self.current_frame_dropout_mode,
             "pc_ppo_scale": self.env.config.reward.resolved_pc_ppo_scale,
             "normalization": self.normalization.as_dict(),
+            "normalization_mode": self.normalization_mode,
+            "actor_normalization_schema": self.actor_normalization_schema,
+            "actor_normalization_schema_hash": (
+                None
+                if self.actor_normalization_schema is None
+                else pc_normalization_schema_hash(self.actor_normalization_schema)
+            ),
+            "critic_normalization_schema": self.critic_normalization_schema,
+            "critic_normalization_schema_hash": (
+                None
+                if self.critic_normalization_schema is None
+                else pc_normalization_schema_hash(self.critic_normalization_schema)
+            ),
             "observation_dtype": str(observation_dtype).removeprefix("torch."),
             "actor_side_channel": (
                 "current_estimate_body"
@@ -206,7 +284,10 @@ class BatchTorchPCVecEnv:
         return self._actor_observations, self._critic_observations
 
     def _tokens(
-        self, observation: BatchedPCObservation
+        self,
+        observation: BatchedPCObservation,
+        *,
+        update_empirical: bool = False,
     ) -> tuple[
         Tensor,
         Tensor | None,
@@ -218,33 +299,15 @@ class BatchTorchPCVecEnv:
         Tensor,
         Tensor,
     ]:
-        actor_state = self.normalization.normalize_actor_state(observation.actor_state)
-        actor_path = observation.actor_path
+        actor_path_raw = observation.actor_path
         if self.actor_layout.path_dim:
-            if actor_path is None:
+            if actor_path_raw is None:
                 raise RuntimeError("PC environment did not expose the path observation block")
-            actor_path = normalize_path_features(actor_path)
-            mask = self._path_column_mask.to(device=actor_path.device, dtype=actor_path.dtype)
-            actor_path = actor_path * mask
-            if self.path_zero:
-                actor_path = torch.zeros_like(actor_path)
-        elif actor_path is not None:
+        elif actor_path_raw is not None:
             raise ValueError("unexpected actor path observations when path_dim=0")
-        actor_current = (
-            self.normalization.normalize_current(observation.actor_current_body)
-            if self.actor_layout.current_dim
-            else None
-        )
-        critic_state = self.normalization.normalize_critic_state(observation.critic_state)
-        # The actor current encoder is the only explicit current channel.  When
-        # it is disabled, zero the history side channel too; otherwise the same
-        # current estimate would leak through the actor's short/long history.
-        actor_side = (
-            self.normalization.normalize_current(observation.actor_current_body)
-            if self.actor_layout.current_dim
-            else torch.zeros_like(observation.actor_current_body)
-        )
-        critic_side = self.normalization.normalize_current(observation.critic_current_ned)
+        command_full = observation.command.normalized()
+        actor_command_raw = self._select_command(command_full, self.actor_layout.command_dim)
+        critic_command_raw = self._select_command(command_full, self.critic_layout.command_dim)
         critic_path: Tensor | None = None
         if self.critic_layout.path_dim:
             if self.env.eta is None or self.env.path is None:
@@ -258,14 +321,95 @@ class BatchTorchPCVecEnv:
                 observation=observation,
                 projection=true_projection,
                 normalization=self.normalization,
+                raw_features=self.normalization_mode == "empirical",
             )
-        command_full = observation.command.normalized()
-        actor_command = self.normalization.normalize_command(
-            self._select_command(command_full, self.actor_layout.command_dim)
-        )
-        critic_command = self.normalization.normalize_command(
-            self._select_command(command_full, self.critic_layout.command_dim)
-        )
+        if self.normalization_mode == "empirical":
+            if self.actor_empirical_normalizer is None or self.critic_empirical_normalizer is None:
+                raise RuntimeError("empirical normalization is not initialized")
+            actor_update_parts = [observation.actor_state]
+            if self.actor_layout.path_dim:
+                assert actor_path_raw is not None
+                actor_update_parts.append(actor_path_raw)
+            if self.actor_layout.current_dim:
+                actor_update_parts.append(observation.actor_current_body)
+            if self.actor_layout.command_dim:
+                actor_update_parts.append(actor_command_raw)
+            critic_update_parts = [observation.critic_state, observation.critic_current_ned]
+            if self.critic_layout.path_dim:
+                assert critic_path is not None
+                critic_update_parts.insert(1, critic_path)
+            if self.critic_layout.command_dim:
+                critic_update_parts.append(critic_command_raw)
+            if update_empirical:
+                self.actor_empirical_normalizer.update(torch.cat(actor_update_parts, dim=1))
+                self.critic_empirical_normalizer.update(torch.cat(critic_update_parts, dim=1))
+            actor_state = self.actor_empirical_normalizer.normalize_group(
+                "state", observation.actor_state
+            )
+            actor_path = actor_path_raw
+            if self.actor_layout.path_dim:
+                assert actor_path is not None
+                actor_path = self.actor_empirical_normalizer.normalize_group("path", actor_path)
+            actor_current = (
+                self.actor_empirical_normalizer.normalize_group(
+                    "current", observation.actor_current_body
+                )
+                if self.actor_layout.current_dim
+                else None
+            )
+            actor_side = (
+                actor_current
+                if actor_current is not None
+                else torch.zeros_like(observation.actor_current_body)
+            )
+            critic_state = self.critic_empirical_normalizer.normalize_group(
+                "state", observation.critic_state
+            )
+            critic_side = self.critic_empirical_normalizer.normalize_group(
+                "current", observation.critic_current_ned
+            )
+            if critic_path is not None:
+                critic_path = self.critic_empirical_normalizer.normalize_group(
+                    "path", critic_path
+                )
+            actor_command = (
+                self.actor_empirical_normalizer.normalize_group("command", actor_command_raw)
+                if self.actor_layout.command_dim
+                else actor_command_raw
+            )
+            critic_command = (
+                self.critic_empirical_normalizer.normalize_group("command", critic_command_raw)
+                if self.critic_layout.command_dim
+                else critic_command_raw
+            )
+        else:
+            actor_state = self.normalization.normalize_actor_state(observation.actor_state)
+            actor_path = actor_path_raw
+            if self.actor_layout.path_dim:
+                assert actor_path is not None
+                actor_path = normalize_path_features(actor_path)
+            actor_current = (
+                self.normalization.normalize_current(observation.actor_current_body)
+                if self.actor_layout.current_dim
+                else None
+            )
+            critic_state = self.normalization.normalize_critic_state(observation.critic_state)
+            # The actor current encoder is the only explicit current channel. When
+            # it is disabled, zero the history side channel too; otherwise the same
+            # current estimate would leak through the actor's short/long history.
+            actor_side = (
+                self.normalization.normalize_current(observation.actor_current_body)
+                if self.actor_layout.current_dim
+                else torch.zeros_like(observation.actor_current_body)
+            )
+            critic_side = self.normalization.normalize_current(observation.critic_current_ned)
+            actor_command = self.normalization.normalize_command(actor_command_raw)
+            critic_command = self.normalization.normalize_command(critic_command_raw)
+        if actor_path is not None:
+            mask = self._path_column_mask.to(device=actor_path.device, dtype=actor_path.dtype)
+            actor_path = actor_path * mask
+            if self.path_zero:
+                actor_path = torch.zeros_like(actor_path)
         actor_token_parts = [actor_state]
         if self.actor_layout.history_path_dim:
             assert actor_path is not None
@@ -284,6 +428,90 @@ class BatchTorchPCVecEnv:
             actor_token,
             critic_token,
         )
+
+    def set_empirical_normalization_training(self, enabled: bool) -> None:
+        """Enable or freeze online empirical-normalization updates."""
+
+        if self.normalization_mode != "empirical":
+            return
+        assert self.actor_empirical_normalizer is not None
+        assert self.critic_empirical_normalizer is not None
+        if enabled:
+            self.actor_empirical_normalizer.train()
+            self.critic_empirical_normalizer.train()
+        else:
+            self.actor_empirical_normalizer.eval()
+            self.critic_empirical_normalizer.eval()
+
+    def freeze_empirical_normalization(self) -> None:
+        """Freeze empirical statistics for evaluation or inference."""
+
+        self.set_empirical_normalization_training(False)
+
+    def empirical_normalization_payload(self) -> dict[str, Any]:
+        """Return checkpoint metadata for the current normalization contract."""
+
+        if self.normalization_mode == "fixed":
+            return {
+                "normalization_mode": "fixed",
+                "normalization_position": "raw_before_token_history",
+                "normalization_state": None,
+            }
+        if self.actor_empirical_normalizer is None or self.critic_empirical_normalizer is None:
+            raise RuntimeError("empirical normalization is not initialized")
+        if self.actor_normalization_schema is None or self.critic_normalization_schema is None:
+            raise RuntimeError("empirical normalization schema is missing")
+        return {
+            "normalization_mode": "empirical",
+            "normalization_position": "raw_before_token_history",
+            "actor_normalization_schema": self.actor_normalization_schema,
+            "actor_normalization_schema_hash": pc_normalization_schema_hash(
+                self.actor_normalization_schema
+            ),
+            "critic_normalization_schema": self.critic_normalization_schema,
+            "critic_normalization_schema_hash": pc_normalization_schema_hash(
+                self.critic_normalization_schema
+            ),
+            "normalization_state": {
+                "actor": self.actor_empirical_normalizer.state_payload(),
+                "critic": self.critic_empirical_normalizer.state_payload(),
+            },
+        }
+
+    def load_empirical_normalization_state(self, payload: Mapping[str, Any]) -> None:
+        """Strictly restore empirical checkpoint statistics and rebuild history."""
+
+        if self.normalization_mode != "empirical":
+            raise ValueError("fixed environment cannot load empirical normalization state")
+        if payload.get("normalization_mode") != "empirical":
+            raise ValueError("checkpoint empirical normalization mode is missing or mismatched")
+        if self.actor_empirical_normalizer is None or self.critic_empirical_normalizer is None:
+            raise RuntimeError("empirical normalization is not initialized")
+        if self.actor_normalization_schema is None or self.critic_normalization_schema is None:
+            raise RuntimeError("empirical normalization schema is missing")
+        expected_actor_hash = pc_normalization_schema_hash(self.actor_normalization_schema)
+        expected_critic_hash = pc_normalization_schema_hash(self.critic_normalization_schema)
+        if payload.get("actor_normalization_schema_hash") != expected_actor_hash:
+            raise ValueError("checkpoint actor normalization schema does not match the environment")
+        if payload.get("critic_normalization_schema_hash") != expected_critic_hash:
+            raise ValueError("checkpoint critic normalization schema does not match the environment")
+        state = payload.get("normalization_state")
+        if not isinstance(state, Mapping):
+            raise ValueError("checkpoint is missing empirical normalization_state")
+        actor_state = state.get("actor")
+        critic_state = state.get("critic")
+        if not isinstance(actor_state, Mapping) or not isinstance(critic_state, Mapping):
+            raise ValueError("checkpoint empirical state must contain actor and critic payloads")
+        self.actor_empirical_normalizer.load_state_payload(actor_state)
+        self.critic_empirical_normalizer.load_state_payload(critic_state)
+        if self._last_observation is not None:
+            self._actor_history = None
+            self._critic_history = None
+            self._set_observations(
+                self._last_observation,
+                reset_mask=torch.ones(self.num_envs, dtype=torch.bool, device=self.device),
+                update_empirical=False,
+            )
 
     def _mask_history_path(self, history: Tensor) -> Tensor:
         """Apply the active path mask to cached encoded-history path columns."""
@@ -518,7 +746,13 @@ class BatchTorchPCVecEnv:
         )
         return actor_obs, critic_obs
 
-    def _set_observations(self, observation: BatchedPCObservation, *, reset_mask: Tensor) -> None:
+    def _set_observations(
+        self,
+        observation: BatchedPCObservation,
+        *,
+        reset_mask: Tensor,
+        update_empirical: bool = False,
+    ) -> None:
         (
             actor_state,
             actor_path,
@@ -529,7 +763,7 @@ class BatchTorchPCVecEnv:
             critic_command,
             actor_token,
             critic_token,
-        ) = self._tokens(observation)
+        ) = self._tokens(observation, update_empirical=update_empirical)
         self._fill_history(actor_token, critic_token, reset_mask=reset_mask)
         actor_obs, critic_obs = self._flatten(
             actor_state,
@@ -902,7 +1136,11 @@ class BatchTorchPCVecEnv:
             active &= ~newly_done
         if bool(done_any.any()):
             self.env.reset_indices(done_any)
-            self._set_observations(self.env.observation, reset_mask=done_any)
+            self._set_observations(
+                self.env.observation,
+                reset_mask=done_any,
+                update_empirical=True,
+            )
             self._reset_episode_logs(done_any)
         actor_obs, _ = self._ensure_observations()
         infos = dict(last_infos) if last_infos else {}
@@ -983,7 +1221,11 @@ class BatchTorchPCVecEnv:
         self.episode_length_buf.add_(1)
         self.episode_length_buf.masked_fill_(dones, 0)
         reset_mask = dones
-        self._set_observations(result.observation, reset_mask=reset_mask)
+        self._set_observations(
+            result.observation,
+            reset_mask=reset_mask,
+            update_empirical=True,
+        )
         log = self._update_logs(result, raw_rewards, action, lengths, dones)
         actor_obs, _ = self._ensure_observations()
         self._total_env_steps += self.num_envs

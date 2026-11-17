@@ -2,10 +2,24 @@
 
 ```yaml
 scope: settled_局部规划器_反应式
-current_goal: Goal182 已恢复；D1–D12 已全部定夺并写入 audit，当前在 goal 内推进实现与标定。训练队列保持关闭，待 D11 阈值冻结和 20/3 smoke 通过后启动。D11=B：先标定冻结 PE2E/ALOSB cross/vertical 阈值，切 enforce 跑 20/3 smoke，再启动 18-run。
+current_goal: Goal184 ACTIVE：从 Goal183 C 线 empirical PE2E BC checkpoint 出发，执行完整 C0–C6 课程单 seed arm；Goal182 infra/18-run 队列仍暂停，旧 GOAL182 infra prompt 只作引用。
 goal182_infra_id_alias: 审计文档的 D1–D12 是 Goal182 内部基础设施项，跨文档统一写 INFRA-D1–INFRA-D12，不是 goal 外前置；不要与主 Goal §13 的 D1–D18 混淆（INFRA-D8=训练续路，INFRA-D11=20/3 晋级）。
-next_goal: D1 hard-cap、D4 radius、D5 depth、D6 paired-zero（含同 seed、PE2E unpaired）、D7 formal 60 s 和 D8 episodes route/depth metadata 均已实现；训练完成后由 `build_goal182_eval_arms.py` 生成正式 arms manifest。下一步先解决 D13.6b 的两个独立前置：阈值来源（REFERENCE_BC vs P0_HISTORICAL）和 C0–C6 覆盖；stage sweep 配置与 launcher 已就绪，待 GPU 空出后在服务器跑 PE2E/ALOSB 各 7×40 iterations，池化 7 份 records 生成并冻结两张 20/3 阈值表。随后跑 1-iteration contract smoke 和 20/3 gate smoke；通过后重启 18-run。旧 2500 env 只作 LEGACY_ONLY，D9/D10 不阻塞首波，D12 第二波交付。
+next_goal: Goal184 Phase A：commit/push，建干净 server worktree，上传 C checkpoint，跑 1-iteration 1536-env smoke；随后冻结 route-gate 阈值并跑 20/3 smoke；通过后启动 PE2E BCFT seed86201 完整 2600-iteration arm。
 goal182_status: ACTIVE / D1_D12_CONFIRMED / D11_B / IMPLEMENTATION_IN_PROGRESS / TRAINING_BLOCKED_UNTIL_CALIBRATION / ENFORCE_20_3
+goal183_status: C_BC_ONLY_TEACHER_MATCH / HANDED_TO_GOAL184 / HELDOUT_CLOSED
+goal183_plan: doc/goals/goal183_env_empirical_bc_20261117.md
+goal183_scope: env-side empirical normalization 替代 fixed，位置固定在 token/history 之前；禁止 runner empirical 叠加；第一轮只重训 PE2E BC 并跑 MOD4 x PE2E x BCFT 的 C0-only 72-iteration 诊断。
+goal183_frozen_recipe: actor LR 1e-5, critic LR 3e-4, schedule=fixed, init_std=0.05, clip=0.2, desired_kl=0.01, entropy=0.005, gamma=0.995, lam=0.95, max_grad_norm=1.0, 5 epochs, 4 minibatches; hidden [512,256,128]; d_z_total=64; path_dim=5; current encoder + DADE enabled.
+goal183_recipe_provenance: guarded C0 诊断 20261117-goal182-c0recipe-53ba1dc/run72_1536 restored from old bad speedv3-5d80de2; last20 completion 0.953644, cross 0.712355 m, vertical 0.255162 m, KL 0.006711, clip 0.087769; noncanonical 1536 envs; evidence in goal182_infra_audit §8 and research/LEDGER.jsonl H182-GUARDED-RECIPE.
+goal183_bc_only_result: old-demo empirical BC_ONLY C3 seeds 20-23 endpoint_stop had 3D 3.1209 m / horizontal 3.0474 m / vertical 0.6735 m; fixed reference was 1.9841 / 1.9060 / 0.5514 m. Success/pre-goal are telemetry only. Plan C re-collected 209 episodes / 262144 samples with unbiased_small_noise_v2, seeds 90000-90063 only; new empirical BC is 2.4459 / 2.4265 / 0.3075 m versus same-env teacher 2.4133 / 2.3955 / 0.2928 m. Status C_BC_ONLY_TEACHER_MATCH / SCREEN_PASS_WITH_REFERENCE_GAP; no PPO 72 yet.
+goal183_root_cause: same old demo SHA and same episode split; empirical BC metadata was strict. The old PE2E demo used realistic_calibrated while BC_ONLY/PPO env uses unbiased_small_noise_v2. Over 300 C3 teacher steps, old-demo statistics gave current 25.33% abs(z)>3 versus state 0.12% and path 0%; plan C demo gives current 0.00%, state 1.65%, path 0.58%. Current OOD is resolved by matching the demo sensor profile.
+goal183_smoke: 1536-env 1-iteration contract smoke PASS: KL 0.005010, clip 0.054077, ratio_max 1.625438, peak reserved 8438 MiB, losses finite. Checkpoint infos contain empirical mode/schema/statistics; actor count 354690+73728, critic count 73728. A 64-env smoke was non-gate due to 3072 samples.
+goal183_next: Plan C is selected and its BC_ONLY is teacher-matched but still 0.4618 m behind the contaminated fixed reference on 3D. Only allowed next step is uploading the C checkpoint, updating warmstart path/SHA, and running a 1-iteration 1536-env smoke from a clean server worktree. Do not start 72 iterations, switch to B, or scan std/LR/seed/route.
+goal184_status: ACTIVE / CONFIG_READY / WAITING_SERVER_SMOKE / HELDOUT_CLOSED
+goal184_plan: doc/goals/goal184_empirical_full_arm_training_20261118.md
+goal184_prompt: /home/bubble/水下机器人/总协调/doc/ops/GOAL184_EMPIRICAL_FULL_ARMS_PROMPT_20261118.md
+goal184_scope: 从 Goal183 C 线 empirical PE2E BC checkpoint 出发，先跑一条单 seed 的完整 C0-C6 课程训练和正式测评；资源允许时按顺序扩 seed/arm，不一次性排满 18-run。旧 GOAL182 infra prompt 只作引用，不作执行主协议；不扫 std/LR/seed/route。
+goal184_next: commit/push 本地 Goal183 代码与 Goal184 文档，建干净 server worktree，上传 C checkpoint，跑 1-iteration 1536-env smoke；随后冻结 route-gate、跑 20/3 smoke，再启动 PE2E BCFT seed86201 完整 2600-iteration arm。
 goal182_decisions_d1_d4: D1=A+ 逐 iteration hard cap + fail-closed + launcher 拒绝 final stage != C6；D2=A formal 前标定冻结 cross/vertical 阈值；D3=B 先只读诊断 C0 completion/timeout，不降 completion_min；D4=A+ 所有 active 评价固定 2.0 m、无 radius 轴、strict125 仅历史、缺失/非 2.0 radius 判 INVALID、success/timeout/plane_miss 仅 telemetry、completion 不等于终点 success。
 goal182_decision_d5: D5=B 已 FIXED。训练侧 C0–C6 depth_range_m、逐 episode depth_m 和 env reset 均有验收测试；测评侧 build_goal182_eval_configs.py 消费 depths_m/depth_profiles_m，生成 10/80/250/500 m × R_STRAIGHT/R_3D_M 共 24 cell，depth 与 route_profile 分开计数，launcher/report/auditor 缺 depth 判 INVALID_GOAL182_DEPTH。
 goal182_decision_d6: D6=A 已 FIXED。eval_pairing.py 校验 paired_zero_tag/zero_for/evaluation_set_id；report 还逐 policy cell 校验同 scenario 的 zero 行、zero cell valid 和 eval_seeds 集合完全一致；缺配对或 seed 不一致判 INVALID_INCOMPLETE_EVAL。EV6 的 PE2E 优先于 composition 规则：所有 PE2E composition 都显式 ZERO_BASELINE_UNPAIRED，禁止声明 PAIRED 或指向冻结 BC zero。ALOSB BCFT/BCRES/TRRES 使用同底座 zero；BCFT zero 用训练前 model_initial.pt。
@@ -515,5 +529,5 @@ goal182_c0_recipe_diagnostic: PASS at 1536 envs (noncanonical due to shared GPU 
 goal182_c0_empirical_std01_ablation: REJECTED at 1536 envs (noncanonical, GPU 6). Guarded LR/schedule with empirical normalization and std 0.1 stayed numerically stable (KL max 0.0130, clip max 0.1960, ratio max 4.70) but tracking degraded progressively: last-20 cross 13.5620 m and vertical 33.4152 m versus fixed+std0.05 0.7124/0.2552 m. Completion 0.9536, timeout 0.0712 and success 0 are telemetry only. Because normalization and std changed together, attribution between them is not isolated; do not run extra matrix-external ablations. BCFT remains on fixed normalization + std 0.05.
 goal182_c0_fixed_std15_ablation: REJECTED at 1536 envs (noncanonical, GPU 4). Kept fixed normalization and guarded LR/schedule, changed only init std to 1.5. First update was numerically stable (KL 0.00246, clip 0.00903, ratio max 1.40), but last-20 cross-track reached 15.1088 m and vertical 3.5953 m versus fixed+std0.05 0.7124/0.2552 m. KL max 0.00492 and clip max 0.0452 confirm that low PPO ratios do not guarantee behavioral quality. Completion/timeout/success were telemetry only. Reject std 1.5; BCFT stays at std 0.05. No further std sweep.
 last_decision: continue
-last_updated: 2026-11-17
+last_updated: 2026-11-18
 ```

@@ -9,6 +9,7 @@ from typing import Any
 import numpy as np
 import torch
 
+from auv_lowlevel.batch.checkpoint import read_pc_normalization_payload
 from auv_lowlevel.batch.geometry import (
     body_to_world,
     ground_velocity_body_for_contract,
@@ -195,6 +196,12 @@ def _run(
         else _resolve(Path(training.environment_config))
     )
     config = load_config(resolved_environment_config)
+    normalization_mode = str(config.normalization.mode)
+    if normalization_mode == "empirical" and bool(training.runner["empirical_normalization"]):
+        raise ValueError(
+            "DOUBLE_EMPIRICAL_NORMALIZATION: environment normalization.mode='empirical' "
+            "conflicts with runner.empirical_normalization=true"
+        )
     base_config = None
     sensor_override = False
     if environment_config_path is not None:
@@ -359,6 +366,7 @@ def _run(
         history_path_dim=training.pc.history_path_dim,
         critic_path_dim=training.pc.critic_path_dim,
         actor_current_encoder_enabled=training.pc.actor_current_encoder_enabled,
+        normalization_mode=normalization_mode,
         normalization=PCNormalization(
             position_scale_m=config.normalization.position_scale_m,
             attitude_scale_rad=config.normalization.attitude_scale_rad,
@@ -377,6 +385,24 @@ def _run(
         num_critic_obs=env.num_privileged_obs,
         device=device,
     )
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    normalization_payload = read_pc_normalization_payload(checkpoint)
+    if normalization_payload is None:
+        if normalization_mode == "empirical":
+            raise ValueError(
+                "empirical environment cannot evaluate a checkpoint without "
+                "normalization metadata"
+            )
+        normalization_payload = {"normalization_mode": "fixed"}
+    checkpoint_mode = str(normalization_payload["normalization_mode"])
+    if checkpoint_mode != normalization_mode:
+        raise ValueError(
+            "checkpoint and environment normalization modes disagree: "
+            f"checkpoint={checkpoint_mode!r}, environment={normalization_mode!r}"
+        )
+    if normalization_mode == "empirical":
+        env.load_empirical_normalization_state(normalization_payload)
+        env.freeze_empirical_normalization()
     checkpoint_action_interface = metadata.get("pc", {}).get("action_interface")
     if (
         checkpoint_action_interface is not None

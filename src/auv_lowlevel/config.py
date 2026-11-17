@@ -983,6 +983,7 @@ class SensorConfig:
 
 @dataclass(frozen=True)
 class NormalizationConfig:
+    mode: str = "fixed"
     position_scale_m: float = 100.0
     attitude_scale_rad: float = math.pi
     angular_rate_scale_rad_s: float = 1.0
@@ -991,6 +992,8 @@ class NormalizationConfig:
     current_scale_mps: float = 0.5
 
     def __post_init__(self) -> None:
+        if self.mode not in {"fixed", "empirical"}:
+            raise ValueError("normalization.mode must be 'fixed' or 'empirical'")
         values = (
             self.position_scale_m,
             self.attitude_scale_rad,
@@ -1002,8 +1005,9 @@ class NormalizationConfig:
         if not all(math.isfinite(value) and value > 0.0 for value in values):
             raise ValueError("normalization scales must be finite and positive")
 
-    def as_dict(self) -> dict[str, float]:
+    def as_dict(self) -> dict[str, float | str]:
         return {
+            "mode": self.mode,
             "position_scale_m": self.position_scale_m,
             "attitude_scale_rad": self.attitude_scale_rad,
             "angular_rate_scale_rad_s": self.angular_rate_scale_rad_s,
@@ -2422,8 +2426,10 @@ def _parse_normalization(value: Any) -> NormalizationConfig:
             "sway_heave_speed_scale_mps",
             "current_scale_mps",
         },
+        optional={"mode"},
     )
     return NormalizationConfig(
+        mode=_string(data.get("mode", "fixed"), "normalization.mode"),
         position_scale_m=_positive(data["position_scale_m"], "normalization.position_scale_m"),
         attitude_scale_rad=_positive(
             data["attitude_scale_rad"], "normalization.attitude_scale_rad"

@@ -30,6 +30,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--validation-fraction", type=float, default=0.15)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--normalization-mode", choices=("fixed", "empirical"), default=None)
     parser.add_argument("--actor-command-dim", type=int, choices=(0, 3), default=None)
     parser.add_argument("--path-dim", type=int, choices=(0, 5, 8, 12), default=None)
     parser.add_argument("--path-encoder-hidden-sizes", default="64")
@@ -69,8 +70,14 @@ def main() -> int:
     dataset, demo_metadata = load_pc_demonstration_dataset(args.demos, path_dim=args.path_dim)
     configs = demo_metadata.get("configs")
     normalization_payload = None
+    demo_normalization_mode = "fixed"
     if isinstance(configs, list) and configs:
         normalization_payload = configs[0].get("normalization")
+        if isinstance(normalization_payload, dict):
+            demo_normalization_mode = str(normalization_payload.get("mode", "fixed"))
+    if isinstance(normalization_payload, dict):
+        normalization_payload = dict(normalization_payload)
+        normalization_payload.pop("mode", None)
     normalization = (
         PCNormalization(**normalization_payload)
         if isinstance(normalization_payload, dict)
@@ -115,6 +122,11 @@ def main() -> int:
         output_dir=args.output,
         metadata=demo_metadata,
         normalization=normalization,
+        normalization_mode=(
+            demo_normalization_mode
+            if args.normalization_mode is None
+            else args.normalization_mode
+        ),
         init_checkpoint=args.init_checkpoint,
     )
     print(json.dumps(result, indent=2, sort_keys=True))

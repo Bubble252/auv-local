@@ -350,6 +350,43 @@ def read_pc_checkpoint_metadata(
     return dict(metadata)
 
 
+def read_pc_normalization_payload(
+    checkpoint: Mapping[str, Any],
+    *,
+    required: bool = False,
+) -> dict[str, Any] | None:
+    """Read the PC empirical-normalization payload from an rsl_rl checkpoint.
+
+    ``RecordingRunner`` merges this payload at the top level of the ``infos``
+    mapping. The checkpoint root is accepted only for standalone fixtures; all
+    newly written training checkpoints use ``infos``.
+    """
+
+    candidates: list[Mapping[str, Any]] = []
+    infos = checkpoint.get("infos")
+    if isinstance(infos, Mapping):
+        candidates.append(infos)
+    candidates.append(checkpoint)
+    for candidate in candidates:
+        if "normalization_mode" in candidate or "normalization_state" in candidate:
+            return {
+                "normalization_mode": str(candidate.get("normalization_mode", "fixed")),
+                "normalization_position": candidate.get("normalization_position"),
+                "actor_normalization_schema": candidate.get("actor_normalization_schema"),
+                "actor_normalization_schema_hash": candidate.get(
+                    "actor_normalization_schema_hash"
+                ),
+                "critic_normalization_schema": candidate.get("critic_normalization_schema"),
+                "critic_normalization_schema_hash": candidate.get(
+                    "critic_normalization_schema_hash"
+                ),
+                "normalization_state": candidate.get("normalization_state"),
+            }
+    if required:
+        raise ValueError("checkpoint is missing PC normalization metadata")
+    return None
+
+
 def validate_pc_checkpoint_metadata(
     checkpoint: Mapping[str, Any],
     *,
@@ -440,6 +477,7 @@ __all__ = [
     "CHECKPOINT_METADATA_KEY",
     "CHECKPOINT_METADATA_SCHEMA",
     "build_checkpoint_infos",
+    "read_pc_normalization_payload",
     "read_checkpoint_metadata",
     "validate_checkpoint_metadata",
 ]

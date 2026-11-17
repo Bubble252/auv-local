@@ -16,7 +16,12 @@ from torch import Tensor, nn
 from torch.nn import functional as F
 
 from .encoded_policy import _activation, _mlp
-from .pc_normalization import PCNormalization
+from .pc_normalization import (
+    PCEmpiricalNormalization,
+    PCNormalization,
+    normalize_pc_normalization_mode,
+    pc_normalization_schema_hash,
+)
 from .pc_path import (
     PC_PATH_DIM_SAFE,
     PC_PATH_DIMS,
@@ -36,6 +41,8 @@ from .pc_policy import (
     PC_SIDE_CHANNEL_DIM,
     PCActorCritic,
     PCReservedSlotEncoder,
+    pc_actor_normalization_contract,
+    pc_actor_normalization_groups,
     pc_schema_hash,
 )
 
@@ -898,9 +905,11 @@ def train_pc_bc(
     output_dir: Path | str | None = None,
     metadata: Mapping[str, Any] | None = None,
     normalization: PCNormalization | None = None,
+    normalization_mode: str = "fixed",
     init_checkpoint: Path | str | None = None,
 ) -> dict[str, Any]:
     normalization = PCNormalization() if normalization is None else normalization
+    canonical_mode = normalize_pc_normalization_mode(normalization_mode)
     device = torch.device(config.device)
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError(f"CUDA device {device} requested but CUDA is unavailable")
@@ -926,25 +935,74 @@ def train_pc_bc(
         raise ValueError(
             "demonstrations are missing current_estimate_body required by the current encoder"
         )
-    state = torch.as_tensor(dataset.actor_state, dtype=torch.float32, device=device)
-    command = torch.as_tensor(dataset.command, dtype=torch.float32, device=device)
-    actor_path = (
+    raw_state = torch.as_tensor(dataset.actor_state, dtype=torch.float32, device=device)
+    raw_command = torch.as_tensor(dataset.command, dtype=torch.float32, device=device)
+    raw_actor_path = (
         torch.as_tensor(dataset.actor_path, dtype=torch.float32, device=device)
         if dataset.actor_path is not None
         else None
     )
-    actor_current = (
+    raw_actor_current = (
         torch.as_tensor(dataset.current_estimate_body, dtype=torch.float32, device=device)
         if config.actor_current_encoder_enabled
         else None
     )
     action = torch.as_tensor(dataset.action, dtype=torch.float32, device=device)
-    state = normalization.normalize_actor_state(state)
-    command = _command_tensor(command, config.actor_command_dim)
-    if actor_path is not None:
-        actor_path = normalize_path_features(actor_path)
-    if actor_current is not None:
-        actor_current = normalization.normalize_current(actor_current)
+    command = _command_tensor(raw_command, config.actor_command_dim)
+    empirical_normalizer: PCEmpiricalNormalization | None = None
+    actor_schema: dict[str, Any] | None = None
+    actor_schema_hash: str | None = None
+    if canonical_mode == "empirical":
+        empirical_normalizer = PCEmpiricalNormalization(
+            pc_actor_normalization_groups(
+                path_dim=config.path_dim,
+                current_dim=PC_SIDE_CHANNEL_DIM if config.actor_current_encoder_enabled else 0,
+                command_dim=config.actor_command_dim,
+            )
+        ).to(device)
+        actor_schema = pc_actor_normalization_contract(
+            path_dim=config.path_dim,
+            current_dim=PC_SIDE_CHANNEL_DIM if config.actor_current_encoder_enabled else 0,
+            command_dim=config.actor_command_dim,
+            mode="empirical",
+        )
+        actor_schema_hash = pc_normalization_schema_hash(actor_schema)
+        empirical_normalizer.train()
+        fit_index = torch.as_tensor(train_indices, dtype=torch.long, device=device)
+        fit_batch = 262_144
+        with torch.no_grad():
+            for start in range(0, fit_index.numel(), fit_batch):
+                indices = fit_index[start : start + fit_batch]
+                parts = [raw_state[indices]]
+                if raw_actor_path is not None:
+                    parts.append(raw_actor_path[indices])
+                if raw_actor_current is not None:
+                    parts.append(raw_actor_current[indices])
+                if config.actor_command_dim:
+                    parts.append(command[indices])
+                empirical_normalizer.update(torch.cat(parts, dim=1))
+        empirical_normalizer.eval()
+        state = empirical_normalizer.normalize_group("state", raw_state)
+        actor_path = (
+            empirical_normalizer.normalize_group("path", raw_actor_path)
+            if raw_actor_path is not None
+            else None
+        )
+        actor_current = (
+            empirical_normalizer.normalize_group("current", raw_actor_current)
+            if raw_actor_current is not None
+            else None
+        )
+        if config.actor_command_dim:
+            command = empirical_normalizer.normalize_group("command", command)
+    else:
+        state = normalization.normalize_actor_state(raw_state)
+        actor_path = raw_actor_path
+        if actor_path is not None:
+            actor_path = normalize_path_features(actor_path)
+        actor_current = raw_actor_current
+        if actor_current is not None:
+            actor_current = normalization.normalize_current(actor_current)
     train_index = torch.as_tensor(train_indices, dtype=torch.long, device=device)
     validation_index = torch.as_tensor(validation_indices, dtype=torch.long, device=device)
 
@@ -1220,6 +1278,15 @@ def train_pc_bc(
                 else "direct_continuous_3d"
             ),
             "normalization": normalization.as_dict(),
+            "normalization_mode": canonical_mode,
+            "normalization_schema": actor_schema,
+            "normalization_schema_hash": actor_schema_hash,
+            "normalization_state": (
+                None if empirical_normalizer is None else empirical_normalizer.state_payload()
+            ),
+            "normalization_update_policy": (
+                "training_demo_once" if canonical_mode == "empirical" else "offline_fixed"
+            ),
             "state_dict": model.state_dict(),
             "training_config": config.as_dict(),
             "training_result": result,
@@ -1235,6 +1302,11 @@ def train_pc_bc(
                     "schema_version": "auv_pc_bc_training_manifest.v1",
                     **checkpoint,
                     "state_dict": "<stored in pc_bc_actor.pt>",
+                    **(
+                        {"normalization_state": "<stored in pc_bc_actor.pt>"}
+                        if checkpoint["normalization_state"] is not None
+                        else {}
+                    ),
                     "checkpoint_path": str(checkpoint_path.resolve()),
                     "checkpoint_sha256": result["checkpoint_sha256"],
                 },
@@ -1450,6 +1522,39 @@ def read_pc_bc_checkpoint_metadata(path: Path | str) -> dict[str, Any]:
             f"declared={declared_top_level_input_dim}, "
             f"expected={expected_top_level_input_dim}"
         )
+    normalization_mode = normalize_pc_normalization_mode(
+        str(checkpoint.get("normalization_mode", "fixed"))
+    )
+    normalization_schema = checkpoint.get("normalization_schema")
+    normalization_schema_hash = checkpoint.get("normalization_schema_hash")
+    normalization_state = checkpoint.get("normalization_state")
+    if normalization_mode == "empirical":
+        expected_schema = pc_actor_normalization_contract(
+            path_dim=path_dim,
+            current_dim=PC_SIDE_CHANNEL_DIM if actor_current_encoder == "encoded" else 0,
+            command_dim=actor_command_dim,
+            mode="empirical",
+        )
+        expected_hash = pc_normalization_schema_hash(expected_schema)
+        if not isinstance(normalization_schema, Mapping):
+            raise ValueError("empirical PC BC checkpoint is missing normalization_schema")
+        if normalization_schema_hash != expected_hash:
+            raise ValueError("empirical PC BC normalization_schema_hash is not canonical")
+        if not isinstance(normalization_state, Mapping):
+            raise ValueError("empirical PC BC checkpoint is missing normalization_state")
+        normalizer = PCEmpiricalNormalization(
+            pc_actor_normalization_groups(
+                path_dim=path_dim,
+                current_dim=PC_SIDE_CHANNEL_DIM if actor_current_encoder == "encoded" else 0,
+                command_dim=actor_command_dim,
+            )
+        )
+        normalizer.load_state_payload(normalization_state)
+    else:
+        if normalization_state is not None:
+            raise ValueError("fixed PC BC checkpoint must not contain empirical statistics")
+        normalization_schema = None
+        normalization_schema_hash = None
     return {
         **checkpoint,
         "command_names": list(command_names),
@@ -1478,6 +1583,10 @@ def read_pc_bc_checkpoint_metadata(path: Path | str) -> dict[str, Any]:
         "action_head": action_head,
         "sign_deadband": sign_deadband,
         "actor_output_dim": declared_output_dim,
+        "normalization_mode": normalization_mode,
+        "normalization_schema": normalization_schema,
+        "normalization_schema_hash": normalization_schema_hash,
+        "normalization_state": normalization_state,
         "action_decode_rule": str(
             checkpoint.get(
                 "action_decode_rule",
@@ -1612,6 +1721,22 @@ class PCBCPolicy:
             sway_heave_speed_scale_mps=float(normalization["sway_heave_speed_scale_mps"]),
             current_scale_mps=float(normalization["current_scale_mps"]),
         )
+        self.normalization_mode = str(metadata["normalization_mode"])
+        self.empirical_normalizer: PCEmpiricalNormalization | None = None
+        if self.normalization_mode == "empirical":
+            self.empirical_normalizer = PCEmpiricalNormalization(
+                pc_actor_normalization_groups(
+                    path_dim=int(metadata["path_dim"]),
+                    current_dim=(
+                        PC_SIDE_CHANNEL_DIM
+                        if self.model.actor_current_encoder is not None
+                        else 0
+                    ),
+                    command_dim=int(metadata["actor_command_dim"]),
+                )
+            ).to(self.device)
+            self.empirical_normalizer.load_state_payload(metadata["normalization_state"])
+            self.empirical_normalizer.eval()
 
     def act_inference(
         self,
@@ -1640,9 +1765,11 @@ class PCBCPolicy:
         if self.model.path_dim:
             if actor_path is None:
                 raise ValueError("actor_path is required for a path-conditioned PC BC actor")
-            path_value = normalize_path_features(
-                torch.as_tensor(actor_path, dtype=torch.float32, device=self.device)
-            )
+            path_value = torch.as_tensor(actor_path, dtype=torch.float32, device=self.device)
+            if self.empirical_normalizer is None:
+                path_value = normalize_path_features(path_value)
+            else:
+                path_value = self.empirical_normalizer.normalize_group("path", path_value)
         else:
             if actor_path is not None:
                 raise ValueError("actor_path must be None when path_dim=0")
@@ -1652,18 +1779,33 @@ class PCBCPolicy:
                 raise ValueError(
                     "actor_current is required for a current-conditioned PC BC actor"
                 )
-            current_value = self.normalization.normalize_current(
-                torch.as_tensor(actor_current, dtype=torch.float32, device=self.device)
+            current_value = torch.as_tensor(
+                actor_current, dtype=torch.float32, device=self.device
             )
+            if self.empirical_normalizer is None:
+                current_value = self.normalization.normalize_current(current_value)
+            else:
+                current_value = self.empirical_normalizer.normalize_group(
+                    "current", current_value
+                )
         else:
             if actor_current is not None:
                 raise ValueError(
                     "actor_current must be None when the BC actor has no current encoder"
                 )
             current_value = None
+        if self.empirical_normalizer is None:
+            state = self.normalization.normalize_actor_state(state)
+            command_value = self.normalization.normalize_command(command_value)
+        else:
+            state = self.empirical_normalizer.normalize_group("state", state)
+            if self.model.actor_command_dim:
+                command_value = self.empirical_normalizer.normalize_group(
+                    "command", command_value
+                )
         with torch.inference_mode():
             return self.model(
-                self.normalization.normalize_actor_state(state),
+                state,
                 command_value,
                 path_value,
                 current_value,
@@ -1731,6 +1873,28 @@ def _scale_dade_input_columns(
     return True
 
 
+def _require_pc_bc_normalization_contract(
+    metadata: Mapping[str, Any],
+    *,
+    expected_mode: str,
+    expected_schema_hash: str | None,
+) -> None:
+    actual_mode = normalize_pc_normalization_mode(
+        str(metadata.get("normalization_mode", "fixed"))
+    )
+    if actual_mode != expected_mode:
+        raise ValueError(
+            "PC BC normalization mode does not match the PPO environment: "
+            f"BC={actual_mode}, PPO={expected_mode}"
+        )
+    if expected_mode == "empirical":
+        actual_hash = metadata.get("normalization_schema_hash")
+        if expected_schema_hash is None or actual_hash != expected_schema_hash:
+            raise ValueError(
+                "PC BC empirical normalization schema does not match the PPO environment"
+            )
+
+
 def load_pc_bc_actor_prior(
     policy: PCActorCritic,
     checkpoint_path: Path | str,
@@ -1741,6 +1905,8 @@ def load_pc_bc_actor_prior(
     expected_actor_hidden_dims: Sequence[int],
     expected_state_encoder_hidden_dims: Sequence[int],
     expected_normalization: PCNormalization,
+    expected_normalization_mode: str = "fixed",
+    expected_normalization_schema_hash: str | None = None,
     dade_input_scale: float = PC_DADE_WARMSTART_INPUT_SCALE,
     load_bc_path_encoder: bool = False,
 ) -> dict[str, Any]:
@@ -1752,6 +1918,11 @@ def load_pc_bc_actor_prior(
             "not actor warm-start"
         )
     metadata = read_pc_bc_checkpoint_metadata(checkpoint_path)
+    _require_pc_bc_normalization_contract(
+        metadata,
+        expected_mode=normalize_pc_normalization_mode(expected_normalization_mode),
+        expected_schema_hash=expected_normalization_schema_hash,
+    )
     if metadata["action_head"] != PC_ACTION_HEAD_CONTINUOUS:
         raise ValueError(
             "PPO actor warm-start currently requires a continuous-action BC checkpoint"
@@ -1978,8 +2149,10 @@ def load_pc_bc_frozen_actor_prior(
     expected_n_z_reserved: int,
     expected_actor_hidden_dims: Sequence[int],
     expected_state_encoder_hidden_dims: Sequence[int],
-    expected_normalization: PCNormalization,
     expected_activation: str,
+    expected_normalization: PCNormalization,
+    expected_normalization_mode: str = "fixed",
+    expected_normalization_schema_hash: str | None = None,
     residual_output_init_std: float = 0.0,
 ) -> dict[str, Any]:
     """Load the frozen BC actor and initialize the trainable residual output."""
@@ -1995,6 +2168,11 @@ def load_pc_bc_frozen_actor_prior(
         )
 
     metadata = read_pc_bc_checkpoint_metadata(checkpoint_path)
+    _require_pc_bc_normalization_contract(
+        metadata,
+        expected_mode=normalize_pc_normalization_mode(expected_normalization_mode),
+        expected_schema_hash=expected_normalization_schema_hash,
+    )
     if metadata["action_head"] != PC_ACTION_HEAD_CONTINUOUS:
         raise ValueError(
             "frozen BC residual currently requires a continuous-action BC checkpoint"

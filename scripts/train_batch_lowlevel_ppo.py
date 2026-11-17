@@ -48,7 +48,10 @@ from auv_lowlevel.batch.pc_env import BatchedPCLowLevelEnv
 from auv_lowlevel.batch.pc_frozen_residual_vec_env import (
     BatchTorchPCFrozenBCResidualVecEnv,
 )
-from auv_lowlevel.batch.pc_normalization import PCNormalization
+from auv_lowlevel.batch.pc_normalization import (
+    PCNormalization,
+    pc_normalization_schema_hash,
+)
 from auv_lowlevel.batch.pc_path import (
     PC_PATH_BLOCK_FEATURE_INDICES_BY_DIM,
     PC_PATH_DIMS,
@@ -61,7 +64,10 @@ from auv_lowlevel.batch.pc_path import (
 from auv_lowlevel.batch.pc_policy import (
     PC_ACTOR_STATE_DIM,
     PC_CRITIC_STATE_DIM,
+    PC_SIDE_CHANNEL_DIM,
     PCPolicyLayout,
+    pc_actor_normalization_contract,
+    pc_critic_normalization_contract,
     pc_schema_hash,
 )
 from auv_lowlevel.batch.pc_privileged_schema import (
@@ -126,6 +132,17 @@ def _final_path_blocks(pc: Any) -> tuple[str, ...]:
     last_start, last_blocks = pc.path_curriculum[-1]
     del last_start
     return tuple(block for block in last_blocks if block != "state_base")
+
+
+def _unwrap_pc_vec_env(env: Any) -> BatchTorchPCVecEnv | None:
+    """Return the innermost PC vector environment, if this stack has one."""
+
+    current = env
+    for _ in range(4):
+        if isinstance(current, BatchTorchPCVecEnv):
+            return current
+        current = getattr(current, "env", None)
+    return None
 
 
 def _configure_optimizer_learning_rates(
@@ -527,6 +544,14 @@ def main() -> int:
     environment_path = _resolve(training.environment_config)
     environment = load_config(environment_path)
     require_training_curriculum(environment, source=environment_path)
+    normalization_mode = str(environment.normalization.mode)
+    if normalization_mode == "empirical" and bool(training.runner["empirical_normalization"]):
+        raise ValueError(
+            "DOUBLE_EMPIRICAL_NORMALIZATION: environment normalization.mode='empirical' "
+            "conflicts with runner.empirical_normalization=true"
+        )
+    if normalization_mode == "empirical" and not is_pc:
+        raise ValueError("environment empirical normalization currently requires a PC policy")
     if args.curriculum_force_current_alpha_zero and not environment.curriculum.enabled:
         raise ValueError(
             "--curriculum-force-current-alpha-zero requires environment.curriculum.enabled=true"
@@ -678,6 +703,47 @@ def main() -> int:
         actor_observation_dim = actor_layout.flat_dim
         critic_observation_dim = critic_layout.flat_dim
         policy_input_dim = actor_observation_dim
+        empirical_actor_state: dict[str, Any] | None = None
+        empirical_actor_schema_hash: str | None = None
+        if normalization_mode == "empirical":
+            stats_checkpoint = warmstart_path
+            if stats_checkpoint is None and training.base_checkpoint is not None:
+                stats_checkpoint = _resolve(training.base_checkpoint)
+            if stats_checkpoint is None:
+                raise ValueError(
+                    "EMPIRICAL_NORMALIZATION_REQUIRES_BC_STATS: empirical PC training "
+                    "requires a BC actor warm-start or frozen BC checkpoint"
+                )
+            bc_metadata = read_pc_bc_checkpoint_metadata(stats_checkpoint)
+            expected_schema = pc_actor_normalization_contract(
+                path_dim=training.pc.path_dim,
+                current_dim=(
+                    PC_SIDE_CHANNEL_DIM
+                    if training.pc.actor_current_encoder_enabled
+                    else 0
+                ),
+                command_dim=training.pc.actor_command_dim,
+                mode="empirical",
+            )
+            empirical_actor_schema_hash = pc_normalization_schema_hash(expected_schema)
+            if bc_metadata.get("normalization_mode") != "empirical":
+                raise ValueError(
+                    "BC_NORMALIZATION_CONTRACT_MISMATCH: PPO environment uses empirical "
+                    "normalization but the BC checkpoint is fixed/legacy"
+                )
+            if bc_metadata.get("normalization_schema_hash") != empirical_actor_schema_hash:
+                raise ValueError(
+                    "BC_NORMALIZATION_CONTRACT_MISMATCH: BC and PPO actor schemas differ"
+                )
+            state_payload = bc_metadata.get("normalization_state")
+            if not isinstance(state_payload, dict):
+                raise ValueError(
+                    "BC_NORMALIZATION_CONTRACT_MISMATCH: BC checkpoint has no actor statistics"
+                )
+            empirical_actor_state = dict(state_payload)
+        else:
+            empirical_actor_state = None
+            empirical_actor_schema_hash = None
     else:
         assert schema is not None
         observation_schema_version = schema.version
@@ -956,6 +1022,9 @@ def main() -> int:
             merged = dict(self._checkpoint_infos)
             if infos is not None:
                 merged.update(infos)
+            pc_env = _unwrap_pc_vec_env(self.env)
+            if pc_env is not None:
+                merged.update(pc_env.empirical_normalization_payload())
             super().save(path, infos=merged)
 
     rsl_module_file = getattr(sys.modules["rsl_rl"], "__file__", None)
@@ -1150,7 +1219,29 @@ def main() -> int:
             ),
             "frozen_bc_path_encoder": frozen_bc_path_metadata,
             "pc_ppo_scale": environment.reward.resolved_pc_ppo_scale,
+            "normalization_mode": normalization_mode,
+            "actor_normalization_schema": pc_actor_normalization_contract(
+                path_dim=training.pc.path_dim,
+                current_dim=(
+                    PC_SIDE_CHANNEL_DIM
+                    if training.pc.actor_current_encoder_enabled
+                    else 0
+                ),
+                command_dim=training.pc.actor_command_dim,
+                mode=normalization_mode,
+            ),
+            "critic_normalization_schema": pc_critic_normalization_contract(
+                critic_path_dim=training.pc.critic_path_dim,
+                command_dim=training.pc.critic_command_dim,
+                mode=normalization_mode,
+            ),
         }
+        pc_metadata["actor_normalization_schema_hash"] = pc_normalization_schema_hash(
+            pc_metadata["actor_normalization_schema"]
+        )
+        pc_metadata["critic_normalization_schema_hash"] = pc_normalization_schema_hash(
+            pc_metadata["critic_normalization_schema"]
+        )
         checkpoint_infos = build_pc_checkpoint_infos(
             training_config_sha256=training_config_sha256,
             environment_config_sha256=environment_config_sha256,
@@ -1290,6 +1381,17 @@ def main() -> int:
         "policy_config": (None if training.encoder is None else training.encoder.as_dict()),
         "policy_input_dim": policy_input_dim,
         "pc": None if training.pc is None else training.pc.as_dict(),
+        "normalization_mode": normalization_mode,
+        "actor_normalization_schema_hash": (
+            None
+            if not is_pc
+            else pc_metadata.get("actor_normalization_schema_hash")
+        ),
+        "critic_normalization_schema_hash": (
+            None
+            if not is_pc
+            else pc_metadata.get("critic_normalization_schema_hash")
+        ),
         "history": (
             None
             if training.history is None
@@ -1464,6 +1566,9 @@ def main() -> int:
                 history_path_dim=training.pc.history_path_dim,
                 critic_path_dim=training.pc.critic_path_dim,
                 actor_current_encoder_enabled=training.pc.actor_current_encoder_enabled,
+                normalization_mode=normalization_mode,
+                empirical_actor_state=empirical_actor_state,
+                empirical_actor_schema_hash=empirical_actor_schema_hash,
                 current_frame_dropout_prob=training.history.current_frame_dropout_prob,
                 current_frame_dropout_mode=training.history.current_frame_dropout_mode,
                 path_blocks=_path_blocks_for_iteration(training.pc, 0),
@@ -1690,6 +1795,8 @@ def main() -> int:
                     expected_actor_hidden_dims=tuple(training.policy["actor_hidden_dims"]),
                     expected_state_encoder_hidden_dims=training.pc.state_encoder_hidden_dims,
                     expected_normalization=env.normalization,
+                    expected_normalization_mode=normalization_mode,
+                    expected_normalization_schema_hash=empirical_actor_schema_hash,
                     dade_input_scale=training.pc.dade_warmstart_input_scale,
                     load_bc_path_encoder=training.pc.bc_path_dim is not None,
                 )
@@ -1730,6 +1837,8 @@ def main() -> int:
                 expected_actor_hidden_dims=tuple(training.policy["actor_hidden_dims"]),
                 expected_state_encoder_hidden_dims=training.pc.state_encoder_hidden_dims,
                 expected_normalization=env.normalization,
+                expected_normalization_mode=normalization_mode,
+                expected_normalization_schema_hash=empirical_actor_schema_hash,
                 expected_activation=str(training.policy["activation"]),
                 residual_output_init_std=residual_output_init_std,
             )

@@ -87,11 +87,140 @@ PC_ACTOR_STATE_DIM = len(PC_ACTOR_STATE_NAMES)
 PC_CRITIC_STATE_DIM = len(PC_CRITIC_STATE_NAMES)
 PC_COMMAND_DIM = len(PC_COMMAND_NAMES)
 PC_SIDE_CHANNEL_DIM = 3
+PC_CURRENT_FEATURE_NAMES = ("current_x_body_mps", "current_y_body_mps", "current_z_body_mps")
 PC_DADE_FEATURE_DIM = 64
 PC_DADE_POSE_STATE_INDICES = (0, 1, 2, 3, 4, 5)
 PC_DADE_STATE_MODES = frozenset({"full", "pose"})
 PC_DADE_HISTORY_MODES = frozenset({"raw", "encoded"})
 PC_ACTOR_STATE_MODES = frozenset({"full", "pose"})
+
+
+def pc_actor_normalization_groups(
+    *,
+    path_dim: int,
+    current_dim: int,
+    command_dim: int,
+) -> tuple[Any, ...]:
+    """Return the ordered actor feature groups used before token/history."""
+
+    from .pc_normalization import pc_normalization_groups
+
+    if current_dim not in (0, PC_SIDE_CHANNEL_DIM):
+        raise ValueError(f"current_dim must be 0 or {PC_SIDE_CHANNEL_DIM}")
+    if command_dim not in PC_COMMAND_NAMES_BY_DIM:
+        raise ValueError("command_dim must be 0, 1, or 3")
+    groups: list[tuple[str, Sequence[str]]] = [("state", PC_ACTOR_STATE_NAMES)]
+    if path_dim:
+        groups.append(("path", pc_path_feature_names_for_dim(path_dim)))
+    if current_dim:
+        groups.append(("current", PC_CURRENT_FEATURE_NAMES))
+    if command_dim:
+        groups.append(("command", PC_COMMAND_NAMES_BY_DIM[command_dim]))
+    return pc_normalization_groups(groups)
+
+
+def pc_critic_normalization_groups(
+    *,
+    critic_path_dim: int,
+    command_dim: int,
+) -> tuple[Any, ...]:
+    """Return the ordered critic feature groups used before the critic encoder."""
+
+    from .pc_normalization import pc_normalization_groups
+
+    if critic_path_dim not in (0, PC_CRITIC_PRIV_DIM):
+        raise ValueError(f"critic_path_dim must be 0 or {PC_CRITIC_PRIV_DIM}")
+    if command_dim not in PC_COMMAND_NAMES_BY_DIM:
+        raise ValueError("command_dim must be 0, 1, or 3")
+    groups: list[tuple[str, Sequence[str]]] = [
+        ("state", PC_CRITIC_STATE_NAMES),
+        ("current", PC_CURRENT_FEATURE_NAMES),
+    ]
+    if critic_path_dim:
+        groups.insert(1, ("path", PC_CRITIC_PRIV_FEATURE_NAMES))
+    if command_dim:
+        groups.append(("command", PC_COMMAND_NAMES_BY_DIM[command_dim]))
+    return pc_normalization_groups(groups)
+
+
+def pc_actor_normalization_contract(
+    *,
+    path_dim: int,
+    current_dim: int,
+    command_dim: int,
+    mode: str,
+) -> dict[str, Any]:
+    """Return the canonical actor normalization schema."""
+
+    from .pc_normalization import normalize_pc_normalization_mode, pc_normalization_schema
+
+    canonical_mode = normalize_pc_normalization_mode(mode)
+    return pc_normalization_schema(
+        pc_actor_normalization_groups(
+            path_dim=path_dim,
+            current_dim=current_dim,
+            command_dim=command_dim,
+        ),
+        mode=canonical_mode,
+    )
+
+
+def pc_critic_normalization_contract(
+    *,
+    critic_path_dim: int,
+    command_dim: int,
+    mode: str,
+) -> dict[str, Any]:
+    """Return the canonical critic normalization schema."""
+
+    from .pc_normalization import normalize_pc_normalization_mode, pc_normalization_schema
+
+    canonical_mode = normalize_pc_normalization_mode(mode)
+    return pc_normalization_schema(
+        pc_critic_normalization_groups(
+            critic_path_dim=critic_path_dim,
+            command_dim=command_dim,
+        ),
+        mode=canonical_mode,
+    )
+
+
+def build_pc_actor_empirical_normalizer(
+    *,
+    path_dim: int,
+    current_dim: int,
+    command_dim: int,
+    device: torch.device | str = "cpu",
+) -> Any:
+    """Build an actor empirical normalizer matching the PC layout."""
+
+    from .pc_normalization import PCEmpiricalNormalization
+
+    return PCEmpiricalNormalization(
+        pc_actor_normalization_groups(
+            path_dim=path_dim,
+            current_dim=current_dim,
+            command_dim=command_dim,
+        )
+    ).to(device)
+
+
+def build_pc_critic_empirical_normalizer(
+    *,
+    critic_path_dim: int,
+    command_dim: int,
+    device: torch.device | str = "cpu",
+) -> Any:
+    """Build a critic empirical normalizer matching the PC layout."""
+
+    from .pc_normalization import PCEmpiricalNormalization
+
+    return PCEmpiricalNormalization(
+        pc_critic_normalization_groups(
+            critic_path_dim=critic_path_dim,
+            command_dim=command_dim,
+        )
+    ).to(device)
 
 
 def pc_schema_hash(
@@ -1592,11 +1721,18 @@ __all__ = [
     "PC_DADE_POSE_STATE_INDICES",
     "PC_DADE_STATE_MODES",
     "PC_ACTOR_STATE_MODES",
+    "PC_CURRENT_FEATURE_NAMES",
     "PC_SCHEMA_VERSION",
     "PC_SIDE_CHANNEL_DIM",
     "PCActorCritic",
     "PCPolicyLayout",
     "PCReservedSlotEncoder",
     "PCStateEncoderMetadata",
+    "build_pc_actor_empirical_normalizer",
+    "build_pc_critic_empirical_normalizer",
+    "pc_actor_normalization_contract",
+    "pc_actor_normalization_groups",
+    "pc_critic_normalization_contract",
+    "pc_critic_normalization_groups",
     "pc_schema_hash",
 ]
