@@ -13,7 +13,7 @@ from scripts.evaluate_pc_ppo import _parse_args
 
 from auv_lowlevel.batch.pc_path import PC_PATH_DIM_ENDPOINT, PC_PATH_DIM_SAFE, PC_PATH_DIM_V1
 from auv_lowlevel.batch.pc_policy import pc_schema_hash
-from auv_lowlevel.config import load_config
+from auv_lowlevel.cli.evaluate_pc_ppo.main import _guidance_telemetry_fields
 from auv_lowlevel.cli.evaluate_pc_ppo.policy import (
     _InferenceEmpiricalNormalization,
     _load_observation_normalizer,
@@ -24,6 +24,7 @@ from auv_lowlevel.cli.evaluate_pc_ppo.validation import (
     _final_path_blocks,
     _validate_eval_start_contract,
 )
+from auv_lowlevel.config import load_config
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "evaluate_pc_ppo.py"
@@ -128,6 +129,34 @@ def test_formal_eval_requires_nominal_start() -> None:
     randomized = _apply_eval_start_contract(config, require_nominal_start=False)
     assert randomized.guidance.nominal_initial_state is False
     _validate_eval_start_contract(randomized, require_nominal_start=False)
+
+
+def test_guidance_telemetry_records_horizontal_and_terminal_fields() -> None:
+    guidance = SimpleNamespace(
+        horizontal_gain=2.5,
+        horizontal_lookahead_m=1.5,
+        vertical_gain=2.5,
+        vertical_lookahead_m=1.5,
+        lookahead_error_gain=0.35,
+        speed_adaptive_lookahead_enabled=True,
+        terminal_alignment_min_m=5.0,
+        terminal_alignment_max_m=5.0,
+        terminal_alignment_horizon_s=6.0,
+    )
+
+    fields = _guidance_telemetry_fields(guidance)
+
+    assert fields == {
+        "guidance_horizontal_gain": 2.5,
+        "guidance_horizontal_lookahead_m": 1.5,
+        "guidance_vertical_gain": 2.5,
+        "guidance_vertical_lookahead_m": 1.5,
+        "guidance_lookahead_error_gain": 0.35,
+        "guidance_speed_adaptive_lookahead_enabled": True,
+        "guidance_terminal_alignment_min_m": 5.0,
+        "guidance_terminal_alignment_max_m": 5.0,
+        "guidance_terminal_alignment_horizon_s": 6.0,
+    }
 
 
 def test_canonical_pc_path_dimensions_are_accepted_by_evaluator() -> None:

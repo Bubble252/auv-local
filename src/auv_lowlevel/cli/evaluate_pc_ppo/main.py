@@ -23,6 +23,30 @@ from .validation import (
 )
 
 
+def _guidance_telemetry_fields(guidance: object) -> dict[str, float | bool]:
+    """Return the effective guidance parameters needed to audit ALOS screens."""
+
+    return {
+        "guidance_horizontal_gain": float(guidance.horizontal_gain),
+        "guidance_horizontal_lookahead_m": float(guidance.horizontal_lookahead_m),
+        "guidance_vertical_gain": float(guidance.vertical_gain),
+        "guidance_vertical_lookahead_m": float(guidance.vertical_lookahead_m),
+        "guidance_lookahead_error_gain": float(guidance.lookahead_error_gain),
+        "guidance_speed_adaptive_lookahead_enabled": bool(
+            guidance.speed_adaptive_lookahead_enabled
+        ),
+        "guidance_terminal_alignment_min_m": float(
+            guidance.terminal_alignment_min_m
+        ),
+        "guidance_terminal_alignment_max_m": float(
+            guidance.terminal_alignment_max_m
+        ),
+        "guidance_terminal_alignment_horizon_s": float(
+            guidance.terminal_alignment_horizon_s
+        ),
+    }
+
+
 def main() -> int:
     args = _parse_args()
     if args.seed_start < 0 or args.seed_count <= 0:
@@ -166,8 +190,7 @@ def main() -> int:
         "guidance_speed_rate_limit_mps2": (effective_guidance.speed_rate_limit_mps2),
         "guidance_terminal_braking_enabled": (effective_guidance.terminal_braking_enabled),
         "guidance_terminal_speed_ratio": effective_guidance.terminal_speed_ratio,
-        "guidance_vertical_gain": effective_guidance.vertical_gain,
-        "guidance_vertical_lookahead_m": effective_guidance.vertical_lookahead_m,
+        **_guidance_telemetry_fields(effective_guidance),
         "controller_pitch_gain": effective_controller.pitch_gain,
         "controller_pitch_rate_gain": effective_controller.pitch_rate_gain,
         "trace_output": str(trace_output),
