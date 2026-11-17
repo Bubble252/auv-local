@@ -182,11 +182,10 @@ auv-local bare main = c186c74；本地 goal182/infra-20261117 = fe8a542，可直
 ```
 
 首波空间预算：现有 600it run 的 checkpoint 约 10.7 MB/个、`save_interval=50`，
-单 run 约 0.17G；首波 6 arm × 3 seeds 粗估 10–20G，380G 容量本身足够。按
-`REMOTE_STORAGE_GOVERNANCE.md` 草案的“used 85%–90% = Red”口径，当前会阻断长训练；
-但该阈值仍是 `DRAFT`，且主要由其他用户占用造成。建议优先清理 L1 的 tmp/pip cache
-（约 18G），或在用户确认后把首波启动口径改为“available ≥ 150G 且 artifact 预算已登记”。
-清理必须按空间治理规则二次确认，不能在训练运行时执行。
+单 run 约 0.17G；首波 6 arm × 3 seeds 粗估 10–20G，380G 容量本身足够。
+**2026-11-17 用户决定：目前不担心容量问题，容量不作为首波启动 gate。** 因此不执行
+L1 清理，也不把 `REMOTE_STORAGE_GOVERNANCE.md` 草案的 89% used 水位当作阻断；仍保留
+每 run 的 artifact 预算和结束后空间复核，避免无记录增长。
 
 单元测试：
 

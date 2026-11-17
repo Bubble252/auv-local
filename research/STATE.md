@@ -4,13 +4,13 @@
 scope: settled_局部规划器_反应式
 current_goal: Goal182 基础设施收尾。actor metadata、reset/nominal start、TRRES config、route telemetry、composition 契约、StageGate training-rollout 20/3 enforce、canonical episodes/trace、formal evaluation launcher/report 和 artifact auditor 已落地；全量 2165 passed。StageGate 默认仍为 shadow。
 next_goal: 本地 checkpoint commit 后等待 D13.6a–d 数值决策和 A0/A3 选择；用户批准 push 后同步到 8×4090 新建干净 worktree，依次跑 CONTRACT_SMOKE、QUICK_SCREEN 和正式训练。
-goal182_status: ACTIVE / INFRA_VERIFIED / FULL_REGRESSION_PASS / STAGEGATE_ENFORCE_READY_SHADOW_DEFAULT / EVAL_CANONICAL_ARTIFACTS_READY / EVAL_LAUNCHER_READY / ARTIFACT_AUDITOR_READY / D13_6_PENDING / STORAGE_REVIEW_PENDING / TRAINING_NOT_STARTED
+goal182_status: ACTIVE / INFRA_VERIFIED / FULL_REGRESSION_PASS / STAGEGATE_ENFORCE_READY_SHADOW_DEFAULT / EVAL_CANONICAL_ARTIFACTS_READY / EVAL_LAUNCHER_READY / ARTIFACT_AUDITOR_READY / D13_6_PENDING / STORAGE_WAIVED_BY_USER / TRAINING_NOT_STARTED
 goal182_plan: doc/goals/goal182_ppo_stack_governance_20261114.md
 goal182_audit: doc/goals/goal182_infra_audit_20261116.md
 goal182_execution_prompt: /home/bubble/水下机器人/总协调/doc/ops/GOAL182_INFRA_THEN_TRAIN_PROMPT_20261116.md
 goal182_worktree: /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/goal182-infra-detached-20261116
 goal182_server: ssh -p 43127 yhx@152.136.183.51；节点 underwater-8x4090；数据根 /data/yhx/underwater-robotics；旧 goal182 worktree 均为 c186c74 且 dirty，不复用。
-goal182_blockers: D13.6a–d 和 A0/A3 仍需用户定夺；push 需用户批准后才能建服务器干净 worktree。正式评价 launcher 已接入 builder 和 auditor，并在 formal phase 拒绝 DRAFT matrix/tier。服务器 /data 为 380G 可用、89% 已用，按空间治理草案属于 Red；L1 清理候选约 18G，需用户确认清理或容量口径。
+goal182_blockers: D13.6a–d 和 A0/A3 仍需用户定夺；push 需用户批准后才能建服务器干净 worktree。正式评价 launcher 已接入 builder 和 auditor，并在 formal phase 拒绝 DRAFT matrix/tier。服务器 /data 为 380G 可用、89% 已用；用户已确认目前不担心容量，容量不作为首波 gate。
 goal175_status: A2_COMPLETE / GATE175_FAIL / VERTICAL_GUARD_FAIL / H175C_NOT_SUPPORTED / HELDOUT_CLOSED
 goal175_result: doc/goals/goal175_result_20261114.md
 goal175_a1_result: doc/goals/goal175_a1_result_20261114.md
