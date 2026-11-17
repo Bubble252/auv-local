@@ -36,6 +36,12 @@ PPO_ITERATIONS = 5
 TRAIN_SEED = 86201
 FORMAL_SEEDS = (86201, 86202, 86203)
 FORMAL_ITERATIONS = 2600
+C0_DIAGNOSTIC_ITERATIONS = 72
+WARMSTART_ACTOR_LR = 1e-5
+WARMSTART_CRITIC_LR = 3e-4
+WARMSTART_INIT_NOISE_STD = 0.05
+REFERENCE_ACTOR_LR = 3e-4
+REFERENCE_INIT_NOISE_STD = 0.3
 # Goal182 CU2 (2026-11-16): formal protocol is 3000 steps x 0.02 s = 60 s.
 # The pre-formal C3 screen env keeps the legacy 2500-step cap.
 FORMAL_MAX_EPISODE_STEPS = 3000
@@ -125,6 +131,15 @@ FORMAL_CURRICULUM = {
         {"stage": "C0", "weight": 0.90},
         {"stage": "C1", "weight": 0.10},
     ],
+}
+
+C0_DIAGNOSTIC_CURRICULUM = {
+    "enabled": True,
+    "promotion_enabled": False,
+    "initial_stage": "C0",
+    "speed_protocol": "SPEED_V3_CENTER_OUT_5S",
+    "manifest_filename": "curriculum_episodes.jsonl",
+    "stage_mix": [{"stage": "C0", "weight": 1.0}],
 }
 
 REWARD = {
@@ -298,6 +313,17 @@ def _alos_environment(*, formal: bool = False) -> dict[str, Any]:
     return payload
 
 
+def _c0_diagnostic_environment() -> dict[str, Any]:
+    payload = _environment(formal=True)
+    payload["curriculum"] = copy.deepcopy(C0_DIAGNOSTIC_CURRICULUM)
+    payload["experiment"].update(
+        {
+            "name": "goal182_path_fixed_speed_c0_diagnostic",
+        }
+    )
+    return payload
+
+
 def _training(
     *,
     mode: str,
@@ -306,6 +332,7 @@ def _training(
     environment_path: Path,
     seed: int = TRAIN_SEED,
     formal: bool = False,
+    iterations: int | None = None,
 ) -> dict[str, Any]:
     control = control.lower()
     if control not in {"pe2e", "alosb"}:
@@ -388,6 +415,7 @@ def _training(
         "trres_cmd": "command",
         "trres_act": "actuator",
     }[mode]
+    bc_warmstart_recipe = mode == "finetune"
 
     payload["vector_env"] = {
         "backend": "batch_torch",
@@ -403,7 +431,11 @@ def _training(
         "write_iteration_records": True,
     }
     payload["training"] = {
-        "iterations": FORMAL_ITERATIONS if formal else PPO_ITERATIONS,
+        "iterations": (
+            int(iterations)
+            if iterations is not None
+            else (FORMAL_ITERATIONS if formal else PPO_ITERATIONS)
+        ),
         "initial_residual_zero": False,
         "initial_residual_output_std": 0.0,
         "privileged_current_critic": False,
@@ -452,15 +484,23 @@ def _training(
     )
     payload["runner"] = {
         "num_steps_per_env": PPO_STEPS_PER_ENV,
-        "save_interval": 100 if formal else 50,
-        "empirical_normalization": True,
+        "save_interval": (
+            int(iterations)
+            if iterations is not None
+            else (100 if formal else 50)
+        ),
+        "empirical_normalization": not bc_warmstart_recipe,
         "logger": "tensorboard",
     }
     payload["policy"] = {
         "actor_hidden_dims": [512, 256, 128],
         "critic_hidden_dims": [512, 256, 128],
         "activation": "elu",
-        "init_noise_std": 0.3,
+        "init_noise_std": (
+            WARMSTART_INIT_NOISE_STD
+            if bc_warmstart_recipe
+            else REFERENCE_INIT_NOISE_STD
+        ),
         "noise_std_type": "scalar",
     }
     payload["algorithm"] = {
@@ -472,9 +512,13 @@ def _training(
         "value_loss_coef": 1.0,
         "entropy_coef": 0.005,
         "learning_rate": 3e-4,
+        "learning_rate_actor": (
+            WARMSTART_ACTOR_LR if bc_warmstart_recipe else REFERENCE_ACTOR_LR
+        ),
+        "learning_rate_critic": WARMSTART_CRITIC_LR,
         "max_grad_norm": 1.0,
         "use_clipped_value_loss": True,
-        "schedule": "adaptive",
+        "schedule": "fixed" if bc_warmstart_recipe else "adaptive",
         "desired_kl": 0.01,
         "normalize_advantage_per_mini_batch": True,
     }
@@ -510,6 +554,11 @@ def _parse_args() -> argparse.Namespace:
         default="MOD4",
         help="module set encoded by the generated configs (default: MOD4)",
     )
+    parser.add_argument(
+        "--c0-diagnostic",
+        action="store_true",
+        help="generate one PE2E finetune C0-only recipe diagnostic config",
+    )
     return parser.parse_args()
 
 
@@ -527,6 +576,39 @@ def _config_name(
 def main() -> None:
     args = _parse_args()
     os.chdir(REPO_ROOT)
+    if args.c0_diagnostic:
+        env_path = GOAL_ROOT / "env_path_fixed_speed_c0_diagnostic.json"
+        _write(env_path, _c0_diagnostic_environment())
+        config = _training(
+            mode="finetune",
+            control="pe2e",
+            module_set=args.module_set,
+            environment_path=env_path,
+            seed=TRAIN_SEED,
+            iterations=C0_DIAGNOSTIC_ITERATIONS,
+        )
+        config["experiment"].update(
+            {
+                "name": (
+                    f"goal182_c0_recipe_diagnostic_{args.module_set.lower()}_"
+                    f"pe2e_finetune_5d_m_seed{TRAIN_SEED}"
+                ),
+                "output": (
+                    "artifacts/lowlevel/goal182_ppo_stack_governance_20261114/"
+                    f"diagnostic/c0_recipe/{args.module_set.lower()}/"
+                    f"pe2e_finetune_seed{TRAIN_SEED}"
+                ),
+            }
+        )
+        _write(
+            GOAL_ROOT
+            / (
+                f"train_c0_diagnostic_{args.module_set.lower()}_pe2e_finetune_"
+                f"5d_m_seed{TRAIN_SEED}.json"
+            ),
+            config,
+        )
+        return
     env_path = GOAL_ROOT / "env_path_fixed_speed_c3.json"
     alos_env_path = GOAL_ROOT / "env_alos_c3_a0_base.json"
     if args.formal:

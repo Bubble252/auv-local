@@ -12,11 +12,13 @@
     "gamma": 0.995,
     "lam": 0.95,
     "learning_rate": 0.0003,
+    "learning_rate_actor": 1e-05,
+    "learning_rate_critic": 0.0003,
     "max_grad_norm": 1.0,
     "normalize_advantage_per_mini_batch": true,
     "num_learning_epochs": 5,
     "num_mini_batches": 4,
-    "schedule": "adaptive",
+    "schedule": "fixed",
     "use_clipped_value_loss": true,
     "value_loss_coef": 1.0
   },
@@ -125,11 +127,11 @@
       256,
       128
     ],
-    "init_noise_std": 0.3,
+    "init_noise_std": 0.05,
     "noise_std_type": "scalar"
   },
   "runner": {
-    "empirical_normalization": true,
+    "empirical_normalization": false,
     "logger": "tensorboard",
     "num_steps_per_env": 48,
     "save_interval": 100

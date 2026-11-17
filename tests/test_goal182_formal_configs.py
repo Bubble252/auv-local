@@ -66,6 +66,54 @@ def test_goal182_formal_mod4_bc_warmstarts_use_current_encoder_checkpoints() -> 
             assert payload["base_policy"]["checkpoint_sha256"] == expected[control]
 
 
+def test_goal182_bc_warmstart_finetune_uses_guarded_recipe() -> None:
+    paths = sorted(GOAL.glob("train_formal_mod4_*_finetune_5d_m_seed*.json"))
+
+    assert len(paths) == 6
+    for path in paths:
+        payload = _module_payload(path)
+        algorithm = payload["algorithm"]
+        assert algorithm["learning_rate_actor"] == 1e-5
+        assert algorithm["learning_rate_critic"] == 3e-4
+        assert algorithm["schedule"] == "fixed"
+        assert payload["runner"]["empirical_normalization"] is False
+        assert payload["policy"]["init_noise_std"] == 0.05
+
+
+def test_goal182_reference_recipe_is_left_for_residual_and_trres() -> None:
+    paths = sorted(
+        list(GOAL.glob("train_formal_mod4_*_residual_5d_m_seed*.json"))
+        + list(GOAL.glob("train_formal_mod4_*_trres_*_5d_m_seed*.json"))
+    )
+
+    assert len(paths) == 12
+    for path in paths:
+        payload = _module_payload(path)
+        assert payload["algorithm"]["learning_rate_actor"] == 3e-4
+        assert payload["algorithm"]["learning_rate_critic"] == 3e-4
+        assert payload["algorithm"]["schedule"] == "adaptive"
+        assert payload["runner"]["empirical_normalization"] is True
+        assert payload["policy"]["init_noise_std"] == 0.3
+
+
+def test_goal182_c0_recipe_diagnostic_is_c0_only_and_guarded() -> None:
+    path = GOAL / "train_c0_diagnostic_mod4_pe2e_finetune_5d_m_seed86201.json"
+    config = load_training_config(path)
+    payload = _module_payload(path)
+
+    assert config.iterations == 72
+    environment = load_config(ROOT / Path(config.environment_config))
+    assert environment.curriculum.initial_stage == "C0"
+    assert environment.curriculum.promotion_enabled is False
+    assert environment.curriculum.stage_mix == (("C0", 1.0),)
+    assert payload["algorithm"]["learning_rate_actor"] == 1e-5
+    assert payload["algorithm"]["learning_rate_critic"] == 3e-4
+    assert payload["algorithm"]["schedule"] == "fixed"
+    assert payload["runner"]["empirical_normalization"] is False
+    assert payload["policy"]["init_noise_std"] == 0.05
+    assert "/diagnostic/" in payload["experiment"]["output"]
+
+
 def test_goal182_formal_mod2_configs_remain_labeled_as_mod2() -> None:
     paths = sorted(GOAL.glob("train_formal_mod2_*_5d_m_seed*.json"))
 
@@ -95,6 +143,31 @@ def test_goal182_formal_envs_use_frozen_60s_episode_protocol() -> None:
         assert environment.curriculum.speed_protocol == "SPEED_V3_CENTER_OUT_5S"
 
 
+def test_goal182_envs_only_use_default_two_metre_radius() -> None:
+    for path in sorted(GOAL.glob("*.json")):
+        payload = _module_payload(path)
+        plant = payload.get("plant")
+        if not isinstance(plant, dict) or "goal_radius_m" not in plant:
+            continue
+        assert float(plant["goal_radius_m"]) == 2.0
+
+
+def test_goal182_ppo_trainer_has_no_strict125_eval_path() -> None:
+    source = (ROOT / "scripts" / "train_batch_lowlevel_ppo.py").read_text(encoding="utf-8")
+    assert "curriculum-eval-strict-config" not in source
+    assert "strict125" not in source
+    assert "combine_eval_summaries" not in source
+
+
+def test_goal182_ppo_trainer_saves_zero_update_checkpoint_for_pc_arms() -> None:
+    source = (ROOT / "scripts" / "train_batch_lowlevel_ppo.py").read_text(encoding="utf-8")
+    assert 'if is_pc:\n            initial_checkpoint_path = output / "model_initial.pt"' in source
+    assert (
+        'if frozen_bc_residual:\n            initial_checkpoint_path = output / "model_initial.pt"'
+        not in source
+    )
+
+
 def test_goal182_formal_curriculum_sampler_covers_all_promotion_stages() -> None:
     from auv_lowlevel.curriculum import (
         CURRICULUM_STAGE_ORDER,
@@ -116,9 +189,7 @@ def test_goal182_formal_curriculum_sampler_covers_all_promotion_stages() -> None
             speed_protocol=environment.curriculum.speed_protocol,
         )
         for stage in CURRICULUM_STAGE_ORDER:
-            sampler.set_stage_mix(
-                curriculum_stage_mix_target(stage, preview_enabled=True)
-            )
+            sampler.set_stage_mix(curriculum_stage_mix_target(stage, preview_enabled=True))
             assert sampler.sample(12345, stage=stage).stage == stage
 
 
@@ -151,18 +222,14 @@ def test_goal182_formal_env_resamples_speed_every_five_seconds() -> None:
     specs = env.curriculum_specs
     assert specs is not None and len(specs) == 2
     for _ in range(260):
-        result = env.step(
-            torch.zeros((2, 3), dtype=torch.float64), auto_reset=False
-        )
+        result = env.step(torch.zeros((2, 3), dtype=torch.float64), auto_reset=False)
     assert torch.equal(
         result.info["speed_segment_index"],
         torch.ones(2, dtype=torch.long),
     )
     assert torch.allclose(
         result.info["speed_target_mps"],
-        torch.tensor(
-            [spec.speed_segment_plan_mps[1] for spec in specs], dtype=torch.float64
-        ),
+        torch.tensor([spec.speed_segment_plan_mps[1] for spec in specs], dtype=torch.float64),
     )
     assert torch.allclose(
         result.info["speed_resample_period_s"],
@@ -218,9 +285,7 @@ def test_goal182_c2_axis_paths_are_geometry_isolated() -> None:
         depth_cycles=vertical.vertical_cycles,
         lateral_amplitude_m=0.0,
     )
-    vertical_path = generate_curriculum_axis_path(
-        reference, route_axis="vert_only", seed=1
-    )
+    vertical_path = generate_curriculum_axis_path(reference, route_axis="vert_only", seed=1)
     assert max(abs(vertical_path.points_ned_m[:, 1])) < 1e-9
     vertical_z = vertical_path.points_ned_m[:, 2]
     assert float(vertical_z.max() - vertical_z.min()) > 1.0
@@ -232,9 +297,7 @@ def test_goal182_c2_axis_paths_are_geometry_isolated() -> None:
         lateral_amplitude_m=horizontal.horizontal_amplitude_m,
         lateral_cycles=1.0,
     )
-    horizontal_path = generate_curriculum_axis_path(
-        reference, route_axis="horiz_only", seed=1
-    )
+    horizontal_path = generate_curriculum_axis_path(reference, route_axis="horiz_only", seed=1)
     assert max(abs(horizontal_path.points_ned_m[:, 2] - horizontal.depth_m)) < 1e-9
     horizontal_y = horizontal_path.points_ned_m[:, 1]
     assert float(horizontal_y.max() - horizontal_y.min()) > 1.0
@@ -245,21 +308,15 @@ def test_goal182_c2_axis_paths_are_geometry_isolated() -> None:
         length_m=coupled_spec.length_m,
         depth_start_m=coupled_spec.depth_m,
     )
-    base = generate_curriculum_path(
-        base_reference, coupled_spec.path_family, seed=7
-    )
+    base = generate_curriculum_path(base_reference, coupled_spec.path_family, seed=7)
     coupled = apply_curriculum_vertical_profile(
         base_reference,
         base,
         amplitude_m=coupled_spec.vertical_amplitude_m,
         cycles=coupled_spec.vertical_cycles,
     )
-    coupled_range = float(
-        coupled.points_ned_m[:, 2].max() - coupled.points_ned_m[:, 2].min()
-    )
-    base_range = float(
-        base.points_ned_m[:, 2].max() - base.points_ned_m[:, 2].min()
-    )
+    coupled_range = float(coupled.points_ned_m[:, 2].max() - coupled.points_ned_m[:, 2].min())
+    base_range = float(base.points_ned_m[:, 2].max() - base.points_ned_m[:, 2].min())
     assert coupled_range > base_range + 1.0
 
 
