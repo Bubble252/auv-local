@@ -2,16 +2,16 @@
 
 ```yaml
 scope: settled_局部规划器_反应式
-current_goal: Goal182 首波因缺失 SPEED_V3 与 CU8 被标 INVALID_SPEED_CURRICULUM 并停止；本轮已补齐中心向外速度课程、5 s 重采样、C2 单轴隔离和 C3–C6 垂向正弦。
-next_goal: 从新 commit 建干净服务器 worktree，跑 1-iteration smoke 验证 C0 speed 1.40–1.60、12 段 5 s 计划和垂向幅值 provenance；通过后重新启动 18-run 队列。
-goal182_status: ACTIVE / SPEED_V3_CU8_FIXED / FIRST_WAVE_INVALIDATED / RELAUNCH_PENDING
+current_goal: Goal182 的 SPEED_V3/CU8 修复已在 5d80de2 上通过 contract smoke，18-run 首波已在全新 worktree 与 run 根重新启动。
+next_goal: 监控 18 个 formal run 直到全部 completed，逐 run 验证 MOD4 provenance、finite losses、SPEED_V3 manifest 和 CU8 字段；全部完成后才运行冻结的 formal 评价矩阵。
+goal182_status: ACTIVE / SPEED_V3_CU8_FIXED / FIRST_WAVE_RELAUNCHED / RUNNING
 goal182_plan: doc/goals/goal182_ppo_stack_governance_20261114.md
 goal182_audit: doc/goals/goal182_infra_audit_20261116.md
 goal182_screen: doc/goals/goal182_screen_20261117.md
 goal182_execution_prompt: /home/bubble/水下机器人/总协调/doc/ops/GOAL182_INFRA_THEN_TRAIN_PROMPT_20261116.md
 goal182_worktree: /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/goal182-infra-detached-20261116
 goal182_branch: goal182/infra-20261117
-goal182_server: ssh -p 43127 yhx@152.136.183.51；节点 underwater-8x4090；formal worktree /data/yhx/underwater-robotics/worktrees/auv-local/goal182/20261117-goal182-mod4-fce2e25 @ 8485ac2；run 根 /data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-mod4-8485ac2。
+goal182_server: ssh -p 43127 yhx@152.136.183.51；节点 underwater-8x4090；formal worktree /data/yhx/underwater-robotics/worktrees/auv-local/goal182/20261117-goal182-speedv3-5d80de2 @ 5d80de2；run 根 /data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-mod4-speedv3-5d80de2。
 goal182_pre_goal_margin: 不设 pre_goal_3d_rmse_m margin；margin 只用于 cross/vertical 0.10；该指标只作 telemetry，单测 test_route_gate_ignores_pre_goal_3d_rmse_telemetry 固定。
 goal182_screen_result: 4 个已就绪 MOD4 × MLP arm（BCFT/BCRES/TRRES_CMD/TRRES_ACT）各 5 iterations、C3、seed 86201，全部 rc=0、5/5 finite；单 seed 评价均写出 summary/episodes/trace，success 0/1；只证明链路可执行，不是 formal 排名。
 goal182_formal_env_fix: CU2 的 max_episode_steps=3000（60 s）此前未写入 formal env；已在 build_goal182_configs.py 增加 FORMAL_MAX_EPISODE_STEPS，重生成两份 formal env，并加 60 s 与 C0–C6 sampler 覆盖测试。screen 的非 formal C3 env 保留 2500 以保持可追溯。
@@ -25,8 +25,9 @@ goal182_invalid_first_wave: /data/yhx/underwater-robotics/runs/auv-local/goal182
 goal182_speed_v3_fix: 新增 SPEED_V3_CENTER_OUT_5S（C0–C6 = 1.4–1.6 / 1.4–1.8 / 1.2–1.8 / 1.2–2.0 / 1.0–2.0 / 1.0–2.2 / 1.0–2.5），sampler 生成 12 个 5 s segment，env 在 t=5…55 s 切换目标，manifest/info 写 speed range/plan/index/period/target min-max。
 goal182_cu8_fix: C2 采样 vert_only/horiz_only 各 50%，正交轴严格为 0；C3–C6 在水平 path 上叠加 2/2/3/5 m、2/2/1.5/1 cycles 垂向正弦；formal env 写 speed_protocol，matrix checker 缺省即 SPEED_CURRICULUM_PROTOCOL_INVALID。
 goal182_verification: 171 passed（curriculum、PC env/vec env、command residual、formal configs、PPO/config）；check_goal182_matrices --require-frozen --require-first-wave-configs PASS arms=60；eval matrix frozen PASS。
-goal182_first_wave_queue: scripts/launch_goal182_first_wave_formal.sh 保留；旧队列已停，不得直接续跑旧 run。新 commit 的 smoke 通过后从干净 worktree 重新启动。
-goal182_blockers: 无代码级阻断。GPU6 free 约 18.5 GiB、GPU0 free 约 22.3 GiB，均低于 23 GiB 门槛，因此重启时仍按 2 并发加 completed skip/conflict 停止；不杀他人进程。
+goal182_smoke_relaunch: 5d80de2 smoke 全部 completed/finite：formal C0/C1 speed [1.4,1.6]/[1.4,1.8]、period 5.0、plan length 12；C2 vert_only 2070 / horiz_only 2026 且正交轴严格为 0；C3 vertical 2.0 m / 2.0 cycles。18-run 队列于 2026-11-17T12:43:31+08:00 启动，pe2e_finetune_seed86201 在 GPU6、pe2e_residual_seed86201 在 GPU7；live formal manifest 已复核 SPEED_V3 与 stage_boundary。只是 RUNNING，不是 formal PASS。
+goal182_first_wave_queue: scripts/launch_goal182_first_wave_formal.sh 使用 WORKTREE/RUN_ROOT 显式覆盖启动；旧 8485ac2 run 根保留为 INVALID_SPEED_CURRICULUM 证据，不删除、不续跑、不进入 formal 评价。
+goal182_blockers: 无代码级阻断。GPU0/1 仍被其他任务占用；launcher 以 23000 MiB free 为门槛，当前 6/7 各跑一个 job，其他 job 等待 completed skip，不杀他人进程，也不手工绕过门槛。
 goal175_status: A2_COMPLETE / GATE175_FAIL / VERTICAL_GUARD_FAIL / H175C_NOT_SUPPORTED / HELDOUT_CLOSED
 goal175_result: doc/goals/goal175_result_20261114.md
 goal175_a1_result: doc/goals/goal175_a1_result_20261114.md

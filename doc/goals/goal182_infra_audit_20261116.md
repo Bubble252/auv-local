@@ -1,14 +1,16 @@
 # Goal182 基础设施审计（2026-11-16）
 
-**状态**：`ACTIVE / SPEED_V3_AND_CU8_FIXED / FIRST_WAVE_INVALIDATED / RELAUNCH_PENDING`<br>
+**状态**：`ACTIVE / SPEED_V3_AND_CU8_FIXED / FIRST_WAVE_RELAUNCHED / RUNNING`<br>
 **范围**：只审计 Goal182 从“文档契约”到“可启动训练”之间的基础设施、配置、schema、checker 和服务器执行面。不重新讨论已经拍板的科学问题。<br>
 **结论先行**：`8485ac2` 首波在跑完 17/12 iterations 后被人工停止并标为
 `INVALID_SPEED_CURRICULUM`：live `curriculum_episodes.jsonl` 的 C0/C1 速度只有
 `1.150–1.250 m/s`，证明 trainer 仍使用 Goal136 v1 默认课程，而 Goal182 §4.12.7.2
 要求 `SPEED_V3_CENTER_OUT_5S`（C0 `1.40–1.60 m/s`、每 5 s 重采样）；同时 CU8 的
 C2 单轴隔离和 C3–C6 垂向正弦也尚未接线。本轮已补齐两套课程契约、给 formal env
-显式写入 `speed_protocol`、增加 fail-closed checker 和回归测试；待服务器 smoke
-验证后重新启动正式训练。`pre_goal_3d_rmse_m` 仍只作 telemetry。
+显式写入 `speed_protocol`、增加 fail-closed checker 和回归测试。修复已在
+`5d80de2` 上通过 C0/C1/C2/C3 contract smoke，并已在全新 worktree 和 run 根重新
+启动 18-run 首波；当前只是 `RUNNING`，不是 formal PASS，正式评价尚未开始，
+held-out 仍关闭。`pre_goal_3d_rmse_m` 仍只作 telemetry。
 
 ## 1. 审计口径
 
@@ -236,7 +238,7 @@ cd 总协调
 |---|---|---|
 | `CONTRACT_SMOKE` | `PASS` | 4 个 MOD4 arm 在 `077ef84` 上各跑 1 iteration：BC current encoder full-width 加载、frozen BC、fresh TRRES、curriculum provenance 和 manifest 均通过 |
 | `QUICK_SCREEN` | `PASS` | 4 个已就绪 MOD4 × MLP arm 在 GPU7 各跑 5 iterations，全部 `rc=0`、5/5 finite；GPU6 单 seed C3 评价全部写出 canonical artifacts。记录：`doc/goals/goal182_screen_20261117.md` |
-| 正式训练 | `BLOCKER → FIXED` | `8485ac2` 首波因缺少 SPEED_V3 与 CU8 被标 `INVALID_SPEED_CURRICULUM` 并停止；本轮补齐后需重新 smoke 和启动 |
+| 正式训练 | `RUNNING` | `8485ac2` 首波因缺少 SPEED_V3 与 CU8 被标 `INVALID_SPEED_CURRICULUM` 并停止；`5d80de2` 的 C0/C1/C2/C3 smoke 已通过，18-run 首波已在全新 run 根重新启动，见 §12.8 |
 | 正式评价 | `PASS` | canonical launcher/report/auditor 已就绪；eval matrix 与全部 tier 已冻结并有 SHA-256 清单 |
 
 ## 7. 下一轮最小垂直切片
@@ -259,8 +261,8 @@ cd 总协调
 10. [x] 启动首波 6 arm × 3 seeds 可续跑队列；`8485ac2` 首波已停止并标 `INVALID_SPEED_CURRICULUM`，见 §12.7；
 10b. [x] 实现并验证 `SPEED_V3_CENTER_OUT_5S`：C0–C6 中心向外区间、12 个 5 s speed segments、静态 speed+current+variation 可行性检查、step info 与 episode manifest provenance；
 10c. [x] 实现 CU8：C2 垂直/水平单轴各 50%，C3–C6 叠加 `2/2/3/5 m` 垂向正弦；路径生成器消费配置幅值与 cycles；
-10d. [ ] 从包含本修复的新 commit 建干净 worktree，跑 1-iteration smoke，确认 C0 速度落在 `1.40–1.60`、`speed_segment_plan_mps` 长度 12、C3+ 垂向幅值进入 manifest；
-10e. [ ] smoke 通过后重新启动 18-run 队列；
+10d. [x] 从包含本修复的新 commit 建干净 worktree，跑 1-iteration smoke，确认 C0 速度落在 `1.40–1.60`、`speed_segment_plan_mps` 长度 12、C3+ 垂向幅值进入 manifest；见 §12.8；
+10e. [x] smoke 通过后重新启动 18-run 队列；新 run 根为 `20261117-goal182-mod4-speedv3-5d80de2`；
 11. [ ] 18 个 run 全部 `completed` 后执行冻结的 formal 评价矩阵；缺 cell 标 `INVALID_INCOMPLETE_EVAL`。
 
 ## 8. D13.6 已冻结参数（2026-11-17）
@@ -570,6 +572,80 @@ integration smoke 根目录：
 
 ```text
 /data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-mod4-8485ac2
+```
+
+### 12.8 干净 worktree smoke 与首波重启（2026-11-17）
+
+修复提交：
+
+```text
+5d80de2 test(goal182): verify speed v3 and cu8 provenance
+e650af9 feat(goal182): implement speed v3 and cu8 curriculum
+```
+
+服务器使用全新 detached worktree，不复用旧 `20261117-goal182-mod4-fce2e25 @ 8485ac2`：
+
+```text
+worktree: /data/yhx/underwater-robotics/worktrees/auv-local/goal182/20261117-goal182-speedv3-5d80de2
+commit:   5d80de2
+run root: /data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-mod4-speedv3-5d80de2
+```
+
+smoke 根目录：
+
+```text
+/data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-speedv3-smoke-5d80de2
+```
+
+smoke 结果：
+
+| case | 结果 |
+|---|---|
+| formal C0/C1，1 iteration | `status=completed`、`losses_finite=true`；4096 episodes 中 C0/C1 的 `speed_range_mps` 分别为 `[1.40,1.60]` / `[1.40,1.80]`；全部 `speed_resample_period_s=5.0`、`speed_segment_plan_mps` 长度 12 |
+| C2 单轴，1 iteration | `vert_only=2070`、`horiz_only=2026`；`vert_only` 的 horizontal 振幅严格为 0，`horiz_only` 的 vertical 振幅严格为 0；speed range `[1.20,1.80]` |
+| C3 垂向，1 iteration | 4096/4096 episodes 为 `coupled`；`vertical_amplitude_m=2.0`、`vertical_cycles=2.0`；speed range `[1.20,2.00]` |
+
+三个 smoke 的 manifest 均记录：
+
+```text
+git_commit=5d80de2
+training_profile=PPO-FLAT-4096x48-E5-MB4
+curriculum.speed_protocol=SPEED_V3_CENTER_OUT_5S
+curriculum_route_gate.mode=shadow
+losses_finite=true
+```
+
+formal C0 smoke 使用正式 launcher 的 `--curriculum-eval-stage-boundaries`，manifest 为
+`curriculum_eval_schedule=stage_boundary`；C2/C3 是临时 initial-stage smoke，不进入正式
+run 根，也不作为 formal 结果。
+
+18-run 队列已重新启动：
+
+```text
+QUEUE_START 2026-11-17T12:43:31+08:00 jobs=18 max_jobs=2 min_free_mib=23000 gpu_whitelist=0 1 6 7
+pe2e_finetune_seed86201 gpu=6
+pe2e_residual_seed86201 gpu=7
+```
+
+队列启动后约 1 分钟，两个 live formal manifest 已确认：
+
+```text
+pe2e_finetune_seed86201: C0 [1.4,1.6] / C1 [1.4,1.8], period 5.0, plan length 12
+pe2e_residual_seed86201: C0 [1.4,1.6] / C1 [1.4,1.8], period 5.0, plan length 12
+```
+
+当前 GPU 0/1 被其他任务占用，launcher 只在空闲显存达到 23 GiB 时接收新 job；不得杀
+他人进程，也不得为提高并发绕过门槛。旧 run 根继续保留为 `INVALID_SPEED_CURRICULUM`
+证据，不删除、不续跑、不进入 formal 评价。
+
+后续监控命令：
+
+```bash
+R=/data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-mod4-speedv3-5d80de2
+tail -20 "$R/queue_status.tsv"
+cat "$R/queue_summary.txt"
+ps -eo pid,etime,%cpu,%mem,cmd | grep train_batch_lowlevel_ppo | grep -v grep
+nvidia-smi
 ```
 
 代码 worktree：
