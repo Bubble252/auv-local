@@ -43,6 +43,7 @@ WARMSTART_INIT_NOISE_STD = 0.05
 REFERENCE_ACTOR_LR = 3e-4
 REFERENCE_INIT_NOISE_STD = 0.3
 C0_REFERENCE_ABLATION_INIT_NOISE_STD = 0.1
+C0_EMPIRICAL_STD01_INIT_NOISE_STD = 0.1
 # Goal182 CU2 (2026-11-16): formal protocol is 3000 steps x 0.02 s = 60 s.
 # The pre-formal C3 screen env keeps the legacy 2500-step cap.
 FORMAL_MAX_EPISODE_STEPS = 3000
@@ -568,6 +569,14 @@ def _parse_args() -> argparse.Namespace:
             "adaptive schedule, empirical normalization, and init std 0.1"
         ),
     )
+    parser.add_argument(
+        "--c0-empirical-std01-ablation",
+        action="store_true",
+        help=(
+            "generate one C0-only PE2E finetune ablation with guarded actor LR "
+            "but empirical normalization and init std 0.1"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -656,6 +665,42 @@ def main() -> None:
             GOAL_ROOT
             / (
                 "train_c0_reference_lr_norm_std01_"
+                f"{args.module_set.lower()}_pe2e_finetune_5d_m_seed{TRAIN_SEED}.json"
+            ),
+            config,
+        )
+        return
+    if args.c0_empirical_std01_ablation:
+        env_path = GOAL_ROOT / "env_path_fixed_speed_c0_diagnostic.json"
+        if not env_path.is_file():
+            _write(env_path, _c0_diagnostic_environment())
+        config = _training(
+            mode="finetune",
+            control="pe2e",
+            module_set=args.module_set,
+            environment_path=env_path,
+            seed=TRAIN_SEED,
+            iterations=C0_DIAGNOSTIC_ITERATIONS,
+        )
+        config["runner"]["empirical_normalization"] = True
+        config["policy"]["init_noise_std"] = C0_EMPIRICAL_STD01_INIT_NOISE_STD
+        config["experiment"].update(
+            {
+                "name": (
+                    f"goal182_c0_empirical_std01_ablation_"
+                    f"{args.module_set.lower()}_pe2e_finetune_5d_m_seed{TRAIN_SEED}"
+                ),
+                "output": (
+                    "artifacts/lowlevel/goal182_ppo_stack_governance_20261114/"
+                    f"diagnostic/c0_recipe/empirical_std01/"
+                    f"{args.module_set.lower()}/pe2e_finetune_seed{TRAIN_SEED}"
+                ),
+            }
+        )
+        _write(
+            GOAL_ROOT
+            / (
+                "train_c0_empirical_std01_"
                 f"{args.module_set.lower()}_pe2e_finetune_5d_m_seed{TRAIN_SEED}.json"
             ),
             config,
