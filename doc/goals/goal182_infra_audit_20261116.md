@@ -386,6 +386,24 @@ vertical `15.5766 m`、KL max `49.87`。因此配方回退已被证伪，warmsta
 update 崩掉；success `0.930` 只作 telemetry。canonical 4096-env 复跑仍待空卡，
 calibration 和 18-run 尚未启动。
 
+**2026-11-17 C0 empirical normalization ablation（REJECTED，非 canonical）**：按用户
+要求只把 normalization 改为 `empirical`、`init_noise_std` 改为 `0.1`，其余保留 guarded
+recipe（actor LR `1e-5`、critic LR `3e-4`、`schedule=fixed`），在 GPU 6 用 1536 envs
+跑 C0-only、`promotion=false`、72 iterations：
+
+- 1-iteration：`approx_kl=0.0058`、`clip_fraction=0.0681`、`ratio_max=2.41`，首个
+  update 本身没有爆炸；
+- 72-iteration 最后 20 条 training-rollout：cross `13.5620 m`、vertical `33.4152 m`；
+  KL max `0.0130`、clip max `0.1960`、ratio max `4.70`，peak reserved `8440 MiB`；
+- 退化是逐步累积的：cross 从 iterations 13–24 的 `3.92 m` 增至 49–60 的 `13.89 m`，
+  vertical 从 `7.10 m` 增至 `34.16 m`（61–72），不是首个 update 的 KL 崩溃；
+- completion `0.9536`、timeout `0.0712`、success `0` 仅作 telemetry，不作为评价标准；
+
+结论：在该 warmstart 配方下，`empirical` normalization 与 BC actor 不兼容，不能替代
+guarded 的 fixed normalization。此次同时把 std 从 `0.05` 改为 `0.1`，因此不能把退化
+单独归因给 normalization 或 std；按反过度实验规则，不追加矩阵外消融去拆分归因。
+BCFT 继续使用 fixed normalization + std `0.05`；C0 路线、速度、`completion_min` 不变。
+
 **最小 stage sweep 已落地（待服务器执行）**：`build_goal182_route_gate_calibration_configs.py`
 现在生成 7 个 stage env（C0–C6，单 stage mix、`promotion_enabled=false`）和 14 个
 training config（PE2E/ALOSB × 7 stage）。每个 stage 固定 40 iterations；
