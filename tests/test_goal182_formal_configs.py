@@ -170,6 +170,20 @@ def test_goal182_formal_env_resamples_speed_every_five_seconds() -> None:
     )
 
 
+def test_goal182_eval_sampler_stays_fixed_speed() -> None:
+    from scripts.evaluate_pc_ppo import _build_curriculum_sampler
+
+    from auv_lowlevel.curriculum import CURRICULUM_STAGE_ORDER
+
+    for stage in CURRICULUM_STAGE_ORDER:
+        sampler = _build_curriculum_sampler(stage)
+        assert sampler is not None
+        assert sampler.speed_protocol == "legacy_v1"
+        spec = sampler.sample(12345, stage=stage)
+        assert spec.speed_resample_period_s is None
+        assert spec.speed_segment_plan_mps == (spec.speed_mps,)
+
+
 def test_goal182_c2_axis_paths_are_geometry_isolated() -> None:
     from dataclasses import replace
 
