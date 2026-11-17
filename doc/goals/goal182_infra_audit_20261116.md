@@ -2,7 +2,7 @@
 
 **状态**：`ACTIVE`<br>
 **范围**：只审计 Goal182 从“文档契约”到“可启动训练”之间的基础设施、配置、schema、checker 和服务器执行面。不重新讨论已经拍板的科学问题。<br>
-**结论先行**：actor metadata、矩阵、导航 profile、curriculum iteration hard cap、reset 初态、训练 route telemetry、warmstart/composition 一等字段、正式 TRRES config、正式评价 nominal 起点、StageGate enforce、canonical evaluation report/launcher/auditor、D13.6 参数冻结和 matrix SHA-256 冻结均已落地；当前只剩服务器 contract smoke / quick screen 与正式 C0→C6 训练 config 生成。
+**结论先行**：actor metadata、矩阵、导航 profile、curriculum iteration hard cap、reset 初态、训练 route telemetry、warmstart/composition 一等字段、正式 TRRES config、正式评价 nominal 起点、StageGate enforce、canonical evaluation report/launcher/auditor、D13.6 参数冻结、matrix SHA-256 冻结、contract smoke 和 quick screen 均已落地；formal env 的 60 s 协议已修复。当前只剩 ALOSB BCFT/BCRES 的兼容 BC 决策（用户 A/B/C/D）和正式训练启动。
 
 ## 1. 审计口径
 
@@ -226,7 +226,7 @@ cd 总协调
 | 门禁 | 状态 | 原因 |
 |---|---|---|
 | `CONTRACT_SMOKE` | `PASS` | `TRRES_CMD` 2 iterations：finite、checkpoint、curriculum provenance、manifest 均通过 |
-| `QUICK_SCREEN` | `IN_PROGRESS` | 6 个 MOD4 × MLP 中 4 个有 config；PE2E BCFT/BCRES 与 ALOSB TRRES_CMD/ACT 正在 GPU7 顺序跑 5 iterations |
+| `QUICK_SCREEN` | `PASS` | 4 个已就绪 MOD4 × MLP arm 在 GPU7 各跑 5 iterations，全部 `rc=0`、5/5 finite；GPU6 单 seed C3 评价全部写出 canonical artifacts。记录：`doc/goals/goal182_screen_20261117.md` |
 | 正式训练 | `BLOCKER` | D13.6、matrix、4 臂 formal config 已就绪；ALOSB BCFT/BCRES 缺兼容 BC checkpoint，不能虚构 |
 | 正式评价 | `PASS` | canonical launcher/report/auditor 已就绪；eval matrix 与全部 tier 已冻结并有 SHA-256 清单 |
 
@@ -243,8 +243,8 @@ cd 总协调
 5. [x] D13.6 阈值和行为决策：按推荐冻结，margin 去掉 pre-goal 3D；
 5b. [x] 冻结 core/eval matrix 并生成 `goal182_matrix_freeze.json` SHA-256 清单；
 5c. [x] 记录 A0/A3：A1 rudder、A2 stern、A3 3D 进入 screen，A0_HISTORICAL 只作历史锚点，3D 为正式主线；
-6. [ ] 跑 1–2 iteration contract smoke 和 `QUICK_SCREEN`（1 seed × 5 iterations，固定 C3）；
-7. [ ] 生成正式 C0→C6、3-seed 训练 config：4/6 臂已生成并通过 profile 检查；ALOSB BCFT/BCRES 仍缺兼容 BC，见 §10。
+6. [x] 跑 1–2 iteration contract smoke 和 `QUICK_SCREEN`（1 seed × 5 iterations，固定 C3）；4 个已就绪 arm 全部 `rc=0`、5/5 finite，评价产物完整，见 §11；
+7. [ ] 生成正式 C0→C6、3-seed 训练 config：4/6 臂已生成并通过 profile 检查；ALOSB BCFT/BCRES 仍缺兼容 BC，见 §10；formal env 的 60 s 协议已修复，见 §11。
 
 ## 8. D13.6 已冻结参数（2026-11-17）
 
@@ -311,3 +311,50 @@ G182_INT_STACK_MLP_ALOSB_BCRES_MOD4 -> CONFIG_COVERAGE_MISSING
 | B | 明确豁免，允许 PE2E 5D BC 作为 ALOSB warmstart | 需写 `PASS_WITH_WAIVER`；BCFT/BCRES 与 TRRES 的初始化不同源，结论要降级 |
 | C | 首波只跑 4 个已就绪 arm，ALOSB BCFT/BCRES 后置 | 不阻塞训练；但首波 6-arm 配对不完整，formal 结论必须标注 |
 | D | 重新定义 ALOSB BCFT/BCRES 的 action/base 契约 | 需要改 Goal182 科学定义，不能由执行代理自行决定 |
+
+## 11. Quick screen 与 formal 60 s 修复（2026-11-17）
+
+`QUICK_SCREEN` 已在服务器完成，详细记录见 `doc/goals/goal182_screen_20261117.md`。
+
+| arm | 训练 rc | finite | 单 seed C3 success | 3D RMSE | 终止 |
+|---|---:|---|---:|---:|---|
+| BCFT | 0 | 5/5 | 0/1 | 18.5278 | timeout 1/1 |
+| BCRES | 0 | 5/5 | 0/1 | 10.0962 | safety 1/1 |
+| TRRES_CMD | 0 | 5/5 | 0/1 | 3.1018 | goal-plane miss 1/1 |
+| TRRES_ACT | 0 | 5/5 | 0/1 | 2.9968 | goal-plane miss 1/1 |
+
+该表只证明启动、provenance、checkpoint 和 canonical 评价链路可执行；5-iteration
+模型不得用于 arm 排名。
+
+同轮发现 `build_goal182_configs.py --formal` 没有把 CU2 冻结的
+`max_episode_steps=3000` 写进 formal env，两份 formal env 仍继承 base 的 `2500`。
+已修复：
+
+- 新增 `FORMAL_MAX_EPISODE_STEPS = 3000`，仅 formal env 使用；
+- 重新生成 `env_path_fixed_speed_formal.json` 与 `env_alos_formal_a3_3d.json`；
+- `tests/test_goal182_formal_configs.py` 断言 formal env 为 `3000 × 0.02 s`；
+- 同文件断言 curriculum sampler 始终覆盖 `C0–C6`，且每个
+  `CURRICULUM_STAGE_MIX_TARGETS` 晋级 mix 都可解析、可采样；formal `stage_mix`
+  只列 `C0/C1` 不是 sampler 覆盖 bug。
+
+可执行证据：
+
+```bash
+PYTHONPATH=src .venv/bin/python -m pytest tests/test_goal182_formal_configs.py -q
+# 4 passed
+
+for f in configs/lowlevel/goal182/train_formal_*.json; do
+  python ../scripts/check_training_profile.py --require-actor-metadata \
+    --require-mlp-critic-mirror --training-config "$f" || exit 1
+done
+# 12/12 PASS
+
+python scripts/check_goal182_matrices.py --require-frozen
+# PASS goal182 matrices arms=60
+
+python scripts/check_goal182_eval_matrix.py --require-frozen
+# PASS goal182 eval matrix frozen
+```
+
+正式训练现在只剩用户对 ALOSB BCFT/BCRES 的 A/B/C/D 决策，以及从包含本修复的新
+commit 建干净服务器 worktree。

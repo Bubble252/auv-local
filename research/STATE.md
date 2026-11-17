@@ -2,15 +2,19 @@
 
 ```yaml
 scope: settled_局部规划器_反应式
-current_goal: Goal182 基础设施收尾。actor metadata、reset/nominal start、TRRES config、route telemetry、composition 契约、StageGate training-rollout 20/3 enforce、canonical episodes/trace、formal evaluation launcher/report、artifact auditor 和 ALOS guidance telemetry 已落地；全量 2166 passed。StageGate 默认仍为 shadow。
-next_goal: 本地 checkpoint commit 后等待 D13.6a–d 数值决策和 A0/A3 选择；用户批准 push 后同步到 8×4090 新建干净 worktree，依次跑 CONTRACT_SMOKE、QUICK_SCREEN 和正式训练。
-goal182_status: ACTIVE / INFRA_VERIFIED / FULL_REGRESSION_PASS / STAGEGATE_ENFORCE_READY_SHADOW_DEFAULT / EVAL_CANONICAL_ARTIFACTS_READY / EVAL_LAUNCHER_READY / ARTIFACT_AUDITOR_READY / D13_6_PENDING / STORAGE_WAIVED_BY_USER / TRAINING_NOT_STARTED
+current_goal: Goal182 基础设施收尾已完成 contract smoke 与 quick screen。D13.6a–d、A0/A3、matrix freeze、formal 12 config、canonical evaluation 链路和 formal env 60 s 协议均已落地。正式训练仍被 ALOSB × BCFT/BCRES 缺少兼容 ALOS 输入 BC 阻断，等待用户选择 A/B/C/D。
+next_goal: 用户对 ALOSB BCFT/BCRES 做 A/B/C/D 决策；随后从包含 60 s 修复的新 commit 建干净服务器 worktree，重跑 profile/matrix/contract 检查并启动正式 C0→C6、3-seed 训练。
+goal182_status: ACTIVE / INFRA_VERIFIED / CONTRACT_SMOKE_PASS / QUICK_SCREEN_PASS / MATRIX_FROZEN / D13_6_FROZEN / A0_A3_DECIDED / FORMAL_ENV_60S_FIXED / ALOSB_BC_BLOCKER / TRAINING_NOT_STARTED
 goal182_plan: doc/goals/goal182_ppo_stack_governance_20261114.md
 goal182_audit: doc/goals/goal182_infra_audit_20261116.md
+goal182_screen: doc/goals/goal182_screen_20261117.md
 goal182_execution_prompt: /home/bubble/水下机器人/总协调/doc/ops/GOAL182_INFRA_THEN_TRAIN_PROMPT_20261116.md
 goal182_worktree: /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/goal182-infra-detached-20261116
-goal182_server: ssh -p 43127 yhx@152.136.183.51；节点 underwater-8x4090；数据根 /data/yhx/underwater-robotics；旧 goal182 worktree 均为 c186c74 且 dirty，不复用。
-goal182_blockers: D13.6a–d 和 A0/A3 仍需用户定夺；push 需用户批准后才能建服务器干净 worktree。正式评价 launcher 已接入 builder 和 auditor，并在 formal phase 拒绝 DRAFT matrix/tier。服务器 /data 为 380G 可用、89% 已用；用户已确认目前不担心容量，容量不作为首波 gate。
+goal182_branch: goal182/infra-20261117
+goal182_server: ssh -p 43127 yhx@152.136.183.51；节点 underwater-8x4090；数据根 /data/yhx/underwater-robotics；smoke worktree 20261117-goal182-smoke-3a96fa7；run 根 /data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-smoke-3a96fa7；GPU6 评价、GPU7 训练。
+goal182_screen_result: 4 个已就绪 MOD4 × MLP arm（BCFT/BCRES/TRRES_CMD/TRRES_ACT）各 5 iterations、C3、seed 86201，全部 rc=0、5/5 finite；单 seed 评价均写出 summary/episodes/trace，success 0/1；只证明链路可执行，不是 formal 排名。
+goal182_formal_env_fix: CU2 的 max_episode_steps=3000（60 s）此前未写入 formal env；已在 build_goal182_configs.py 增加 FORMAL_MAX_EPISODE_STEPS，重生成两份 formal env，并加 60 s 与 C0–C6 sampler 覆盖测试。screen 的非 formal C3 env 保留 2500 以保持可追溯。
+goal182_blockers: ALOSB × BCFT/BCRES 需要兼容 ALOS 输入的 5D BC；现有 PE2E BC SHA f7103f04… 不能直接作 ALOSB warmstart。可选 A 先训 ALOS BC、B 用户豁免、C 首波 4 臂后置、D 重定义契约。正式训练前必须清空此 USER_DECISION。
 goal175_status: A2_COMPLETE / GATE175_FAIL / VERTICAL_GUARD_FAIL / H175C_NOT_SUPPORTED / HELDOUT_CLOSED
 goal175_result: doc/goals/goal175_result_20261114.md
 goal175_a1_result: doc/goals/goal175_a1_result_20261114.md
