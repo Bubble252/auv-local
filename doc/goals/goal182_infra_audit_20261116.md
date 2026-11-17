@@ -1,8 +1,14 @@
 # Goal182 基础设施审计（2026-11-16）
 
-**状态**：`ACTIVE / BC_CURRENT_PREP_COMPLETE / MOD4_SMOKE_PASS / FIRST_WAVE_RUNNING`<br>
+**状态**：`ACTIVE / SPEED_V3_AND_CU8_FIXED / FIRST_WAVE_INVALIDATED / RELAUNCH_PENDING`<br>
 **范围**：只审计 Goal182 从“文档契约”到“可启动训练”之间的基础设施、配置、schema、checker 和服务器执行面。不重新讨论已经拍板的科学问题。<br>
-**结论先行**：ALOSB BCFT/BCRES 的兼容 BC 阻断已按 A 方案解决；MOD4 的 18 个正式 config、current encoder full-width 修复、stage-boundary frozen-dev 调度和首波队列均已落地。首波 6 arm × 3 seeds 已从 `8485ac2` 的干净 worktree 启动，当前 GPU7 跑 `pe2e_finetune_seed86201`、GPU1 跑 `pe2e_residual_seed86201`，两者均已写出 finite iteration。`pre_goal_3d_rmse_m` 只作 telemetry，不进入 margin 或 route gate。
+**结论先行**：`8485ac2` 首波在跑完 17/12 iterations 后被人工停止并标为
+`INVALID_SPEED_CURRICULUM`：live `curriculum_episodes.jsonl` 的 C0/C1 速度只有
+`1.150–1.250 m/s`，证明 trainer 仍使用 Goal136 v1 默认课程，而 Goal182 §4.12.7.2
+要求 `SPEED_V3_CENTER_OUT_5S`（C0 `1.40–1.60 m/s`、每 5 s 重采样）；同时 CU8 的
+C2 单轴隔离和 C3–C6 垂向正弦也尚未接线。本轮已补齐两套课程契约、给 formal env
+显式写入 `speed_protocol`、增加 fail-closed checker 和回归测试；待服务器 smoke
+验证后重新启动正式训练。`pre_goal_3d_rmse_m` 仍只作 telemetry。
 
 ## 1. 审计口径
 
@@ -230,7 +236,7 @@ cd 总协调
 |---|---|---|
 | `CONTRACT_SMOKE` | `PASS` | 4 个 MOD4 arm 在 `077ef84` 上各跑 1 iteration：BC current encoder full-width 加载、frozen BC、fresh TRRES、curriculum provenance 和 manifest 均通过 |
 | `QUICK_SCREEN` | `PASS` | 4 个已就绪 MOD4 × MLP arm 在 GPU7 各跑 5 iterations，全部 `rc=0`、5/5 finite；GPU6 单 seed C3 评价全部写出 canonical artifacts。记录：`doc/goals/goal182_screen_20261117.md` |
-| 正式训练 | `RUNNING` | 18 个 MOD4 formal config 已就绪；首波队列已启动，GPU7 `pe2e_finetune_seed86201`、GPU1 `pe2e_residual_seed86201`，两者均 finite |
+| 正式训练 | `BLOCKER → FIXED` | `8485ac2` 首波因缺少 SPEED_V3 与 CU8 被标 `INVALID_SPEED_CURRICULUM` 并停止；本轮补齐后需重新 smoke 和启动 |
 | 正式评价 | `PASS` | canonical launcher/report/auditor 已就绪；eval matrix 与全部 tier 已冻结并有 SHA-256 清单 |
 
 ## 7. 下一轮最小垂直切片
@@ -250,7 +256,11 @@ cd 总协调
 7. [x] 生成正式 C0→C6、3-seed 训练 config：18 个 MOD4 config 全部通过 profile 检查；旧 12 个 MOD2 config 已改名隔离，见 §10；
 8. [x] 完成 BC-CURRENT-PREP：PE2E 与 ALOS current-encoder BC 均生成，ALOSB BCFT/BCRES 阻断按 A 方案解除；
 9. [x] 修复 current encoder 从 BC 加载时的 full-width 布局，并修复 frozen-dev eval 的 stage-boundary 调度，见 §12.2–§12.4；
-10. [x] 启动首波 6 arm × 3 seeds 可续跑队列；当前 `RUNNING`，见 §12.5；
+10. [x] 启动首波 6 arm × 3 seeds 可续跑队列；`8485ac2` 首波已停止并标 `INVALID_SPEED_CURRICULUM`，见 §12.7；
+10b. [x] 实现并验证 `SPEED_V3_CENTER_OUT_5S`：C0–C6 中心向外区间、12 个 5 s speed segments、静态 speed+current+variation 可行性检查、step info 与 episode manifest provenance；
+10c. [x] 实现 CU8：C2 垂直/水平单轴各 50%，C3–C6 叠加 `2/2/3/5 m` 垂向正弦；路径生成器消费配置幅值与 cycles；
+10d. [ ] 从包含本修复的新 commit 建干净 worktree，跑 1-iteration smoke，确认 C0 速度落在 `1.40–1.60`、`speed_segment_plan_mps` 长度 12、C3+ 垂向幅值进入 manifest；
+10e. [ ] smoke 通过后重新启动 18-run 队列；
 11. [ ] 18 个 run 全部 `completed` 后执行冻结的 formal 评价矩阵；缺 cell 标 `INVALID_INCOMPLETE_EVAL`。
 
 ## 8. D13.6 已冻结参数（2026-11-17）
@@ -286,6 +296,7 @@ routine route gate。该约束由 `RouteGateThresholds` 的四个字段和
 | 2026-11-17 | current encoder full-width | BC current encoder 输出 `d_z_total=64`；旧 policy 在 `bc_path_dim` 路径仍只输出 60，导致 state_dict `[64,64] vs [60,64]`。修复后仅 active 宽度才补 reserved zeros | `077ef84`；4 个 MOD4 contract smoke 通过 |
 | 2026-11-17 | frozen-dev stage-boundary 调度 | 4096×48 transitions/iteration 会让旧 100000 transition interval 每 iteration 触发 40-seed×2 eval；首波改为每个 stage soft cap 边界首次触发，之后每 20 iteration 重试 | `8485ac2`；首跑 `next_eval_iteration=72`，不生成 iteration-1 评测 |
 | 2026-11-17 | pre-goal 3D margin 复核 | 用户再次确认 margin 不需要 `pre_goal_3d_rmse_m`；该指标只作 telemetry/评价复算 | route gate 仍只消费 cross、vertical、completion、safety；单测固定 |
+| 2026-11-17 | SPEED_V3 / CU8 审计 | 首波 live speed 只有 `1.150–1.250 m/s`，trainer 硬编码 `default_curriculum_stages()`；CU8 字段也不存在。首波标 `INVALID_SPEED_CURRICULUM` 停止 | 新增 `SPEED_V3_CENTER_OUT_5S`、5 s 重采样、C2 单轴隔离、C3–C6 垂向正弦；formal env 与 matrix checker fail closed |
 
 ## 10. 首波 formal config 覆盖：已按 A 解决（2026-11-17）
 
@@ -649,4 +660,63 @@ git push origin goal182/infra-20261117
 ssh -p 43127 yhx@152.136.183.51 \
   'W=/data/yhx/underwater-robotics/worktrees/auv-local/goal182/20261117-goal182-mod4-fce2e25; \
    git -C "$W" rev-parse HEAD; git -C "$W" status --porcelain'
+```
+
+### 12.7 SPEED_V3 与 CU8 阻断（2026-11-17）
+
+首波两个 run 在 `8485ac2` 上写出 finite iteration，但 curriculum provenance 暴露了
+训练协议错误：
+
+```text
+pe2e_finetune_seed86201  C0/C1  speed range 1.1504–1.2499 m/s
+pe2e_residual_seed86201  C0/C1  speed range 1.1504–1.2499 m/s
+```
+
+Goal182 要求 C0 `1.40–1.60 m/s`，且训练 episode 起点及每 5 s 重采样。根因是
+`train_batch_lowlevel_ppo.py` 只调用 `curriculum_stages_with_overrides()`，后者从
+Goal136 `default_curriculum_stages()` 取 v1 速度；`high_speed_curriculum_stages()`
+是另一套单调 v2，也不能冒充 center-out v3。CU8 的
+`vertical_amplitude_m/vertical_cycles/route_axis` 同样未进入 dataclass、sampler 或
+路径生成器。
+
+本轮修复：
+
+- `SPEED_V3_CENTER_OUT_5S` 常量与 C0–C6 区间；
+- sampler 生成 12 个 5 s 速度段，episode manifest 写 `speed_range_mps`、
+  `speed_segment_plan_mps`、`speed_resample_period_s`；
+- env 在 `t=5,10,…,55 s` 切换 `_episode_command_speed_mps`，同步 direct command 速度目标；
+- step info 写 `speed_profile_id`、`speed_segment_index`、`speed_segment_start_s`、
+  `speed_target_*`；
+- C2 采样 `vert_only` / `horiz_only` 各 50%，正交轴严格为零；
+- C3–C6 在水平 path 上叠加 `2/2/3/5 m`、`2/2/1.5/1` cycles 的垂向正弦；
+- formal env 写 `curriculum.speed_protocol=SPEED_V3_CENTER_OUT_5S`，matrix checker
+  对缺失或错误值报 `SPEED_CURRICULUM_PROTOCOL_INVALID`；
+- 单测固定区间、12 段计划、5 s 重采样、C2 单轴隔离、C3–C6 垂直幅值与 60 s 协议。
+
+可执行证据：
+
+```bash
+.venv/bin/python -m pytest \
+  tests/test_lowlevel_curriculum_sampler.py \
+  tests/test_goal182_formal_configs.py \
+  tests/test_lowlevel_pc_env.py \
+  tests/test_lowlevel_pc_vec_env.py \
+  tests/test_lowlevel_pc_command_residual.py \
+  tests/test_lowlevel_curriculum_trainer.py \
+  tests/test_lowlevel_ppo_config.py \
+  tests/test_lowlevel_config.py -q
+# 171 passed
+
+.venv/bin/python scripts/check_goal182_matrices.py \
+  --require-frozen --require-first-wave-configs
+# PASS goal182 matrices arms=60
+
+.venv/bin/python scripts/check_goal182_eval_matrix.py --require-frozen
+# PASS goal182 eval matrix frozen
+```
+
+首波 run 根保留为 `INVALID_SPEED_CURRICULUM` 证据，不删除、不续跑：
+
+```text
+/data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-mod4-8485ac2
 ```

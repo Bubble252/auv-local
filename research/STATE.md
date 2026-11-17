@@ -2,9 +2,9 @@
 
 ```yaml
 scope: settled_局部规划器_反应式
-current_goal: Goal182 首波 6 arm × 3 seeds 的 MOD4 正式训练已启动；BC-CURRENT-PREP、MOD4 full-width 修复、stage-boundary eval 调度和可续跑队列均已落地。
-next_goal: 轮询 18 个 run 直到 completed，核验 manifest/finite/provenance；全部完成后按冻结 evaluation matrix 跑正式评价，缺 cell 标 INVALID_INCOMPLETE_EVAL。
-goal182_status: ACTIVE / BC_CURRENT_PREP_COMPLETE / MOD4_SMOKE_PASS / FORMAL_TRAINING_RUNNING
+current_goal: Goal182 首波因缺失 SPEED_V3 与 CU8 被标 INVALID_SPEED_CURRICULUM 并停止；本轮已补齐中心向外速度课程、5 s 重采样、C2 单轴隔离和 C3–C6 垂向正弦。
+next_goal: 从新 commit 建干净服务器 worktree，跑 1-iteration smoke 验证 C0 speed 1.40–1.60、12 段 5 s 计划和垂向幅值 provenance；通过后重新启动 18-run 队列。
+goal182_status: ACTIVE / SPEED_V3_CU8_FIXED / FIRST_WAVE_INVALIDATED / RELAUNCH_PENDING
 goal182_plan: doc/goals/goal182_ppo_stack_governance_20261114.md
 goal182_audit: doc/goals/goal182_infra_audit_20261116.md
 goal182_screen: doc/goals/goal182_screen_20261117.md
@@ -21,8 +21,12 @@ goal182_bc_current_prep: PE2E current BC SHA d85718a432a287f2ae255528f645bc20f44
 goal182_bc_only_ablation: C3 seeds20-23 BC_ONLY: PE2E current 4/4, 3D 1.9841 m; PE2E current-zero 4/4, 1.4325 m; ALOS current 4/4, 1.6979 m; ALOS current-zero 3/4, 7.2774 m. Current encoder helps ALOS but not PE2E; pre_goal column is telemetry only.
 goal182_current_encoder_fix: 077ef84 修复 BC current encoder full d_z_total=64 与 policy active d_z_active=60 的 state_dict 尺寸冲突；69 passed / 1 skipped，4 个 MOD4 smoke 均 finite。
 goal182_stage_boundary_eval: 8485ac2 新增 --curriculum-eval-stage-boundaries；C0 首次 eval 为 iteration 72，之后每 20 iteration 重试；integration smoke 2/2 finite 且 next_eval_iteration=72。
-goal182_first_wave_queue: scripts/launch_goal182_first_wave_formal.sh，18 runs，seed-first，max_jobs=2，GPU 白名单 0/1/6/7，free>=23000 MiB，completed skip，conflict 停止；2026-11-17 12:19 启动 pe2e_finetune_seed86201@GPU7，12:22 启动 pe2e_residual_seed86201@GPU1，两者均 finite。
-goal182_blockers: 无。GPU6 free 约 18.5 GiB、GPU0 free 约 22.3 GiB，均低于 23 GiB 门槛，因此当前保持 2 并发；不杀他人进程，不占用不足门槛的 GPU。
+goal182_invalid_first_wave: /data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-mod4-8485ac2 保留为 INVALID_SPEED_CURRICULUM；两个 run 在 8485ac2 上各跑 17/12 iterations 后人工停止，curriculum_episodes.jsonl 的 C0/C1 速度只有 1.1504–1.2499 m/s，不是 Goal182 的 C0 1.40–1.60。
+goal182_speed_v3_fix: 新增 SPEED_V3_CENTER_OUT_5S（C0–C6 = 1.4–1.6 / 1.4–1.8 / 1.2–1.8 / 1.2–2.0 / 1.0–2.0 / 1.0–2.2 / 1.0–2.5），sampler 生成 12 个 5 s segment，env 在 t=5…55 s 切换目标，manifest/info 写 speed range/plan/index/period/target min-max。
+goal182_cu8_fix: C2 采样 vert_only/horiz_only 各 50%，正交轴严格为 0；C3–C6 在水平 path 上叠加 2/2/3/5 m、2/2/1.5/1 cycles 垂向正弦；formal env 写 speed_protocol，matrix checker 缺省即 SPEED_CURRICULUM_PROTOCOL_INVALID。
+goal182_verification: 171 passed（curriculum、PC env/vec env、command residual、formal configs、PPO/config）；check_goal182_matrices --require-frozen --require-first-wave-configs PASS arms=60；eval matrix frozen PASS。
+goal182_first_wave_queue: scripts/launch_goal182_first_wave_formal.sh 保留；旧队列已停，不得直接续跑旧 run。新 commit 的 smoke 通过后从干净 worktree 重新启动。
+goal182_blockers: 无代码级阻断。GPU6 free 约 18.5 GiB、GPU0 free 约 22.3 GiB，均低于 23 GiB 门槛，因此重启时仍按 2 并发加 completed skip/conflict 停止；不杀他人进程。
 goal175_status: A2_COMPLETE / GATE175_FAIL / VERTICAL_GUARD_FAIL / H175C_NOT_SUPPORTED / HELDOUT_CLOSED
 goal175_result: doc/goals/goal175_result_20261114.md
 goal175_a1_result: doc/goals/goal175_a1_result_20261114.md

@@ -11,6 +11,10 @@ from auv_lowlevel.curriculum import (
     CURRICULUM_EPISODE_MANIFEST_SCHEMA,
     CURRICULUM_STAGE_ORDER,
     SPEED_CURRICULUM_V2_RANGES_MPS,
+    SPEED_V3_CENTER_OUT_RANGES_MPS,
+    SPEED_V3_PROFILE_ID,
+    SPEED_V3_RESAMPLE_PERIOD_S,
+    SPEED_V3_SEGMENT_COUNT,
     CurriculumDecision,
     CurriculumMixRamp,
     CurriculumPromotionController,
@@ -21,6 +25,7 @@ from auv_lowlevel.curriculum import (
     StageEvaluation,
     curriculum_stage_mix_target,
     curriculum_stratum,
+    curriculum_stages_with_overrides,
     default_curriculum_stages,
     high_speed_curriculum_stages,
 )
@@ -88,6 +93,60 @@ def test_high_speed_curriculum_v2_is_explicit_and_reaches_remus_ceiling() -> Non
     for stage in CURRICULUM_STAGE_ORDER:
         assert v2[stage].depth_range_m == v1[stage].depth_range_m
         assert v2[stage].current_speed_range_mps == v1[stage].current_speed_range_mps
+
+
+def test_speed_v3_center_out_ranges_and_five_second_plan() -> None:
+    stages = curriculum_stages_with_overrides(
+        CURRICULUM_STAGE_ORDER,
+        speed_protocol=SPEED_V3_PROFILE_ID,
+    )
+    assert {
+        name: stage.speed_range_mps for name, stage in stages.items()
+    } == SPEED_V3_CENTER_OUT_RANGES_MPS
+    sampler = CurriculumStageSampler(
+        stages=stages,
+        stage_mix=(("C6", 1.0),),
+        current_variation_speed_amplitude_mps=0.10,
+        speed_protocol=SPEED_V3_PROFILE_ID,
+    )
+    specs = sampler.sample_batch(range(512), stage="C6")
+    for spec in specs:
+        assert spec.speed_resample_period_s == SPEED_V3_RESAMPLE_PERIOD_S
+        assert len(spec.speed_segment_plan_mps) == SPEED_V3_SEGMENT_COUNT
+        assert spec.speed_mps == spec.speed_segment_plan_mps[0]
+        assert spec.speed_range_mps is not None
+        assert spec.speed_range_mps == SPEED_V3_CENTER_OUT_RANGES_MPS["C6"]
+        assert spec.speed_visited_range_mps is not None
+        assert spec.speed_visited_range_mps[0] == min(spec.speed_segment_plan_mps)
+        assert spec.speed_visited_range_mps[1] == max(spec.speed_segment_plan_mps)
+        assert max(spec.speed_segment_plan_mps) <= REMUS100_MAX_SPEED_MPS - 0.10 + 1e-12
+        assert max(spec.speed_segment_plan_mps) + spec.current_speed_mps + 0.10 <= (
+            REMUS100_MAX_SPEED_MPS + 1e-12
+        )
+        assert min(spec.speed_segment_plan_mps) >= SPEED_V3_CENTER_OUT_RANGES_MPS["C6"][0]
+
+
+def test_c2_axis_isolated_sampler_keeps_one_axis_zero() -> None:
+    stages = curriculum_stages_with_overrides(
+        CURRICULUM_STAGE_ORDER,
+        speed_protocol=SPEED_V3_PROFILE_ID,
+    )
+    sampler = CurriculumStageSampler(
+        stages=stages,
+        stage_mix=(("C2", 1.0),),
+        current_variation_speed_amplitude_mps=0.0,
+        speed_protocol=SPEED_V3_PROFILE_ID,
+    )
+    specs = sampler.sample_batch(range(1000), stage="C2")
+    axes = {spec.route_axis for spec in specs}
+    assert axes == {"vert_only", "horiz_only"}
+    for spec in specs:
+        if spec.route_axis == "vert_only":
+            assert spec.vertical_amplitude_m == pytest.approx(1.75)
+            assert spec.horizontal_amplitude_m == 0.0
+        else:
+            assert spec.vertical_amplitude_m == 0.0
+            assert spec.horizontal_amplitude_m == pytest.approx(1.75)
 
 
 def test_high_speed_curriculum_v2_sampler_respects_joint_ground_speed_cap() -> None:

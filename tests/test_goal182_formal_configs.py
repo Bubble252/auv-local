@@ -4,6 +4,9 @@ import importlib.util
 import json
 from pathlib import Path
 
+import torch
+
+from auv_lowlevel.batch.pc_env import BatchedPCLowLevelEnv
 from auv_lowlevel.config import load_config
 from auv_lowlevel.ppo_config import load_training_config
 
@@ -30,6 +33,7 @@ def test_goal182_formal_mod4_configs_are_complete_and_three_seed() -> None:
         assert environment.curriculum.promotion_enabled is True
         assert environment.curriculum.initial_stage == "C0"
         assert environment.curriculum.stage_mix == (("C0", 0.9), ("C1", 0.1))
+        assert environment.curriculum.speed_protocol == "SPEED_V3_CENTER_OUT_5S"
 
 
 def test_goal182_formal_mod4_configs_encode_full_module_set() -> None:
@@ -88,6 +92,7 @@ def test_goal182_formal_envs_use_frozen_60s_episode_protocol() -> None:
         environment = load_config(GOAL / name)
         assert environment.plant.max_episode_steps == 3000
         assert environment.plant.dt_s == 0.02
+        assert environment.curriculum.speed_protocol == "SPEED_V3_CENTER_OUT_5S"
 
 
 def test_goal182_formal_curriculum_sampler_covers_all_promotion_stages() -> None:
@@ -101,17 +106,147 @@ def test_goal182_formal_curriculum_sampler_covers_all_promotion_stages() -> None
     for name in ("env_path_fixed_speed_formal.json", "env_alos_formal_a3_3d.json"):
         environment = load_config(GOAL / name)
         stages = curriculum_stages_with_overrides(
-            [stage for stage, _weight in environment.curriculum.stage_mix]
+            [stage for stage, _weight in environment.curriculum.stage_mix],
+            speed_protocol=environment.curriculum.speed_protocol,
         )
         assert set(stages) == set(CURRICULUM_STAGE_ORDER)
         sampler = CurriculumStageSampler(
-            stages=stages, stage_mix=environment.curriculum.stage_mix
+            stages=stages,
+            stage_mix=environment.curriculum.stage_mix,
+            speed_protocol=environment.curriculum.speed_protocol,
         )
         for stage in CURRICULUM_STAGE_ORDER:
             sampler.set_stage_mix(
                 curriculum_stage_mix_target(stage, preview_enabled=True)
             )
             assert sampler.sample(12345, stage=stage).stage == stage
+
+
+def test_goal182_formal_env_resamples_speed_every_five_seconds() -> None:
+    from auv_lowlevel.curriculum import (
+        CurriculumStageSampler,
+        curriculum_stages_with_overrides,
+    )
+
+    environment = load_config(GOAL / "env_path_fixed_speed_formal.json")
+    stages = curriculum_stages_with_overrides(
+        [stage for stage, _weight in environment.curriculum.stage_mix],
+        speed_protocol=environment.curriculum.speed_protocol,
+    )
+    sampler = CurriculumStageSampler(
+        stages=stages,
+        stage_mix=(("C0", 1.0),),
+        current_variation_speed_amplitude_mps=0.10,
+        speed_protocol=environment.curriculum.speed_protocol,
+    )
+    env = BatchedPCLowLevelEnv(
+        environment,
+        num_envs=2,
+        curriculum_sampler=sampler,
+        path_dim=5,
+        device="cpu",
+        dtype=torch.float64,
+    )
+    env.reset([90000, 90001])
+    specs = env.curriculum_specs
+    assert specs is not None and len(specs) == 2
+    for _ in range(260):
+        result = env.step(
+            torch.zeros((2, 3), dtype=torch.float64), auto_reset=False
+        )
+    assert torch.equal(
+        result.info["speed_segment_index"],
+        torch.ones(2, dtype=torch.long),
+    )
+    assert torch.allclose(
+        result.info["speed_target_mps"],
+        torch.tensor(
+            [spec.speed_segment_plan_mps[1] for spec in specs], dtype=torch.float64
+        ),
+    )
+    assert torch.allclose(
+        result.info["speed_resample_period_s"],
+        torch.full((2,), 5.0, dtype=torch.float64),
+    )
+
+
+def test_goal182_c2_axis_paths_are_geometry_isolated() -> None:
+    from dataclasses import replace
+
+    from auv_lowlevel.curriculum import (
+        CurriculumStageSampler,
+        curriculum_stages_with_overrides,
+    )
+    from auv_lowlevel.path import (
+        apply_curriculum_vertical_profile,
+        generate_curriculum_axis_path,
+        generate_curriculum_path,
+    )
+
+    environment = load_config(GOAL / "env_path_fixed_speed_formal.json")
+    stages = curriculum_stages_with_overrides(
+        ["C2", "C3", "C4", "C5", "C6"],
+        speed_protocol=environment.curriculum.speed_protocol,
+    )
+    sampler = CurriculumStageSampler(
+        stages=stages,
+        stage_mix=(("C2", 1.0),),
+        speed_protocol=environment.curriculum.speed_protocol,
+    )
+    specs = sampler.sample_batch(range(20), stage="C2")
+    vertical = next(spec for spec in specs if spec.route_axis == "vert_only")
+    horizontal = next(spec for spec in specs if spec.route_axis == "horiz_only")
+    reference = replace(
+        environment.reference,
+        length_m=vertical.length_m,
+        depth_start_m=vertical.depth_m,
+        depth_amplitude_m=vertical.vertical_amplitude_m,
+        depth_cycles=vertical.vertical_cycles,
+        lateral_amplitude_m=0.0,
+    )
+    vertical_path = generate_curriculum_axis_path(
+        reference, route_axis="vert_only", seed=1
+    )
+    assert max(abs(vertical_path.points_ned_m[:, 1])) < 1e-9
+    vertical_z = vertical_path.points_ned_m[:, 2]
+    assert float(vertical_z.max() - vertical_z.min()) > 1.0
+
+    reference = replace(
+        reference,
+        depth_start_m=horizontal.depth_m,
+        depth_amplitude_m=0.0,
+        lateral_amplitude_m=horizontal.horizontal_amplitude_m,
+        lateral_cycles=1.0,
+    )
+    horizontal_path = generate_curriculum_axis_path(
+        reference, route_axis="horiz_only", seed=1
+    )
+    assert max(abs(horizontal_path.points_ned_m[:, 2] - horizontal.depth_m)) < 1e-9
+    horizontal_y = horizontal_path.points_ned_m[:, 1]
+    assert float(horizontal_y.max() - horizontal_y.min()) > 1.0
+
+    coupled_spec = sampler.sample(12345, stage="C6")
+    base_reference = replace(
+        environment.reference,
+        length_m=coupled_spec.length_m,
+        depth_start_m=coupled_spec.depth_m,
+    )
+    base = generate_curriculum_path(
+        base_reference, coupled_spec.path_family, seed=7
+    )
+    coupled = apply_curriculum_vertical_profile(
+        base_reference,
+        base,
+        amplitude_m=coupled_spec.vertical_amplitude_m,
+        cycles=coupled_spec.vertical_cycles,
+    )
+    coupled_range = float(
+        coupled.points_ned_m[:, 2].max() - coupled.points_ned_m[:, 2].min()
+    )
+    base_range = float(
+        base.points_ned_m[:, 2].max() - base.points_ned_m[:, 2].min()
+    )
+    assert coupled_range > base_range + 1.0
 
 
 def test_goal182_matrix_checker_rejects_mod2_config_as_mod4() -> None:
