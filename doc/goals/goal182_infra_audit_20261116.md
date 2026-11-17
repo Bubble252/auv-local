@@ -168,13 +168,25 @@ current_true[0]            = [-0.1965, 0.4866, 0.0]         # 真实海流仅作
 `test_current_estimate_warm_starts_from_first_valid_measurement`；正式评价 nominal
 强制见 `test_formal_eval_requires_nominal_start`。
 
-服务器只读检查（`underwater-8x4090`，2026-11-16）：
+服务器只读检查（`underwater-8x4090`，2026-11-17）：
 
 ```text
-GPU 0–7 = 11.9 / 11.2 / 15.8 / 15.6 / 15.6 / 15.8 / 3.1 / 0.5 GiB 已用，24.6 GiB/卡总量
-/data = 560 GiB 可用（84% 已用）
+GPU 0–7 = 11.9 / 11.2 / 15.8 / 15.6 / 15.6 / 15.8 / 5.3 / 0.5 GiB 已用，24.6 GiB/卡总量
+GPU compute apps：GPU 0/1 与 zyt、Falcon 作业共享；GPU 2–5 为 GLJ 作业；GPU 6/7 有其他用户作业
+/data = 3.5T total，2.9T used，380G available，89% used
+/     = 3.5T total，2.7T used，636G available，81% used
+本仓库树 = 215G：src 96G、envs 56G、assets 28G、cache 12G、tools 9.2G、tmp 7.3G、runs 6.9G
+L1 可回收候选 = tmp 7.3G + pip cache 11G，约 18G；不触碰 src/envs/assets/runs
 Goal182 远端仍只有 20261116-bc5d-c186c74、20261116-joint-c186c74、20261116-ppo-c186c74 三套旧 worktree/run
+auv-local bare main = c186c74；本地 goal182/infra-20261117 = fe8a542，可直接 fast-forward
 ```
+
+首波空间预算：现有 600it run 的 checkpoint 约 10.7 MB/个、`save_interval=50`，
+单 run 约 0.17G；首波 6 arm × 3 seeds 粗估 10–20G，380G 容量本身足够。按
+`REMOTE_STORAGE_GOVERNANCE.md` 草案的“used 85%–90% = Red”口径，当前会阻断长训练；
+但该阈值仍是 `DRAFT`，且主要由其他用户占用造成。建议优先清理 L1 的 tmp/pip cache
+（约 18G），或在用户确认后把首波启动口径改为“available ≥ 150G 且 artifact 预算已登记”。
+清理必须按空间治理规则二次确认，不能在训练运行时执行。
 
 单元测试：
 
