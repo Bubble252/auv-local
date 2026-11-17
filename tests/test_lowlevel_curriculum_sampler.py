@@ -492,6 +492,26 @@ def test_route_gate_window_requires_three_consecutive_passes_in_enforce_mode() -
     assert status["should_promote"] is False
 
 
+def test_route_gate_ignores_pre_goal_3d_rmse_telemetry() -> None:
+    thresholds = RouteGateThresholds(
+        cross_track_rmse_max_m=0.25,
+        vertical_rmse_max_m=0.25,
+        completion_min=0.8,
+        safety_max=0.01,
+    )
+    gate = RouteGateWindow(window_size=1, consecutive_required=1, mode="enforce")
+    status = gate.observe(
+        stage="C0",
+        iteration=20,
+        metrics=_route_metrics(three_d=1_000.0),
+        min_iterations=20,
+        thresholds=thresholds,
+    )
+    assert status["would_pass"] is True
+    assert status["should_promote"] is True
+    assert "pre_goal_3d_rmse_mean" not in status["window_mean"]
+
+
 def test_route_gate_window_resets_on_stage_change() -> None:
     gate = RouteGateWindow(window_size=2, consecutive_required=1, mode="shadow")
     for iteration in (1, 2):
