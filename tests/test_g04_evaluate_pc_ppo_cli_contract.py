@@ -13,16 +13,21 @@ from scripts.evaluate_pc_ppo import _parse_args
 
 from auv_lowlevel.batch.pc_path import PC_PATH_DIM_ENDPOINT, PC_PATH_DIM_SAFE, PC_PATH_DIM_V1
 from auv_lowlevel.batch.pc_policy import pc_schema_hash
+from auv_lowlevel.config import load_config
 from auv_lowlevel.cli.evaluate_pc_ppo.policy import (
     _InferenceEmpiricalNormalization,
     _load_observation_normalizer,
     _ObservationNormalizedPolicy,
 )
-from auv_lowlevel.cli.evaluate_pc_ppo.validation import _final_path_blocks
+from auv_lowlevel.cli.evaluate_pc_ppo.validation import (
+    _apply_eval_start_contract,
+    _final_path_blocks,
+    _validate_eval_start_contract,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "evaluate_pc_ppo.py"
-HELP_SHA256 = "02f82c57b62f6e0b6ecaf92307f35ee707018bfa7a92a7ad50aed77c7bf35fa2"
+HELP_SHA256 = "895873e097531e9bbef5fdc847b9887dae63a3be82f21d8c5b1309201afd9b87"
 
 
 def test_help_text_is_byte_stable() -> None:
@@ -62,6 +67,7 @@ def test_default_namespace_is_stable() -> None:
         "allow_alos_current_mode_override": False,
         "allow_diversity_environment_override": False,
         "allow_guidance_rate_limit_override": False,
+        "allow_non_nominal_start": False,
         "allow_sensor_override": False,
         "allow_stage_override": False,
         "allow_start_progress_training_override": False,
@@ -92,6 +98,36 @@ def test_default_namespace_is_stable() -> None:
         "trace_sensor_ages": False,
         "training_config": Path("train.json"),
     }
+
+    override = _parse_args(
+        [
+            "--training-config",
+            "train.json",
+            "--checkpoint",
+            "ck.pt",
+            "--output",
+            "out",
+            "--allow-non-nominal-start",
+        ]
+    )
+    assert override.allow_non_nominal_start is True
+
+
+def test_formal_eval_requires_nominal_start() -> None:
+    config = load_config(
+        ROOT / "configs" / "lowlevel" / "goal182" / "env_path_fixed_speed_c3.json"
+    )
+
+    with pytest.raises(ValueError, match="INVALID_EVAL_START_CONTRACT"):
+        _validate_eval_start_contract(config)
+
+    forced = _apply_eval_start_contract(config)
+    assert forced.guidance.nominal_initial_state is True
+    _validate_eval_start_contract(forced)
+
+    randomized = _apply_eval_start_contract(config, require_nominal_start=False)
+    assert randomized.guidance.nominal_initial_state is False
+    _validate_eval_start_contract(randomized, require_nominal_start=False)
 
 
 def test_canonical_pc_path_dimensions_are_accepted_by_evaluator() -> None:

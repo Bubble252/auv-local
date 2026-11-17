@@ -34,6 +34,11 @@ PPO_MINI_BATCHES = 4
 PPO_ITERATIONS = 5
 TRAIN_SEED = 86201
 
+START_JITTER_YAW_RAD = 0.1745329252
+START_JITTER_PITCH_RAD = 0.1745329252
+INITIAL_SPEED_RATIO_RANGE = [0.8, 1.2]
+INITIAL_ANGULAR_RATE_RANGE = [-0.05, 0.05]
+
 BC_CHECKPOINT = (
     "/data/yhx/underwater-robotics/runs/auv-local/goal182/"
     "20261116-ppo-c186c74/bc5d_m/full/pc_bc_actor.pt"
@@ -137,6 +142,20 @@ def _environment() -> dict[str, Any]:
     payload["curriculum"] = copy.deepcopy(CURRICULUM)
     payload["reward"] = copy.deepcopy(REWARD)
     payload["termination"] = copy.deepcopy(TERMINATION)
+    payload["guidance"].update(
+        {
+            "initial_speed_ratio_range": copy.deepcopy(INITIAL_SPEED_RATIO_RANGE),
+            "initial_angular_rate_range": copy.deepcopy(
+                INITIAL_ANGULAR_RATE_RANGE
+            ),
+        }
+    )
+    payload["reference"].update(
+        {
+            "start_jitter_yaw_rad": START_JITTER_YAW_RAD,
+            "start_jitter_pitch_rad": START_JITTER_PITCH_RAD,
+        }
+    )
     payload["plant"]["bounds_m"][2][1] = 520.0
     payload["sensors"] = {"profile": "unbiased_small_noise_v2", "seed": 81300}
     payload["experiment"].update(
@@ -150,6 +169,48 @@ def _environment() -> dict[str, Any]:
             "seed": 81300,
         }
     )
+    return payload
+
+
+def _alos_environment() -> dict[str, Any]:
+    payload = _environment()
+    payload["experiment"].update(
+        {
+            "name": "goal182_alos_c3_a0_base",
+            "output": "artifacts/lowlevel/goal182_ppo_stack_governance_20261114/env_alos",
+            "pc_control_mode": "alos",
+        }
+    )
+    payload["guidance"].update(
+        {
+            "horizontal_gain": 2.5,
+            "horizontal_lookahead_m": 3.0,
+            "vertical_gain": 1.0,
+            "vertical_lookahead_m": 2.0,
+        }
+    )
+    payload["reward"].update(
+        {
+            "mode": "pc_command_track_v2",
+            "w_cmd_pitch": 1.0,
+            "w_cmd_yaw": 1.0,
+            "w_path_pitch": 0.0,
+            "w_yaw": 0.0,
+        }
+    )
+    payload["command_residual"] = {
+        "enabled": True,
+        "scale_heading_rad": 0.35,
+        "scale_pitch_rad": 0.17,
+        "scale_speed_mps": 0.60,
+        "rate_heading_rad_s": 0.25,
+        "rate_pitch_rad_s": 0.15,
+        "rate_speed_mps2": 0.80,
+        "controller_state": "actor",
+        "terminal_gate_enabled": False,
+        "terminal_gate_enter_m": 20.0,
+        "terminal_gate_full_m": 5.0,
+    }
     return payload
 
 
@@ -173,14 +234,53 @@ def _training(*, mode: str, environment_path: Path) -> dict[str, Any]:
             "residual_scale": 1.0,
             "residual_action_mask": [1.0, 1.0, 1.0],
         }
+        payload["experiment"].update(
+            {
+                "learning_composition": "BCRES",
+                "trainable_scope": "actor_critic",
+            }
+        )
     elif mode == "finetune":
         payload["base_policy"] = {
             "mode": "none",
             "checkpoint": None,
             "checkpoint_sha256": None,
         }
+        payload["experiment"].update(
+            {
+                "learning_composition": "BCFT",
+                "warmstart_actor": BC_CHECKPOINT,
+                "warmstart_actor_sha256": BC_CHECKPOINT_SHA256,
+                "trainable_scope": "actor_critic",
+            }
+        )
+    elif mode in {"trres_cmd", "trres_act"}:
+        payload["base_policy"] = {
+            "mode": "none",
+            "checkpoint": None,
+            "checkpoint_sha256": None,
+        }
+        payload["experiment"].update(
+            {
+                "learning_composition": (
+                    "TRRES_CMD" if mode == "trres_cmd" else "TRRES_ACT"
+                ),
+                "encoder_init": "standard_fresh",
+                "trainable_scope": "actor_critic",
+            }
+        )
     else:
         raise ValueError(f"unknown mode: {mode}")
+
+    trres = mode in {"trres_cmd", "trres_act"}
+    actor_command_dim = 3 if trres else 0
+    critic_command_dim = 3 if trres else 1
+    action_interface = {
+        "residual": "environment",
+        "finetune": "environment",
+        "trres_cmd": "command",
+        "trres_act": "actuator",
+    }[mode]
 
     payload["vector_env"] = {
         "backend": "batch_torch",
@@ -226,8 +326,8 @@ def _training(*, mode: str, environment_path: Path) -> dict[str, Any]:
             "actor_current_encoder_enabled": False,
             "actor_current_encoder_hidden_dims": [64],
             "actor_current_encoder_alpha": 1.0,
-            "actor_command_dim": 0,
-            "critic_command_dim": 1,
+            "actor_command_dim": actor_command_dim,
+            "critic_command_dim": critic_command_dim,
             "path_dim": 5,
             "critic_path_dim": 30,
             "critic_path_encoder_hidden_dims": [64],
@@ -237,7 +337,7 @@ def _training(*, mode: str, environment_path: Path) -> dict[str, Any]:
             "path_encoder_alpha": 1.0,
             "path_encoder_zero_init": False,
             "bc_path_dim": 5,
-            "action_interface": "environment",
+            "action_interface": action_interface,
             "actuator_residual_scale": 1.0,
             "actuator_residual_channel_gains": [1.0, 1.0, 1.0],
             "path_curriculum": [],
@@ -288,11 +388,18 @@ def _training(*, mode: str, environment_path: Path) -> dict[str, Any]:
 def main() -> None:
     os.chdir(REPO_ROOT)
     env_path = GOAL_ROOT / "env_path_fixed_speed_c3.json"
+    alos_env_path = GOAL_ROOT / "env_alos_c3_a0_base.json"
     _write(env_path, _environment())
+    _write(alos_env_path, _alos_environment())
     for mode in ("residual", "finetune"):
         _write(
             GOAL_ROOT / f"train_{mode}_5d_m_seed{TRAIN_SEED}.json",
             _training(mode=mode, environment_path=env_path),
+        )
+    for mode in ("trres_cmd", "trres_act"):
+        _write(
+            GOAL_ROOT / f"train_{mode}_5d_m_seed{TRAIN_SEED}.json",
+            _training(mode=mode, environment_path=alos_env_path),
         )
 
 

@@ -77,6 +77,8 @@ from auv_lowlevel.curriculum import (
     CurriculumPromotionController,
     CurriculumStageSampler,
     LinearAlphaSchedule,
+    RouteGateThresholds,
+    RouteGateWindow,
     curriculum_stages_with_overrides,
 )
 from auv_lowlevel.curriculum_trainer import (
@@ -328,6 +330,18 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--curriculum-eval-seed-count", type=int, default=40)
     parser.add_argument("--curriculum-eval-timeout-s", type=float, default=1800.0)
     parser.add_argument("--curriculum-mix-ramp-transitions", type=int, default=0)
+    parser.add_argument(
+        "--curriculum-route-gate-mode",
+        choices=("shadow", "enforce"),
+        default="shadow",
+        help="20-iteration route gate mode; first wave stays in shadow until D13.6 is frozen",
+    )
+    parser.add_argument(
+        "--curriculum-route-thresholds",
+        type=Path,
+        default=None,
+        help="route-gate threshold JSON produced by the Goal182 calibration entry",
+    )
     parser.add_argument("--curriculum-eval-device", default="cpu")
     parser.add_argument(
         "--curriculum-force-current-alpha-zero",
@@ -364,6 +378,11 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--skip-training-profile-check",
+        action="store_true",
+        help="smoke-only escape hatch; formal runs must keep the canonical profile check enabled",
+    )
+    parser.add_argument(
         "--checkpoint-selection-basis",
         default=None,
         help="human-readable checkpoint selection protocol recorded in the manifest",
@@ -398,6 +417,57 @@ def _git_commit() -> str | None:
         ).strip()
     except (OSError, subprocess.CalledProcessError):
         return None
+
+
+def _main_repo_root() -> Path:
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return REPO_ROOT
+    if completed.returncode != 0:
+        return REPO_ROOT
+    common = Path(completed.stdout.strip())
+    if not common.is_absolute():
+        common = (REPO_ROOT / common).resolve()
+    return common.parent if common.name == ".git" else common
+
+
+def _check_training_profile(training_path: Path, training: Any) -> None:
+    if training.training_profile is None:
+        return
+    governance = Path(os.environ.get("AUV_GOVERNANCE_ROOT", ""))
+    if not str(governance):
+        governance = _main_repo_root().parent / "总协调"
+    checker = governance / "scripts" / "check_training_profile.py"
+    if not checker.is_file():
+        raise RuntimeError(
+            "canonical training-profile checker not found at "
+            f"{checker}; set AUV_GOVERNANCE_ROOT"
+        )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(checker),
+            "--training-config",
+            str(training_path),
+            "--require-actor-metadata",
+            "--require-mlp-critic-mirror",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "canonical training-profile check failed: "
+            f"{completed.stdout[-2000:]}{completed.stderr[-2000:]}"
+        )
 
 
 def _package_version(name: str) -> str | None:
@@ -445,6 +515,8 @@ def main() -> int:
 
     training_path = _resolve(args.training_config)
     training = load_training_config(training_path)
+    if not args.skip_training_profile_check:
+        _check_training_profile(training_path, training)
     validate_arm_base_consistency(
         training,
         allow_legacy=args.allow_legacy_arm_label,
@@ -519,7 +591,23 @@ def main() -> int:
         )
     device = torch.device(training.training_device if args.device is None else args.device)
     output = _resolve(training.output if args.output is None else args.output)
-    warmstart_path = _resolve(args.warmstart_actor) if args.warmstart_actor else None
+    warmstart_source = "cli" if args.warmstart_actor else "config"
+    warmstart_path = (
+        _resolve(args.warmstart_actor)
+        if args.warmstart_actor
+        else (
+            _resolve(training.warmstart_actor)
+            if training.warmstart_actor is not None
+            else None
+        )
+    )
+    if warmstart_path is not None and training.warmstart_actor_sha256 is not None:
+        actual_warmstart_sha = sha256_file(warmstart_path)
+        if actual_warmstart_sha != training.warmstart_actor_sha256:
+            raise ValueError(
+                "actor warm-start SHA mismatch: "
+                f"expected {training.warmstart_actor_sha256}, got {actual_warmstart_sha}"
+            )
     residual_warmstart_path = (
         _resolve(args.warmstart_residual) if args.warmstart_residual else None
     )
@@ -860,6 +948,7 @@ def main() -> int:
                 self._curriculum_hook.maybe_update(
                     int(self.env.total_env_steps),
                     completed_iterations=int(locs["it"]) + 1,
+                    training_metrics=episode_metrics,
                 )
 
         def gpu_peak_summary(self) -> dict[str, float | None]:
@@ -1185,6 +1274,33 @@ def main() -> int:
         "training_config_sha256": training_config_sha256,
         "training_profile": training.training_profile,
         "actor": None if training.actor is None else training.actor.as_dict(),
+        "reset_contract": {
+            "schema_version": "auv_pc_reset_contract.v1",
+            "nominal_initial_state": bool(environment.guidance.nominal_initial_state),
+            "start_jitter_xy_m": float(environment.reference.start_jitter_xy_m),
+            "start_jitter_z_m": float(environment.reference.start_jitter_z_m),
+            "start_jitter_yaw_rad": float(environment.reference.start_jitter_yaw_rad),
+            "start_jitter_pitch_rad": float(
+                environment.reference.start_jitter_pitch_rad
+            ),
+            "initial_speed_ratio_range": list(
+                environment.guidance.initial_speed_ratio_range
+                or (
+                    environment.guidance.initial_speed_ratio,
+                    environment.guidance.initial_speed_ratio,
+                )
+            ),
+            "initial_propeller_rpm_ratio_range": list(
+                environment.guidance.initial_propeller_rpm_ratio_range
+                or (
+                    environment.guidance.initial_propeller_rpm_ratio,
+                    environment.guidance.initial_propeller_rpm_ratio,
+                )
+            ),
+            "initial_angular_rate_range": list(
+                environment.guidance.initial_angular_rate_range or (0.0, 0.0)
+            ),
+        },
         "learning_composition": training.learning_composition,
         "encoder_init": training.encoder_init,
         "encoder_init_checkpoint": training.encoder_init_checkpoint,
@@ -1279,6 +1395,8 @@ def main() -> int:
         ),
         "warmstart_actor": None if warmstart_path is None else str(warmstart_path),
         "warmstart_actor_sha256": (None if warmstart_path is None else sha256_file(warmstart_path)),
+        "warmstart_actor_source": None if warmstart_path is None else warmstart_source,
+        "trainable_scope": training.trainable_scope,
         "warmstart_residual": (
             None if residual_warmstart_path is None else str(residual_warmstart_path)
         ),
@@ -1453,6 +1571,7 @@ def main() -> int:
         )
         if isinstance(env, BatchTorchPCFrozenBCResidualVecEnv):
             env.set_base_action_fn(runner.alg.policy.base_action)
+        curriculum_route_gate_manifest = None
         if environment.curriculum.enabled:
             default_eval_config = (
                 environment_path
@@ -1516,6 +1635,15 @@ def main() -> int:
                     gate=curriculum_sampler.stages[stage].gate,
                 )
 
+            route_thresholds = None
+            if args.curriculum_route_thresholds is not None:
+                threshold_path = _resolve(args.curriculum_route_thresholds)
+                threshold_payload = json.loads(
+                    threshold_path.read_text(encoding="utf-8")
+                )
+                if isinstance(threshold_payload.get("thresholds"), dict):
+                    threshold_payload = threshold_payload["thresholds"]
+                route_thresholds = RouteGateThresholds.from_dict(threshold_payload)
             curriculum_hook = CurriculumTrainerHook(
                 controller=CurriculumPromotionController(
                     start_stage=environment.curriculum.initial_stage
@@ -1530,8 +1658,27 @@ def main() -> int:
                     args.curriculum_force_current_alpha_zero
                 ),
                 promotion_enabled=environment.curriculum.promotion_enabled,
+                routine_gate=RouteGateWindow(
+                    window_size=20,
+                    consecutive_required=3,
+                    mode=args.curriculum_route_gate_mode,
+                ),
+                route_gate_thresholds=route_thresholds,
             )
             runner._curriculum_hook = curriculum_hook
+            curriculum_route_gate_manifest = {
+                "window_size": 20,
+                "consecutive_required": 3,
+                "mode": args.curriculum_route_gate_mode,
+                "thresholds_path": (
+                    None
+                    if args.curriculum_route_thresholds is None
+                    else str(_resolve(args.curriculum_route_thresholds))
+                ),
+                "thresholds": (
+                    None if route_thresholds is None else route_thresholds.as_dict()
+                ),
+            }
             initial_alpha = curriculum_hook.current_encoder_alpha(0)
             runner._current_encoder_alpha = initial_alpha
             runner.alg.policy.set_actor_current_encoder_alpha(initial_alpha)
@@ -1544,6 +1691,7 @@ def main() -> int:
         manifest.update(
             {
                 **policy_parameter_counts,
+                "curriculum_route_gate": curriculum_route_gate_manifest,
                 "optimizer_param_group_counts": {
                     group.get("name", f"group_{index}"): sum(
                         parameter.numel() for parameter in group["params"]

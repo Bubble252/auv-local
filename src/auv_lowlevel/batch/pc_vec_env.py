@@ -140,6 +140,13 @@ class BatchTorchPCVecEnv:
         self._episode_abs_roll = self._zeros()
         self._episode_material_saturation = self._zeros()
         self._episode_safety_events = self._zeros()
+        self._episode_route_steps = self._zeros()
+        self._episode_cross_track_sq_sum = self._zeros()
+        self._episode_vertical_sq_sum = self._zeros()
+        self._episode_pre_goal_3d_sq_sum = self._zeros()
+        self._episode_max_progress_m = self._zeros()
+        self._episode_start_progress_m = self._zeros()
+        self._episode_path_length_m = self._zeros()
         self._total_env_steps = 0
         self._elapsed_s = 0.0
         self._record_step_timings = bool(record_step_timings)
@@ -576,8 +583,13 @@ class BatchTorchPCVecEnv:
             self._episode_abs_roll,
             self._episode_material_saturation,
             self._episode_safety_events,
+            self._episode_route_steps,
+            self._episode_cross_track_sq_sum,
+            self._episode_vertical_sq_sum,
+            self._episode_pre_goal_3d_sq_sum,
         ):
             value.zero_()
+        self._capture_episode_route_geometry(reset_mask)
         actor_obs, _ = self._ensure_observations()
         return actor_obs, self._extras()
 
@@ -612,6 +624,25 @@ class BatchTorchPCVecEnv:
         self._episode_abs_roll.add_(roll)
         self._episode_material_saturation.add_(material_saturation)
         self._episode_safety_events.add_(safety)
+        projection = result.info.get("projection")
+        if projection is not None:
+            route_steps = self._episode_route_steps + 1.0
+            self._episode_route_steps.copy_(route_steps)
+            self._episode_cross_track_sq_sum.add_(
+                projection.horizontal_error_m.to(self.observation_dtype).square()
+            )
+            self._episode_vertical_sq_sum.add_(
+                projection.vertical_error_m.to(self.observation_dtype).square()
+            )
+            self._episode_pre_goal_3d_sq_sum.add_(
+                projection.error_3d_m.to(self.observation_dtype).square()
+            )
+            self._episode_max_progress_m.copy_(
+                torch.maximum(
+                    self._episode_max_progress_m,
+                    projection.progress_m.to(self.observation_dtype),
+                )
+            )
 
         reset_count = dones.to(dtype=torch.float32).sum()
         denominator = torch.clamp(reset_count, min=1.0)
@@ -649,6 +680,40 @@ class BatchTorchPCVecEnv:
             self._episode_safety_events,
             torch.zeros_like(self._episode_safety_events),
         )
+        completed_route_steps = torch.clamp(
+            torch.where(
+                dones, self._episode_route_steps, torch.zeros_like(self._episode_route_steps)
+            ),
+            min=1.0,
+        )
+        completed_cross_rmse = torch.where(
+            dones,
+            torch.sqrt(self._episode_cross_track_sq_sum / completed_route_steps),
+            torch.zeros_like(self._episode_cross_track_sq_sum),
+        )
+        completed_vertical_rmse = torch.where(
+            dones,
+            torch.sqrt(self._episode_vertical_sq_sum / completed_route_steps),
+            torch.zeros_like(self._episode_vertical_sq_sum),
+        )
+        completed_three_d_rmse = torch.where(
+            dones,
+            torch.sqrt(self._episode_pre_goal_3d_sq_sum / completed_route_steps),
+            torch.zeros_like(self._episode_pre_goal_3d_sq_sum),
+        )
+        available_progress_m = torch.clamp(
+            self._episode_path_length_m - self._episode_start_progress_m, min=1e-9
+        )
+        completed_completion = torch.where(
+            dones,
+            torch.clamp(
+                (self._episode_max_progress_m - self._episode_start_progress_m)
+                / available_progress_m,
+                min=0.0,
+                max=1.0,
+            ),
+            torch.zeros_like(self._episode_max_progress_m),
+        )
         step_denominator = torch.clamp(completed_length.sum(), min=1.0)
         goal_count = (
             ((terminal_kind == int(PCTerminalKind.GOAL)) & dones).to(dtype=torch.float32).sum()
@@ -663,8 +728,13 @@ class BatchTorchPCVecEnv:
             self._episode_abs_roll,
             self._episode_material_saturation,
             self._episode_safety_events,
+            self._episode_route_steps,
+            self._episode_cross_track_sq_sum,
+            self._episode_vertical_sq_sum,
+            self._episode_pre_goal_3d_sq_sum,
         ):
             value.masked_fill_(dones, 0.0)
+        self._capture_episode_route_geometry(dones)
 
         return {
             "/env/reset_count": reset_count,
@@ -687,6 +757,10 @@ class BatchTorchPCVecEnv:
             "/episode/speed_abs_error_mean": completed_speed.sum() / step_denominator,
             "/episode/roll_abs_mean": completed_roll.sum() / step_denominator,
             "/episode/material_saturation_rate": completed_material.sum() / step_denominator,
+            "/episode/cross_track_rmse_mean": completed_cross_rmse.sum() / denominator,
+            "/episode/vertical_rmse_mean": completed_vertical_rmse.sum() / denominator,
+            "/episode/pre_goal_3d_rmse_mean": completed_three_d_rmse.sum() / denominator,
+            "/episode/path_completion_mean": completed_completion.sum() / denominator,
         }
 
     def _reset_episode_logs(self, mask: Tensor) -> None:
@@ -698,9 +772,33 @@ class BatchTorchPCVecEnv:
             self._episode_abs_roll,
             self._episode_material_saturation,
             self._episode_safety_events,
+            self._episode_route_steps,
+            self._episode_cross_track_sq_sum,
+            self._episode_vertical_sq_sum,
+            self._episode_pre_goal_3d_sq_sum,
         ):
             value[mask] = 0
+        self._capture_episode_route_geometry(mask)
         self.episode_length_buf[mask] = 0
+
+    def _capture_episode_route_geometry(self, mask: Tensor) -> None:
+        """Store the reset-time path geometry needed for route telemetry."""
+
+        start = self.env.episode_start_progress_m.to(
+            device=self.device, dtype=self.observation_dtype
+        )
+        length = self.env.path.total_length_m_for(self.num_envs).to(
+            device=self.device, dtype=self.observation_dtype
+        )
+        if start.shape != (self.num_envs,):
+            raise ValueError("episode start progress must have one value per environment")
+        if length.shape == ():
+            length = length.expand(self.num_envs)
+        if length.shape != (self.num_envs,):
+            raise ValueError("path length must have one value per environment")
+        self._episode_start_progress_m[mask] = start[mask]
+        self._episode_path_length_m[mask] = length[mask]
+        self._episode_max_progress_m[mask] = start[mask]
 
     def step(
         self, actions: Tensor, *, auto_reset: bool = True

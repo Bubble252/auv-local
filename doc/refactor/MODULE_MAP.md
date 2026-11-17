@@ -53,6 +53,8 @@
 | `src/auv_lowlevel/batch/pc_env/core.py` | `BatchedPCLowLevelEnv` 状态、reset、控制和 step 编排 | 不承载类型、observation 或 diagnostics 的重复实现 | `BatchedPCLowLevelEnv` | PC 环境全量契约测试 | lowlevel | 存量文件/函数长度 ratchet |
 | `src/auv_lowlevel/batch/pc_bc.py` | PC BC 数据、训练和 manifest | 不复制训练脚本入口 | `__all__` | `tests/test_lowlevel_pc_bc.py` | lowlevel | 存量文件长度 |
 | `src/auv_lowlevel/batch/metrics.py` | rollout 指标聚合 | 不写 artifact | `__all__` | `tests/test_batch_metrics.py` | lowlevel | 无 |
+| `src/auv_lowlevel/curriculum.py` | 课程 stage、speed/path 配置、训练 rollout route gate、晋级/回退状态机 | 不执行训练 step、不跑 frozen-dev 评价、不写训练 artifact | `CurriculumPromotionController`, `RouteGateWindow`, `CurriculumStageSampler` | `tests/test_lowlevel_curriculum_*.py` | lowlevel | 存量文件长度 |
+| `src/auv_lowlevel/curriculum_trainer.py` | 把训练 rollout telemetry 与 frozen-dev 边界评价接入课程状态机 | 不定义 gate 阈值、不改变 sampler 概率或训练算法 | `CurriculumTrainerHook`, `StageEvaluation` 组合 helper | `tests/test_lowlevel_curriculum_trainer.py` | lowlevel | 无 |
 | `scripts/train_batch_lowlevel_ppo.py` | PPO 训练 CLI 调度 | 不承载核心训练算法 | `main` | `tests/test_training_curriculum_guard.py` | training | 存量文件长度 |
 | `scripts/evaluate_pc_ppo.py` | PC PPO 评价薄入口，转发到 `auv_lowlevel.cli.evaluate_pc_ppo` | 不定义评价、reward 或 matrix | `main` | `tests/test_g04_evaluate_pc_ppo_cli_contract.py` | evaluation | 无 |
 | `scripts/check_goal173_protocol.py` | Goal173 预注册协议检查 | 不改 Gate 阈值或 split | `main` | `tests/test_goal173_protocol.py` | protocol | 无 |

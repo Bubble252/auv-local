@@ -872,6 +872,207 @@ class StageEvaluation:
         return True
 
 
+@dataclass(frozen=True)
+class RouteGateThresholds:
+    """Frozen 20-iteration route thresholds for one control contract."""
+
+    cross_track_rmse_max_m: float
+    vertical_rmse_max_m: float
+    pre_goal_3d_rmse_max_m: float
+    completion_min: float
+    safety_max: float = 0.0
+
+    def __post_init__(self) -> None:
+        for name in (
+            "cross_track_rmse_max_m",
+            "vertical_rmse_max_m",
+            "pre_goal_3d_rmse_max_m",
+        ):
+            value = float(getattr(self, name))
+            if not math.isfinite(value) or value < 0.0:
+                raise ValueError(f"RouteGateThresholds.{name} must be finite and non-negative")
+        for name in ("completion_min", "safety_max"):
+            value = float(getattr(self, name))
+            if not math.isfinite(value) or value < 0.0 or value > 1.0:
+                raise ValueError(f"RouteGateThresholds.{name} must lie in [0, 1]")
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> RouteGateThresholds:
+        required = {
+            "cross_track_rmse_max_m",
+            "vertical_rmse_max_m",
+            "pre_goal_3d_rmse_max_m",
+            "completion_min",
+        }
+        missing = required.difference(value)
+        if missing:
+            raise ValueError(
+                "route gate thresholds are missing fields: "
+                + ", ".join(sorted(missing))
+            )
+        return cls(
+            cross_track_rmse_max_m=float(value["cross_track_rmse_max_m"]),
+            vertical_rmse_max_m=float(value["vertical_rmse_max_m"]),
+            pre_goal_3d_rmse_max_m=float(value["pre_goal_3d_rmse_max_m"]),
+            completion_min=float(value["completion_min"]),
+            safety_max=float(value.get("safety_max", 0.0)),
+        )
+
+    def as_dict(self) -> dict[str, float]:
+        return {
+            "cross_track_rmse_max_m": float(self.cross_track_rmse_max_m),
+            "vertical_rmse_max_m": float(self.vertical_rmse_max_m),
+            "pre_goal_3d_rmse_max_m": float(self.pre_goal_3d_rmse_max_m),
+            "completion_min": float(self.completion_min),
+            "safety_max": float(self.safety_max),
+        }
+
+
+ROUTE_GATE_METRIC_KEYS = {
+    "cross_track_rmse_m": "/episode/cross_track_rmse_mean",
+    "vertical_rmse_m": "/episode/vertical_rmse_mean",
+    "pre_goal_3d_rmse_m": "/episode/pre_goal_3d_rmse_mean",
+    "completion_ratio": "/episode/path_completion_mean",
+    "safety_rate": "/episode/safety_termination_rate",
+}
+
+
+class RouteGateWindow:
+    """Rolling 20-iteration route gate used in shadow mode before D13.6 freeze.
+
+    The window always records telemetry.  Without a frozen threshold table it
+    reports ``would_pass=None`` and ``reason=CALIBRATION_MISSING``; it never
+    promotes in shadow mode.
+    """
+
+    def __init__(
+        self,
+        *,
+        window_size: int = 20,
+        consecutive_required: int = 3,
+        mode: str = "shadow",
+    ) -> None:
+        if isinstance(window_size, bool) or window_size <= 0:
+            raise ValueError("window_size must be a positive integer")
+        if isinstance(consecutive_required, bool) or consecutive_required <= 0:
+            raise ValueError("consecutive_required must be a positive integer")
+        if mode not in {"shadow", "enforce"}:
+            raise ValueError("route gate mode must be 'shadow' or 'enforce'")
+        self.window_size = int(window_size)
+        self.consecutive_required = int(consecutive_required)
+        self.mode = mode
+        self.stage: str | None = None
+        self._samples: list[dict[str, float]] = []
+        self._consecutive_passes = 0
+        self.last_status: dict[str, Any] = {
+            "available": False,
+            "reason": "NO_OBSERVATION",
+            "mode": self.mode,
+        }
+
+    def reset(self) -> None:
+        self._samples.clear()
+        self._consecutive_passes = 0
+        self.last_status = {
+            "available": False,
+            "reason": "STAGE_RESET",
+            "mode": self.mode,
+        }
+
+    def observe(
+        self,
+        *,
+        stage: str,
+        iteration: int,
+        metrics: Mapping[str, Any],
+        min_iterations: int,
+        thresholds: RouteGateThresholds | None,
+    ) -> dict[str, Any]:
+        if stage != self.stage:
+            self.stage = stage
+            self.reset()
+            self.stage = stage
+        if isinstance(iteration, bool) or iteration < 0:
+            raise ValueError("iteration must be a non-negative integer")
+        if isinstance(min_iterations, bool) or min_iterations < 0:
+            raise ValueError("min_iterations must be a non-negative integer")
+        sample: dict[str, float] = {}
+        for name, key in ROUTE_GATE_METRIC_KEYS.items():
+            if key not in metrics or metrics[key] is None:
+                if name == "safety_rate":
+                    sample[name] = 0.0
+                    continue
+                self.last_status = {
+                    "available": False,
+                    "reason": "TELEMETRY_MISSING",
+                    "missing": key,
+                    "iteration": int(iteration),
+                    "mode": self.mode,
+                }
+                return dict(self.last_status)
+            sample[name] = float(metrics[key])
+        if any(not math.isfinite(value) for value in sample.values()):
+            self.last_status = {
+                "available": False,
+                "reason": "NONFINITE_TELEMETRY",
+                "iteration": int(iteration),
+                "mode": self.mode,
+            }
+            return dict(self.last_status)
+        self._samples.append(sample)
+        self._samples = self._samples[-self.window_size :]
+        window_full = len(self._samples) == self.window_size
+        eligible = window_full and int(iteration) >= int(min_iterations)
+        means = {
+            name: sum(item[name] for item in self._samples) / len(self._samples)
+            for name in sample
+        } if self._samples else {}
+        would_pass: bool | None = None
+        reason = "WINDOW_NOT_FULL"
+        if window_full and not eligible:
+            reason = "SOFT_ITERATION_CAP_NOT_REACHED"
+        elif eligible and thresholds is None:
+            reason = "CALIBRATION_MISSING"
+        elif eligible and thresholds is not None:
+            would_pass = bool(
+                means["cross_track_rmse_m"] <= thresholds.cross_track_rmse_max_m
+                and means["vertical_rmse_m"] <= thresholds.vertical_rmse_max_m
+                and means["pre_goal_3d_rmse_m"] <= thresholds.pre_goal_3d_rmse_max_m
+                and means["completion_ratio"] >= thresholds.completion_min
+                and means["safety_rate"] <= thresholds.safety_max
+            )
+            reason = "ROUTE_GATE_PASS" if would_pass else "ROUTE_GATE_MISS"
+        if would_pass is True and eligible:
+            self._consecutive_passes += 1
+        elif eligible:
+            self._consecutive_passes = 0
+        else:
+            self._consecutive_passes = 0
+        should_promote = (
+            self.mode == "enforce"
+            and would_pass is True
+            and self._consecutive_passes >= self.consecutive_required
+        )
+        self.last_status = {
+            "available": True,
+            "mode": self.mode,
+            "stage": stage,
+            "iteration": int(iteration),
+            "window_size": self.window_size,
+            "window_fill": len(self._samples),
+            "min_iterations": int(min_iterations),
+            "eligible": bool(eligible),
+            "window_mean": means,
+            "thresholds": None if thresholds is None else thresholds.as_dict(),
+            "would_pass": would_pass,
+            "consecutive_passes": self._consecutive_passes,
+            "consecutive_required": self.consecutive_required,
+            "should_promote": bool(should_promote),
+            "reason": reason,
+        }
+        return dict(self.last_status)
+
+
 class CurriculumDecision(str, Enum):
     CONTINUE = "CONTINUE"
     PROMOTE = "PROMOTE"
@@ -1233,6 +1434,9 @@ __all__ = [
     "CurriculumStageSpec",
     "EpisodeManifestWriter",
     "LinearAlphaSchedule",
+    "ROUTE_GATE_METRIC_KEYS",
+    "RouteGateThresholds",
+    "RouteGateWindow",
     "StageEvaluation",
     "StageGate",
     "curriculum_episode_metadata",

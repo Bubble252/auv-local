@@ -47,6 +47,8 @@ from .validation import (
     _validate_actuator_channel_gain_schedule,
     _validate_actuator_residual_scale_schedule,
     _validate_controller_pitch_override,
+    _apply_eval_start_contract,
+    _validate_eval_start_contract,
     _validate_environment_override,
 )
 
@@ -115,6 +117,7 @@ def _run(
     allow_alos_current_mode_override: bool = False,
     allow_diversity_environment_override: bool = False,
     allow_start_progress_training_override: bool = False,
+    require_nominal_start: bool = True,
     curriculum_stage: str | None = None,
     disable_curriculum_direct_command: bool = False,
     curriculum_current_speed_range_mps: tuple[float, float] | None = None,
@@ -212,6 +215,12 @@ def _run(
         controller_override = load_config(controller_config_path).controller
         _validate_controller_pitch_override(config.controller, controller_override)
         config = replace(config, controller=controller_override)
+    config = _apply_eval_start_contract(
+        config, require_nominal_start=require_nominal_start
+    )
+    _validate_eval_start_contract(
+        config, require_nominal_start=require_nominal_start
+    )
     if config.arm != "PC" or config.policy_mode != "pure_controller":
         raise ValueError("environment config is not a PC pure-controller config")
     effective_current_override = curriculum_current_speed_range_mps
@@ -1350,6 +1359,10 @@ def _run(
             )
     contract = {
         "endpoint_stop_enabled": endpoint_stop_enabled,
+        "nominal_initial_state": bool(config.guidance.nominal_initial_state),
+        "start_contract": (
+            "nominal" if config.guidance.nominal_initial_state else "training_randomized"
+        ),
         "sensor_override": sensor_override,
         "actor_observation_source": (
             "ideal" if config.observation.ideal_actor_observations else "nominal"

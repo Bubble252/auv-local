@@ -23,6 +23,9 @@ ACTOR_INPUT_CONTRACTS = {
     "transformer": ("token_attention", "attention"),
 }
 TRRES_LEARNING_COMPOSITIONS = frozenset({"TRRES_CMD", "TRRES_ACT"})
+LEARNING_COMPOSITIONS = frozenset(
+    {"SCRATCH", "BCFT", "BCRES", "TRRES_CMD", "TRRES_ACT"}
+)
 
 
 def _mapping(
@@ -591,6 +594,9 @@ class PPOTrainingConfig:
     learning_composition: str | None
     encoder_init: str | None
     encoder_init_checkpoint: str | None
+    warmstart_actor: str | None
+    warmstart_actor_sha256: str | None
+    trainable_scope: str | None
     name: str
     arm: str
     seed: int
@@ -902,7 +908,14 @@ def parse_training_config(
         root["experiment"],
         "experiment",
         {"name", "arm", "seed", "output", "device"},
-        optional={"learning_composition", "encoder_init", "encoder_init_checkpoint"},
+        optional={
+            "learning_composition",
+            "encoder_init",
+            "encoder_init_checkpoint",
+            "warmstart_actor",
+            "warmstart_actor_sha256",
+            "trainable_scope",
+        },
     )
     learning_composition = None
     if "learning_composition" in experiment:
@@ -917,6 +930,20 @@ def parse_training_config(
         encoder_init_checkpoint = _string(
             experiment["encoder_init_checkpoint"],
             "experiment.encoder_init_checkpoint",
+        )
+    warmstart_actor = None
+    if "warmstart_actor" in experiment:
+        warmstart_actor = _string(experiment["warmstart_actor"], "experiment.warmstart_actor")
+    warmstart_actor_sha256 = None
+    if "warmstart_actor_sha256" in experiment:
+        warmstart_actor_sha256 = _string(
+            experiment["warmstart_actor_sha256"],
+            "experiment.warmstart_actor_sha256",
+        )
+    trainable_scope = None
+    if "trainable_scope" in experiment:
+        trainable_scope = _string(
+            experiment["trainable_scope"], "experiment.trainable_scope"
         )
     environment = _mapping(
         root["environment"],
@@ -1624,6 +1651,9 @@ def parse_training_config(
         learning_composition=learning_composition,
         encoder_init=encoder_init,
         encoder_init_checkpoint=encoder_init_checkpoint,
+        warmstart_actor=warmstart_actor,
+        warmstart_actor_sha256=warmstart_actor_sha256,
+        trainable_scope=trainable_scope,
         name=_string(experiment["name"], "experiment.name"),
         arm=_string(experiment["arm"], "experiment.arm"),
         seed=_integer(experiment["seed"], "experiment.seed"),
@@ -1763,7 +1793,51 @@ def _validate_semantics(config: PPOTrainingConfig) -> None:
         raise ValueError("algorithm.num_mini_batches exceeds rollout sample count")
     if config.arm not in {"I", "O", "PC", "R", "S"}:
         raise ValueError("experiment.arm must be I, O, PC, R, or S")
+    if (
+        config.learning_composition is not None
+        and config.learning_composition not in LEARNING_COMPOSITIONS
+    ):
+        raise ValueError(
+            "experiment.learning_composition must be one of "
+            f"{sorted(LEARNING_COMPOSITIONS)}"
+        )
+    if config.learning_composition == "BCFT":
+        if config.warmstart_actor is None or config.warmstart_actor_sha256 is None:
+            raise ValueError(
+                "BCFT requires experiment.warmstart_actor and "
+                "experiment.warmstart_actor_sha256"
+            )
+        if config.trainable_scope not in {"actor_critic", "actor_only"}:
+            raise ValueError(
+                "BCFT requires experiment.trainable_scope in "
+                "{'actor_critic', 'actor_only'}"
+            )
+        if config.base_mode != "none":
+            raise ValueError(
+                "BCFT requires base_policy.mode='none'; use BCRES for a frozen "
+                "BC residual base"
+            )
+    if config.learning_composition == "BCRES":
+        if config.base_mode != "frozen_pc_bc_residual":
+            raise ValueError(
+                "BCRES requires base_policy.mode='frozen_pc_bc_residual'"
+            )
+        if config.base_checkpoint is None or config.base_checkpoint_sha256 is None:
+            raise ValueError(
+                "BCRES requires base_policy.checkpoint and "
+                "base_policy.checkpoint_sha256"
+            )
+        if config.warmstart_actor is not None:
+            raise ValueError(
+                "BCRES must not set experiment.warmstart_actor; the frozen BC "
+                "checkpoint belongs in base_policy"
+            )
     if config.learning_composition in TRRES_LEARNING_COMPOSITIONS:
+        if config.warmstart_actor is not None:
+            raise ValueError(
+                f"{config.learning_composition} must not set experiment.warmstart_actor; "
+                "TRRES_ENCODER_INIT_INVALID"
+            )
         if config.base_mode != "none":
             raise ValueError(
                 f"{config.learning_composition} requires base_policy.mode='none'; "
@@ -1834,6 +1908,7 @@ __all__ = [
     "ActorMetadata",
     "ARM_BASE_MODE_CONSISTENCY",
     "TRRES_LEARNING_COMPOSITIONS",
+    "LEARNING_COMPOSITIONS",
     "EncoderConfig",
     "HistoryConfig",
     "PCConfig",

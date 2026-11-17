@@ -158,6 +158,37 @@ def test_unbiased_nav_noise_is_zero_mean_without_drift() -> None:
     assert torch.all((last - first).abs() < 0.02), (first, last)
 
 
+def test_current_estimate_warm_starts_from_first_valid_measurement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile = replace(
+        PROFILES["unbiased_small_noise_v2"],
+        current_est_hz=(50.0, 50.0),
+        current_est_delay_s=(0.0, 0.0),
+        current_est_noise_mps=(0.0, 0.0),
+        current_est_bias_mps=(0.0, 0.0),
+        current_est_walk_mps=(0.0, 0.0),
+        current_est_tau_s=(10.0, 10.0),
+        current_est_outage_start_prob=(0.0, 0.0),
+    )
+    monkeypatch.setitem(PROFILES, "unbiased_small_noise_v2", profile)
+    config = _pc_config(profile="unbiased_small_noise_v2")
+    suite = SyntheticSensorSuite(config, num_envs=4, dtype=torch.float64)
+    suite.reset([40, 41, 42, 43])
+    eta = torch.zeros((4, 6), dtype=torch.float64)
+    nu = torch.zeros((4, 6), dtype=torch.float64)
+    current = torch.tensor([[0.4, 0.0, 0.0]] * 4, dtype=torch.float64)
+
+    output = suite.step(eta_true=eta, nu_true=nu, current_true_ned_mps=current)
+    torch.testing.assert_close(suite._current_lpf, current)
+    torch.testing.assert_close(output.current_estimate_body, current)
+    queue = suite._queues["current"]
+    assert queue.buffer is not None
+    expected = current[:, None, :].expand_as(queue.buffer)
+    torch.testing.assert_close(queue.buffer, expected)
+    assert bool(suite._current_initialized.all())
+
+
 def test_termination_position_source_eta_ignores_pnav_bias() -> None:
     config = _pc_config(position_source="eta")
     env = BatchedPCLowLevelEnv(config, num_envs=2, validate_finite=True)

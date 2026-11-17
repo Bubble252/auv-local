@@ -94,6 +94,27 @@ GOAL182_RESIDUAL_CONFIG_PATH = (
     / "goal182"
     / "train_residual_5d_m_seed86201.json"
 )
+GOAL182_TRRES_CMD_CONFIG_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "configs"
+    / "lowlevel"
+    / "goal182"
+    / "train_trres_cmd_5d_m_seed86201.json"
+)
+GOAL182_TRRES_ACT_CONFIG_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "configs"
+    / "lowlevel"
+    / "goal182"
+    / "train_trres_act_5d_m_seed86201.json"
+)
+GOAL182_ALOS_ENV_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "configs"
+    / "lowlevel"
+    / "goal182"
+    / "env_alos_c3_a0_base.json"
+)
 HIDDEN_I_ENVIRONMENT_PATH = (
     Path(__file__).resolve().parents[1]
     / "configs"
@@ -194,7 +215,13 @@ def test_actor_metadata_contract_must_match_actor_kind() -> None:
 
 
 @pytest.mark.parametrize(
-    "path", [GOAL182_FINETUNE_CONFIG_PATH, GOAL182_RESIDUAL_CONFIG_PATH]
+    "path",
+    [
+        GOAL182_FINETUNE_CONFIG_PATH,
+        GOAL182_RESIDUAL_CONFIG_PATH,
+        GOAL182_TRRES_CMD_CONFIG_PATH,
+        GOAL182_TRRES_ACT_CONFIG_PATH,
+    ],
 )
 def test_goal182_configs_declare_explicit_actor_metadata(path: Path) -> None:
     config = load_training_config(path)
@@ -208,8 +235,101 @@ def test_goal182_configs_declare_explicit_actor_metadata(path: Path) -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("path", "composition"),
+    [
+        (GOAL182_FINETUNE_CONFIG_PATH, "BCFT"),
+        (GOAL182_RESIDUAL_CONFIG_PATH, "BCRES"),
+        (GOAL182_TRRES_CMD_CONFIG_PATH, "TRRES_CMD"),
+        (GOAL182_TRRES_ACT_CONFIG_PATH, "TRRES_ACT"),
+    ],
+)
+def test_goal182_configs_declare_learning_composition(
+    path: Path, composition: str
+) -> None:
+    config = load_training_config(path)
+
+    assert config.learning_composition == composition
+
+
+@pytest.mark.parametrize(
+    ("path", "composition", "action_interface"),
+    [
+        (GOAL182_TRRES_CMD_CONFIG_PATH, "TRRES_CMD", "command"),
+        (GOAL182_TRRES_ACT_CONFIG_PATH, "TRRES_ACT", "actuator"),
+    ],
+)
+def test_goal182_trres_configs_use_fresh_alos_base(
+    path: Path, composition: str, action_interface: str
+) -> None:
+    config = load_training_config(path)
+
+    assert config.learning_composition == composition
+    assert config.base_mode == "none"
+    assert config.encoder_init == "standard_fresh"
+    assert config.encoder_init_checkpoint is None
+    assert config.warmstart_actor is None
+    assert config.pc is not None
+    assert config.pc.action_interface == action_interface
+    assert config.pc.actor_command_dim == 3
+    assert config.pc.critic_command_dim == 3
+
+
+def test_goal182_alos_environment_declares_command_tracking_contract() -> None:
+    config = load_config(GOAL182_ALOS_ENV_PATH)
+
+    assert config.pc_control_mode == "alos"
+    assert config.reward.mode == "pc_command_track_v2"
+    assert config.reward.hold_bonus is False
+    assert config.reward.w_cmd_yaw == pytest.approx(1.0)
+    assert config.reward.w_cmd_pitch == pytest.approx(1.0)
+    assert config.reward.w_cmd_speed == pytest.approx(2.5)
+    assert config.reward.w_path_cross == pytest.approx(3.5)
+    assert config.reward.w_path_vertical == pytest.approx(1.5)
+    assert config.command_residual.enabled is True
+
+
+def test_bcft_requires_warmstart_and_no_frozen_base() -> None:
+    payload = json.loads(GOAL182_FINETUNE_CONFIG_PATH.read_text(encoding="utf-8"))
+    payload["experiment"].pop("warmstart_actor")
+
+    with pytest.raises(ValueError, match="BCFT requires experiment.warmstart_actor"):
+        parse_training_config(payload)
+
+    payload = json.loads(GOAL182_FINETUNE_CONFIG_PATH.read_text(encoding="utf-8"))
+    payload["base_policy"]["mode"] = "frozen_pc_bc_residual"
+    payload["base_policy"]["checkpoint"] = "bc.pt"
+    payload["base_policy"]["checkpoint_sha256"] = "0" * 64
+    payload["base_policy"]["residual_scale"] = 1.0
+
+    with pytest.raises(ValueError, match="BCFT requires base_policy.mode='none'"):
+        parse_training_config(payload)
+
+
+def test_bcres_requires_frozen_base_and_rejects_warmstart() -> None:
+    payload = json.loads(GOAL182_RESIDUAL_CONFIG_PATH.read_text(encoding="utf-8"))
+    payload["base_policy"]["mode"] = "none"
+    payload["base_policy"]["checkpoint"] = None
+    payload["base_policy"]["checkpoint_sha256"] = None
+    payload["base_policy"].pop("residual_scale")
+    payload["base_policy"].pop("residual_action_mask")
+
+    with pytest.raises(
+        ValueError, match="BCRES requires base_policy.mode='frozen_pc_bc_residual'"
+    ):
+        parse_training_config(payload)
+
+    payload = json.loads(GOAL182_RESIDUAL_CONFIG_PATH.read_text(encoding="utf-8"))
+    payload["experiment"]["warmstart_actor"] = payload["base_policy"]["checkpoint"]
+
+    with pytest.raises(ValueError, match="BCRES must not set experiment.warmstart_actor"):
+        parse_training_config(payload)
+
+
 def test_trres_requires_fresh_encoder_initialization() -> None:
     payload = json.loads(GOAL182_FINETUNE_CONFIG_PATH.read_text(encoding="utf-8"))
+    for key in ("warmstart_actor", "warmstart_actor_sha256", "trainable_scope"):
+        payload["experiment"].pop(key, None)
     payload["experiment"]["learning_composition"] = "TRRES_CMD"
     payload["experiment"]["encoder_init"] = "standard_fresh"
 
@@ -221,6 +341,8 @@ def test_trres_requires_fresh_encoder_initialization() -> None:
 
 def test_trres_rejects_borrowed_encoder_or_bc_base() -> None:
     payload = json.loads(GOAL182_FINETUNE_CONFIG_PATH.read_text(encoding="utf-8"))
+    for key in ("warmstart_actor", "warmstart_actor_sha256", "trainable_scope"):
+        payload["experiment"].pop(key, None)
     payload["experiment"]["learning_composition"] = "TRRES_ACT"
     payload["experiment"]["encoder_init"] = "bc_checkpoint"
 

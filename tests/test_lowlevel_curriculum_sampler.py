@@ -16,12 +16,31 @@ from auv_lowlevel.curriculum import (
     CurriculumPromotionController,
     CurriculumStageSampler,
     EpisodeManifestWriter,
+    RouteGateThresholds,
+    RouteGateWindow,
     StageEvaluation,
     curriculum_stage_mix_target,
     curriculum_stratum,
     default_curriculum_stages,
     high_speed_curriculum_stages,
 )
+
+
+def _route_metrics(
+    *,
+    cross: float = 0.2,
+    vertical: float = 0.2,
+    three_d: float = 0.3,
+    completion: float = 0.9,
+    safety: float = 0.0,
+):
+    return {
+        "/episode/cross_track_rmse_mean": cross,
+        "/episode/vertical_rmse_mean": vertical,
+        "/episode/pre_goal_3d_rmse_mean": three_d,
+        "/episode/path_completion_mean": completion,
+        "/episode/safety_termination_rate": safety,
+    }
 
 
 def _passing_evaluation(default: float = 0.92) -> StageEvaluation:
@@ -408,3 +427,88 @@ def test_stage_mix_ramp_is_linear_and_sets_sampler_mix() -> None:
     for key, weight in target:
         assert counts[key] == pytest.approx(weight, abs=0.035)
 
+
+
+def test_route_gate_window_is_shadow_until_thresholds_are_frozen() -> None:
+    gate = RouteGateWindow(window_size=20, consecutive_required=3, mode="shadow")
+    status = {}
+    for iteration in range(1, 73):
+        status = gate.observe(
+            stage="C0",
+            iteration=iteration,
+            metrics=_route_metrics(),
+            min_iterations=72,
+            thresholds=None,
+        )
+    assert status["available"] is True
+    assert status["window_fill"] == 20
+    assert status["eligible"] is True
+    assert status["would_pass"] is None
+    assert status["reason"] == "CALIBRATION_MISSING"
+    assert status["should_promote"] is False
+
+
+def test_route_gate_window_requires_three_consecutive_passes_in_enforce_mode() -> None:
+    thresholds = RouteGateThresholds(
+        cross_track_rmse_max_m=0.25,
+        vertical_rmse_max_m=0.25,
+        pre_goal_3d_rmse_max_m=0.35,
+        completion_min=0.8,
+        safety_max=0.01,
+    )
+    gate = RouteGateWindow(window_size=20, consecutive_required=3, mode="enforce")
+    status = {}
+    for iteration in range(1, 21):
+        status = gate.observe(
+            stage="C0",
+            iteration=iteration,
+            metrics=_route_metrics(),
+            min_iterations=20,
+            thresholds=thresholds,
+        )
+    assert status["would_pass"] is True
+    assert status["consecutive_passes"] == 1
+    assert status["should_promote"] is False
+    for iteration in (21, 22):
+        status = gate.observe(
+            stage="C0",
+            iteration=iteration,
+            metrics=_route_metrics(),
+            min_iterations=20,
+            thresholds=thresholds,
+        )
+    assert status["consecutive_passes"] == 3
+    assert status["should_promote"] is True
+
+    for iteration in range(23, 43):
+        status = gate.observe(
+            stage="C0",
+            iteration=iteration,
+            metrics=_route_metrics(cross=0.5),
+            min_iterations=20,
+            thresholds=thresholds,
+        )
+    assert status["would_pass"] is False
+    assert status["consecutive_passes"] == 0
+    assert status["should_promote"] is False
+
+
+def test_route_gate_window_resets_on_stage_change() -> None:
+    gate = RouteGateWindow(window_size=2, consecutive_required=1, mode="shadow")
+    for iteration in (1, 2):
+        gate.observe(
+            stage="C0",
+            iteration=iteration,
+            metrics=_route_metrics(),
+            min_iterations=0,
+            thresholds=None,
+        )
+    status = gate.observe(
+        stage="C1",
+        iteration=3,
+        metrics=_route_metrics(),
+        min_iterations=0,
+        thresholds=None,
+    )
+    assert status["window_fill"] == 1
+    assert status["eligible"] is False

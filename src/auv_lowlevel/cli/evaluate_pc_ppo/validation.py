@@ -32,6 +32,32 @@ def _validate_trace_reward_breakdown(
         raise ValueError("--trace-reward-breakdown requires --trace-output")
 
 
+def _apply_eval_start_contract(
+    config: Any, *, require_nominal_start: bool = True
+) -> Any:
+    """Force the formal evaluation start to the nominal, unperturbed state."""
+
+    if not require_nominal_start or config.guidance.nominal_initial_state:
+        return config
+    return replace(
+        config,
+        guidance=replace(config.guidance, nominal_initial_state=True),
+    )
+
+
+def _validate_eval_start_contract(
+    config: Any, *, require_nominal_start: bool = True
+) -> None:
+    """Reject a formal evaluation config that still randomizes the start."""
+
+    if require_nominal_start and not bool(config.guidance.nominal_initial_state):
+        raise ValueError(
+            "INVALID_EVAL_START_CONTRACT: formal evaluation requires "
+            "guidance.nominal_initial_state=true; pass "
+            "--allow-non-nominal-start only for non-formal diagnostics"
+        )
+
+
 def _validate_actuator_residual_scale_schedule(
     *,
     near: float | None,

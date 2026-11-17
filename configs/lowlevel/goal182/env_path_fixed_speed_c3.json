@@ -97,6 +97,10 @@
     "compensate_current": false,
     "horizontal_gain": 2.5,
     "horizontal_lookahead_m": 3,
+    "initial_angular_rate_range": [
+      -0.05,
+      0.05
+    ],
     "initial_propeller_rpm_ratio": 0.0,
     "initial_propeller_rpm_ratio_range": [
       0.0,
@@ -104,8 +108,8 @@
     ],
     "initial_speed_ratio": 1.0,
     "initial_speed_ratio_range": [
-      0.75,
-      1.25
+      0.8,
+      1.2
     ],
     "lookahead_error_gain": 1,
     "max_lookahead_m": 20,
@@ -166,8 +170,9 @@
     "path_bank_size": 32,
     "sample_spacing_m": 0.1,
     "speed_mps": 1.2,
+    "start_jitter_pitch_rad": 0.1745329252,
     "start_jitter_xy_m": 0.5,
-    "start_jitter_yaw_rad": 0.0872664626,
+    "start_jitter_yaw_rad": 0.1745329252,
     "start_jitter_z_m": 0.5,
     "x_span_m": 30
   },

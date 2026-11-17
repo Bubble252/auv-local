@@ -230,6 +230,14 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--allow-non-nominal-start",
+        action="store_true",
+        help=(
+            "diagnostic only: allow guidance.nominal_initial_state=false; "
+            "formal evaluation requires the nominal start contract"
+        ),
+    )
+    parser.add_argument(
         "--allow-actor-observation-override",
         action="store_true",
         help=(

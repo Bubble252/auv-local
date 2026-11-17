@@ -78,6 +78,7 @@ def main() -> int:
         allow_alos_current_mode_override=args.allow_alos_current_mode_override,
         allow_diversity_environment_override=(args.allow_diversity_environment_override),
         allow_start_progress_training_override=(args.allow_start_progress_training_override),
+        require_nominal_start=not args.allow_non_nominal_start,
         curriculum_stage=args.curriculum_stage,
         disable_curriculum_direct_command=args.disable_curriculum_direct_command,
         curriculum_current_speed_range_mps=(
@@ -121,6 +122,11 @@ def main() -> int:
     report = {
         "schema_version": "auv_pc_ppo_evaluation.v1",
         "training_config": str(training_config_path),
+        "actor": (
+            None if training_config.actor is None else training_config.actor.as_dict()
+        ),
+        "learning_composition": training_config.learning_composition,
+        "trainable_scope": training_config.trainable_scope,
         "environment_config": str(selected_environment_config),
         "curriculum_stage": args.curriculum_stage,
         "curriculum_current_speed_range_override_mps": (
@@ -141,6 +147,9 @@ def main() -> int:
         "alos_current_mode_override": args.allow_alos_current_mode_override,
         "diversity_environment_override": (args.allow_diversity_environment_override),
         "start_progress_training_override": (args.allow_start_progress_training_override),
+        "non_nominal_start_override": args.allow_non_nominal_start,
+        "nominal_initial_state": contract["nominal_initial_state"],
+        "start_contract": contract["start_contract"],
         "guidance_command_rate_limit_enabled": (effective_guidance.command_rate_limit_enabled),
         "guidance_pitch_rate_limit_rad_s": (effective_guidance.pitch_rate_limit_rad_s),
         "guidance_heading_rate_limit_rad_s": (effective_guidance.heading_rate_limit_rad_s),

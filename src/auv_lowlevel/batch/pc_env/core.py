@@ -696,7 +696,12 @@ class BatchedPCLowLevelEnv:
             mask,
         )
         speed_ratio_range = self.config.guidance.initial_speed_ratio_range
-        if speed_ratio_range is None:
+        nominal_initial_state = bool(self.config.guidance.nominal_initial_state)
+        if nominal_initial_state:
+            initial_speed_ratio = torch.ones(
+                (count,), device=self.device, dtype=self.dtype
+            )
+        elif speed_ratio_range is None:
             initial_speed_ratio = torch.full(
                 (count,),
                 float(self.config.guidance.initial_speed_ratio),
@@ -713,7 +718,11 @@ class BatchedPCLowLevelEnv:
                 generator=self._command_generator,
             )
         rpm_ratio_range = self.config.guidance.initial_propeller_rpm_ratio_range
-        if rpm_ratio_range is None:
+        if nominal_initial_state:
+            initial_rpm_ratio = torch.ones(
+                (count,), device=self.device, dtype=self.dtype
+            )
+        elif rpm_ratio_range is None:
             initial_rpm_ratio = torch.full(
                 (count,),
                 float(self.config.guidance.initial_propeller_rpm_ratio),
@@ -750,6 +759,20 @@ class BatchedPCLowLevelEnv:
             )
             self.actuator[mask, 2] = rpm
             self.previous_actuator[mask, 2] = rpm
+        angular_rate_range = self.config.guidance.initial_angular_rate_range
+        if not nominal_initial_state and angular_rate_range is not None:
+            seeds_tensor = self.episode_seed[mask]
+            unit_rates = torch.stack(
+                [
+                    self._seed_unit_interval(seeds_tensor, salt=salt)
+                    for salt in (0xA11, 0xB22, 0xC33)
+                ],
+                dim=1,
+            ).to(dtype=self.dtype)
+            low, high = (float(value) for value in angular_rate_range)
+            angular_rates = low + (high - low) * unit_rates
+            self.nu = self.nu.clone()
+            self.nu[mask, 3:6] = angular_rates
 
     def _reset_direct_commands(self, mask: Tensor, seeds: list[int] | None) -> None:
         if self.t_s is None:
@@ -1598,19 +1621,39 @@ class BatchedPCLowLevelEnv:
             -start_tangent[:, 2], torch.linalg.norm(start_tangent[:, :2], dim=1)
         )
         eta = torch.empty((count, 6), device=self.device, dtype=self.dtype)
-        eta[:, :3] = start_point + randomization.start_jitter_ned_m
+        nominal = bool(self.config.guidance.nominal_initial_state)
+        start_jitter = (
+            torch.zeros_like(randomization.start_jitter_ned_m)
+            if nominal
+            else randomization.start_jitter_ned_m
+        )
+        yaw_jitter = (
+            torch.zeros_like(randomization.start_yaw_jitter_rad)
+            if nominal
+            else randomization.start_yaw_jitter_rad
+        )
+        pitch_jitter = (
+            torch.zeros((count,), device=self.device, dtype=self.dtype)
+            if nominal
+            else (2.0 * self._seed_unit_interval(randomization.seed, salt=0x51ED) - 1.0).to(
+                dtype=self.dtype
+            )
+            * float(self.config.reference.start_jitter_pitch_rad)
+        )
+        eta[:, :3] = start_point + start_jitter
         eta[:, 3] = 0.0
-        eta[:, 4] = start_pitch
-        eta[:, 5] = wrap_angle(start_yaw + randomization.start_yaw_jitter_rad)
+        eta[:, 4] = start_pitch + pitch_jitter
+        eta[:, 5] = wrap_angle(start_yaw + yaw_jitter)
         nu = torch.zeros((count, 6), device=self.device, dtype=self.dtype)
         nu[:, 0] = self.config.guidance.initial_speed_ratio * float(self.config.reference.speed_mps)
         return eta, nu
 
     @staticmethod
-    def _seed_unit_interval(seeds: Tensor) -> Tensor:
+    def _seed_unit_interval(seeds: Tensor, *, salt: int = 0) -> Tensor:
         """Deterministic per-episode uniform hash in ``[0, 1)`` for seed tensors."""
 
         values = seeds.to(device=seeds.device, dtype=torch.int64).bitwise_and(0xFFFFFFFF)
+        values = values.bitwise_xor(int(salt) & 0xFFFFFFFF)
         values = values.bitwise_xor(values.bitwise_right_shift(16))
         values = values * 0x45D9F3B
         values = values.bitwise_xor(values.bitwise_right_shift(16))

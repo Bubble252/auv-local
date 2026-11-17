@@ -2,8 +2,15 @@
 
 ```yaml
 scope: settled_局部规划器_反应式
-current_goal: Goal178 已完成；A_S150 的闭环改善归因于冻结 BC authority 0.75 -> 1.50，不是 PPO head。Goal179 已写成 DRAFT_FOR_APPROVAL，尚未启动实验。
-next_goal: Goal179 Phase A：固定 BC authority 0.75，只扫 s_head=1/4/8/16 的 eval-only head-only 诊断；随后做 BC/PPO 抵消、reward credit 和 PPO update credit 审计。A–C 未通过前不启动 H0/H1 训练。
+current_goal: Goal182 基础设施收尾。actor metadata、reset/nominal start、TRRES config、route telemetry 和 composition 契约已落地并通过组合回归；源码仍缺 routine StageGate 训练 rollout 20/3 的 enforce 接线和 Goal182 artifact auditor，StageGate 默认必须保持 shadow。
+next_goal: 先对当前 Goal182 基础设施做本地 checkpoint commit（需用户批准，不 push），再实现并测试 StageGate enforce 机制与 artifact auditor；之后等待 D13.6a–d 数值决策、用户批准 commit/push，并同步到 8×4090 新建干净 worktree，依次跑 CONTRACT_SMOKE、QUICK_SCREEN 和正式训练。
+goal182_status: ACTIVE / INFRA_VERIFIED / STAGEGATE_ENFORCE_PENDING / EVAL_CANONICAL_ARTIFACTS_PENDING / ARTIFACT_AUDITOR_PENDING / TRAINING_NOT_STARTED
+goal182_plan: doc/goals/goal182_ppo_stack_governance_20261114.md
+goal182_audit: doc/goals/goal182_infra_audit_20261116.md
+goal182_execution_prompt: /home/bubble/水下机器人/总协调/doc/ops/GOAL182_INFRA_THEN_TRAIN_PROMPT_20261116.md
+goal182_worktree: /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/goal182-infra-detached-20261116
+goal182_server: ssh -p 43127 yhx@152.136.183.51；节点 underwater-8x4090；数据根 /data/yhx/underwater-robotics；旧 goal182 worktree 均为 c186c74 且 dirty，不复用。
+goal182_blockers: auv-refactor-guard 阻止 dirty worktree 源码改动，需用户批准本地 checkpoint commit；StageGate enforce、evaluator 默认 episodes.jsonl/trace.npz 与 artifact auditor 未实现；D13.6a–d 仍需定夺；本地 commit 后需用户批准 push 才能建服务器干净 worktree。
 goal175_status: A2_COMPLETE / GATE175_FAIL / VERTICAL_GUARD_FAIL / H175C_NOT_SUPPORTED / HELDOUT_CLOSED
 goal175_result: doc/goals/goal175_result_20261114.md
 goal175_a1_result: doc/goals/goal175_a1_result_20261114.md

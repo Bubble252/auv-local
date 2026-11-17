@@ -1375,11 +1375,10 @@ radius 都要保留各压力自己的 mean、median、p90、`n`、无效 cell �
 
 - Goal173/175/177/179 已使用 `arms × levels × radii × seeds + zero baselines` 的
   `auv_goal_matrix.v1`，但字段语义不完全统一，且 `level` 同时承载压力档；
-- Goal182 的 `goal182_axis_registry.json` 已创建，但仍为
-  `DRAFT_FOR_APPROVAL`；`goal182_core_composition_index.json`、
+- Goal182 的 `goal182_axis_registry.json`、`goal182_core_composition_index.json`、
   `goal182_core_pe2e_matrix.json`、`goal182_core_alosb_matrix.json` 和
-  `goal182_eval_matrix.json` 尚未生成；protocol checker、matrix checker、
-  artifact auditor 也尚不存在；
+  `goal182_eval_matrix.json` 已生成 DRAFT；matrix/eval checker 已存在并通过，
+  Goal182 artifact auditor 仍未实现；
 - 通读时发现 Goal182 §5.1 已冻结只保留 `default 2.0 m`，而旧 §5.3 仍写 `× 2 radii`；
   该内部冲突已在本次 §5.3 修订中改为单一 `2.0 m`；
 - 当前 600-it 结果只覆盖 C3、4 个 eval seeds，不是完整 `arms × levels × radii`；
@@ -2044,22 +2043,25 @@ ALOS + 命令层残差。完整的 `run_id` 和 `eval_cell` 继续使用 §4.12.
 
 #### 4.13.6 当前代码对照与缺口
 
-- `AX_ACTOR_BACKEND`：**未实现**。当前 `encoder.kind` 是历史编码器，不是 actor；
-  必须先落地 `actor_kind=mlp|token_mlp|transformer`、`actor_input_contract`
-  （`fused|token_mean|token_attention`）、token contract、pooling 和 M 档容量配对。
+- `AX_ACTOR_BACKEND`：**schema 和 MLP/token 契约已实现**。`actor_kind=mlp|token_mlp|
+  transformer`、`actor_input_contract`、token contract、pooling 已写入 config /
+  checkpoint / manifest / matrix，并由 parser、launcher 和 checker 强制；`AB_TA_M`
+  的 Transformer 实现与 M 档容量配对仍后置。
 - `AX_CONTROL_CONTRACT`：**已实现**。`pc_control_mode` 已有 `alos`、
   `path_fixed_speed`、`path_learned_speed`。
-- `LC_BC_FINETUNE`：**部分实现**。`--warmstart-actor` 可加载 BC actor，但未写入
-  config/matrix；必须把 warmstart SHA 和可训练范围变成一等字段。
-- `LC_BC_RESIDUAL`：**已实现执行器残差**。`frozen_pc_bc_residual` 路径存在，但当前
-  只支持 `absolute/environment/actuator`，不支持命令层残差；`BCRES_CMD` 需另做。
+- `LC_BC_FINETUNE`：**已实现**。`warmstart_actor`、SHA 和 `trainable_scope` 已是
+  config/manifest 一等字段；BCFT 强制 `base_policy.mode=none`。
+- `LC_BC_RESIDUAL`：**已实现执行器残差契约**。BCRES 强制
+  `frozen_pc_bc_residual` + checkpoint/SHA，并禁止额外的 warmstart；当前仍只支持
+  `absolute/environment/actuator`，不支持命令层残差，`BCRES_CMD` 需另做。
 - `LC_TRAD_RESIDUAL`：**代码组件存在但未接入 Goal182**。PPO 支持
   `BatchedPCCommandResidualEnv` 和 `BatchedPCActuatorResidualEnv`；
   `controller_gain` 残差目前主要在 SAC 路径，PPO 路径未接线。
-- `AX_MODULE_SET`：**组件存在但未命名成组**。history/dual-horizon encoder、DADE、
-  actor current encoder、privileged critic 都有独立字段，但没有 `MS_*` 组合 schema。
-- `FORMAL_C0_C6`：**阻塞**。`curriculum.py` 当前 hard cap 仍按 transition 计，
-  与已确认的 iteration 预算不一致；正式核心 arm 启动前必须修复。
+- `AX_MODULE_SET`：**registry 已命名成组，生成器待展开**。history/dual-horizon
+  encoder、DADE、actor current encoder、privileged critic 已有 `MOD0–MOD4` 映射；
+  训练 config 生成器仍需按该映射展开。
+- `FORMAL_C0_C6`：**已实现**。C0–C6 hard cap 已按 iteration 计；transition 只作
+  遥测。
 
 #### 4.13.7 待确认 CM1–CM9
 
@@ -2132,7 +2134,8 @@ ALOS + 命令层残差。完整的 `run_id` 和 `eval_cell` 继续使用 §4.12.
 - 现有 goal182 训练配置是固定 C3、`promotion_enabled=false`，只能作 screen /
   diagnostic，不是正式 C0→C6。
 - `goal182_core_composition_index.json`、两张 program core matrix 和
-  `goal182_eval_matrix.json` 尚未生成；当前只有 `goal182_axis_registry.json`。
+  `goal182_eval_matrix.json` 已生成 DRAFT 并通过 checker；Goal182 artifact auditor
+  仍缺失，正式评价前必须补齐。
 - evaluator summary 的 `success_rate` 仍是 p_nav tight；standing suite 的 primary 是
   `success_eta_tight_at_done`。§4.12.9 默认是低噪声 `unbiased_small_noise_v2`
   （`nav_noise_m=0.001–0.1 m`），`p_nav` 不再等于 `eta`；只有 optional

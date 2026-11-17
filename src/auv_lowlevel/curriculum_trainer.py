@@ -13,6 +13,8 @@ from .curriculum import (
     CurriculumMixRamp,
     CurriculumPromotionController,
     CurriculumStageSampler,
+    RouteGateThresholds,
+    RouteGateWindow,
     StageEvaluation,
     StageGate,
     curriculum_stage_mix_target,
@@ -146,6 +148,8 @@ class CurriculumTrainerHook:
         preview_enabled: bool = True,
         force_current_encoder_alpha_zero: bool = False,
         promotion_enabled: bool = True,
+        routine_gate: RouteGateWindow | None = None,
+        route_gate_thresholds: RouteGateThresholds | None = None,
     ) -> None:
         if isinstance(eval_interval_transitions, bool) or eval_interval_transitions <= 0:
             raise ValueError("eval_interval_transitions must be a positive integer")
@@ -163,6 +167,8 @@ class CurriculumTrainerHook:
             force_current_encoder_alpha_zero
         )
         self.promotion_enabled = bool(promotion_enabled)
+        self.routine_gate = routine_gate
+        self.route_gate_thresholds = route_gate_thresholds
         self._next_eval_transition = int(eval_interval_transitions)
         self._mix_ramp: CurriculumMixRamp | None = None
         self._stage_entered_at = 0
@@ -188,6 +194,9 @@ class CurriculumTrainerHook:
             "stage_mix": [[key, float(weight)] for key, weight in self.sampler.stage_mix],
             "promotion_enabled": self.promotion_enabled,
             "frozen_stage": None if self.promotion_enabled else self.controller.stage,
+            "route_gate": (
+                None if self.routine_gate is None else dict(self.routine_gate.last_status)
+            ),
             "last_decision": None if decision is None else decision.value,
             "rollbacks_used": self.controller.rollbacks_used,
             "force_current_encoder_alpha_zero": self.force_current_encoder_alpha_zero,
@@ -208,6 +217,7 @@ class CurriculumTrainerHook:
         self,
         completed_transitions: int,
         completed_iterations: int | None = None,
+        training_metrics: Mapping[str, Any] | None = None,
     ) -> CurriculumDecision | None:
         """Evaluate at the next scheduled boundary, then promote or roll back."""
 
@@ -218,6 +228,15 @@ class CurriculumTrainerHook:
         ):
             raise ValueError("completed_iterations must be a non-negative integer")
         self._apply_mix_ramp(completed_transitions)
+        if self.routine_gate is not None and training_metrics is not None:
+            spec = self.controller.stages[self.controller.stage]
+            self.routine_gate.observe(
+                stage=self.controller.stage,
+                iteration=0 if completed_iterations is None else completed_iterations,
+                metrics=training_metrics,
+                min_iterations=int(spec.soft_budget_iterations or 0),
+                thresholds=self.route_gate_thresholds,
+            )
         if not self.promotion_enabled:
             if completed_transitions >= self._next_eval_transition:
                 while completed_transitions >= self._next_eval_transition:

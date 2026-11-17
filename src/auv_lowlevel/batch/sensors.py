@@ -519,6 +519,7 @@ class SyntheticSensorSuite:
         self._current_outage_s = torch.zeros((self.num_envs,), device=self.device, dtype=self.dtype)
         self._current_lpf: Tensor | None = None
         self._current_walk: Tensor | None = None
+        self._current_initialized: Tensor | None = None
         self._attitude_drift = torch.zeros((self.num_envs, 3), device=self.device, dtype=self.dtype)
         self._nav_ou = torch.zeros((self.num_envs, 3), device=self.device, dtype=self.dtype)
         self._nav_event = torch.zeros((self.num_envs, 3), device=self.device, dtype=self.dtype)
@@ -719,6 +720,9 @@ class SyntheticSensorSuite:
         self._usbl_last.zero_()
         self._current_lpf = torch.zeros((self.num_envs, 3), device=self.device, dtype=self.dtype)
         self._current_walk = torch.zeros((self.num_envs, 3), device=self.device, dtype=self.dtype)
+        self._current_initialized = torch.zeros(
+            (self.num_envs,), device=self.device, dtype=torch.bool
+        )
         for queue in self._queues.values():
             queue.reset(self.num_envs)
 
@@ -762,8 +766,10 @@ class SyntheticSensorSuite:
             -self.profile.nav_bias_calibration_fraction * self._params.nav_bias[mask_t]
         )
         assert self._current_lpf is not None and self._current_walk is not None
+        assert self._current_initialized is not None
         self._current_lpf[mask_t] = 0.0
         self._current_walk[mask_t] = 0.0
+        self._current_initialized[mask_t] = False
         for queue in self._queues.values():
             if queue.buffer is None:
                 raise RuntimeError("delay queue must be initialized")
@@ -843,8 +849,10 @@ class SyntheticSensorSuite:
         )
         previous_state = [tensor.clone() for tensor in state_tensors]
         assert self._current_lpf is not None and self._current_walk is not None
+        assert self._current_initialized is not None
         previous_current_lpf = self._current_lpf.clone()
         previous_current_walk = self._current_walk.clone()
+        previous_current_initialized = self._current_initialized.clone()
         previous_queues = {
             name: (queue.buffer.clone(), queue.cursor)
             for name, queue in self._queues.items()
@@ -864,6 +872,9 @@ class SyntheticSensorSuite:
         self._t_s = torch.where(mask_t, self._t_s - dt, previous_state[0])
         self._current_lpf = torch.where(mask_t[:, None], self._current_lpf, previous_current_lpf)
         self._current_walk = torch.where(mask_t[:, None], self._current_walk, previous_current_walk)
+        self._current_initialized = torch.where(
+            mask_t, self._current_initialized, previous_current_initialized
+        )
 
         for name, queue in self._queues.items():
             if queue.buffer is None:
@@ -1170,10 +1181,19 @@ class SyntheticSensorSuite:
             1.0 - torch.exp(-elapsed_s / torch.clamp(p.current_est_tau_s, min=1e-9)),
             torch.ones_like(p.current_est_tau_s),
         )
-        updated_current = self._current_lpf + alpha[:, None] * (target - self._current_lpf)
         current_update = current_due & current_valid
+        assert self._current_initialized is not None
+        first_valid = current_update & ~self._current_initialized
+        blended_current = self._current_lpf + alpha[:, None] * (target - self._current_lpf)
+        updated_current = torch.where(first_valid[:, None], target, blended_current)
         self._current_lpf = torch.where(current_update[:, None], updated_current, self._current_lpf)
         self._queues["current"].push(self._current_lpf)
+        if bool(first_valid.any()):
+            current_queue = self._queues["current"]
+            if current_queue.buffer is None:
+                raise RuntimeError("current delay queue must be initialized")
+            current_queue.buffer[first_valid] = target[first_valid][:, None, :]
+        self._current_initialized = self._current_initialized | current_update
 
         self._nav_last = p_nav_current
         if _prime_rows_mask is not None:

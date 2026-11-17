@@ -278,6 +278,7 @@ class ReferenceConfig:
     start_jitter_xy_m: float
     start_jitter_z_m: float
     start_jitter_yaw_rad: float
+    start_jitter_pitch_rad: float = 0.0
     path_bank_size: int = 1
     path_bank_seed: int = 0
     path_family: str | None = None
@@ -322,6 +323,13 @@ class ReferenceConfig:
             )
         if not math.isfinite(self.start_progress_m) or self.start_progress_m < 0.0:
             raise ValueError("reference.start_progress_m must be finite and non-negative")
+        if (
+            not math.isfinite(self.start_jitter_pitch_rad)
+            or self.start_jitter_pitch_rad < 0.0
+        ):
+            raise ValueError(
+                "reference.start_jitter_pitch_rad must be finite and non-negative"
+            )
         if self.start_progress_m >= self.length_m:
             raise ValueError("reference.start_progress_m must be less than reference.length_m")
         if (
@@ -463,6 +471,8 @@ class GuidanceConfig:
     initial_speed_ratio: float = 1.0
     initial_propeller_rpm_ratio_range: tuple[float, float] | None = None
     initial_speed_ratio_range: tuple[float, float] | None = None
+    initial_angular_rate_range: tuple[float, float] | None = None
+    nominal_initial_state: bool = False
     high_speed_threshold_mps: float = 1.8
     heading_rate_limit_rad_s: float = math.radians(30.0)
     pitch_rate_limit_rad_s: float = math.radians(15.0)
@@ -599,10 +609,30 @@ class GuidanceConfig:
                 raise ValueError(f"guidance.{name} must be a finite [min, max] pair")
             if value[0] < 0.0 or value[0] > value[1]:
                 raise ValueError(f"guidance.{name} must satisfy 0 <= min <= max")
+        angular_rate_range = self.initial_angular_rate_range
+        if angular_rate_range is not None:
+            if len(angular_rate_range) != 2 or not all(
+                math.isfinite(item) for item in angular_rate_range
+            ):
+                raise ValueError(
+                    "guidance.initial_angular_rate_range must be a finite [min, max] pair"
+                )
+            if angular_rate_range[0] > angular_rate_range[1]:
+                raise ValueError(
+                    "guidance.initial_angular_rate_range must satisfy min <= max"
+                )
         if self.initial_speed_ratio_range is not None and (
             self.initial_speed_ratio_range[0] <= 0.0
         ):
             raise ValueError("guidance.initial_speed_ratio_range must be positive")
+        if self.initial_angular_rate_range is not None and (
+            self.initial_angular_rate_range[0] > 0.0
+            or self.initial_angular_rate_range[1] < 0.0
+        ):
+            raise ValueError(
+                "guidance.initial_angular_rate_range must straddle zero so that "
+                "the training contract is symmetric"
+            )
 
 
 @dataclass(frozen=True)
@@ -1316,6 +1346,7 @@ def _parse_reference(value: Any) -> ReferenceConfig:
             "command_speed_range_mps",
             "start_progress_m",
             "start_progress_full_fraction",
+            "start_jitter_pitch_rad",
         },
     )
     if data["generator"] != "sinusoidal_3d_arclength":
@@ -1368,6 +1399,10 @@ def _parse_reference(value: Any) -> ReferenceConfig:
         start_jitter_z_m=_non_negative(data["start_jitter_z_m"], "reference.start_jitter_z_m"),
         start_jitter_yaw_rad=_non_negative(
             data["start_jitter_yaw_rad"], "reference.start_jitter_yaw_rad"
+        ),
+        start_jitter_pitch_rad=_non_negative(
+            data.get("start_jitter_pitch_rad", 0.0),
+            "reference.start_jitter_pitch_rad",
         ),
         path_bank_size=path_bank_size,
         path_bank_seed=path_bank_seed,
@@ -1564,6 +1599,8 @@ def _parse_guidance(value: Any) -> GuidanceConfig:
             "initial_propeller_rpm_ratio",
             "initial_speed_ratio_range",
             "initial_propeller_rpm_ratio_range",
+            "initial_angular_rate_range",
+            "nominal_initial_state",
             "high_speed_threshold_mps",
             "heading_rate_limit_rad_s",
             "pitch_rate_limit_rad_s",
@@ -1750,6 +1787,14 @@ def _parse_guidance(value: Any) -> GuidanceConfig:
         initial_speed_ratio_range=_optional_range(
             data.get("initial_speed_ratio_range"),
             "guidance.initial_speed_ratio_range",
+        ),
+        initial_angular_rate_range=_optional_range(
+            data.get("initial_angular_rate_range"),
+            "guidance.initial_angular_rate_range",
+        ),
+        nominal_initial_state=_boolean(
+            data.get("nominal_initial_state", False),
+            "guidance.nominal_initial_state",
         ),
         high_speed_threshold_mps=_positive(
             data.get("high_speed_threshold_mps", 1.8),

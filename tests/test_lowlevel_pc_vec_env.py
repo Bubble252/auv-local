@@ -274,7 +274,6 @@ def test_pc_vec_env_fixed_seed_reset_and_no_auto_reset_exposes_terminal_info() -
     env.reset([101, 102])
     assert inner.episode_seed is not None
     assert inner.episode_seed.tolist() == [101, 102]
-
     for _ in range(3):
         actor_obs, reward, done, infos = env.step(
             torch.zeros((2, 3), dtype=torch.float64), auto_reset=False
@@ -287,6 +286,32 @@ def test_pc_vec_env_fixed_seed_reset_and_no_auto_reset_exposes_terminal_info() -
     assert torch.isfinite(infos["hold_fraction"]).all()
     assert torch.isfinite(infos["material_saturated"]).all()
     assert inner.episode_seed.tolist() == [101, 102]
+
+
+def test_pc_vec_env_logs_route_telemetry_on_episode_end() -> None:
+    config = _pc_config("C0", current_enabled=False, max_episode_steps=3)
+    inner = BatchedPCLowLevelEnv(config, num_envs=2)
+    env = BatchTorchPCVecEnv(inner, short_window=2, long_window=3)
+    env.reset([301, 302])
+
+    route_keys = {
+        "/episode/cross_track_rmse_mean",
+        "/episode/vertical_rmse_mean",
+        "/episode/pre_goal_3d_rmse_mean",
+        "/episode/path_completion_mean",
+    }
+    log = {}
+    for _ in range(3):
+        _, _, _, infos = env.step(
+            torch.zeros((2, 3), dtype=torch.float64), auto_reset=False
+        )
+        log = infos["log"]
+    assert route_keys.issubset(log)
+    for key in route_keys:
+        value = log[key]
+        assert torch.isfinite(torch.as_tensor(value)).all()
+    assert 0.0 <= float(log["/episode/path_completion_mean"]) <= 1.0
+    assert float(log["/episode/pre_goal_3d_rmse_mean"]) >= 0.0
 
 
 def test_pc_vec_env_returns_scaled_ppo_reward_and_logs_raw_return() -> None:

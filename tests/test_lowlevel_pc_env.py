@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import replace
 from pathlib import Path
 
@@ -472,3 +473,86 @@ def test_v0_initial_speed_and_rpm_ranges_are_actually_sampled() -> None:
     assert float(env.actuator[:, 2].max()) > 0.0
     assert torch.isfinite(env.actuator).all()
     assert torch.isfinite(env.nu).all()
+
+
+def test_goal182_reset_contract_samples_pitch_and_angular_rates() -> None:
+    base = _pc_config("C0", max_episode_steps=2)
+    config = replace(
+        base,
+        reference=replace(
+            base.reference,
+            start_jitter_yaw_rad=math.radians(10.0),
+            start_jitter_pitch_rad=math.radians(10.0),
+        ),
+        guidance=replace(
+            base.guidance,
+            initial_speed_ratio_range=(0.8, 1.2),
+            initial_propeller_rpm_ratio_range=(0.0, 1.0),
+            initial_angular_rate_range=(-0.05, 0.05),
+        ),
+    )
+    env = BatchedPCLowLevelEnv(config, num_envs=32, validate_finite=True, path_dim=8)
+    env.reset(list(range(2000, 2032)))
+    assert env.eta is not None and env.nu is not None
+
+    pitch_limit = math.radians(10.0) + 1e-12
+    yaw_limit = math.radians(10.0) + 1e-12
+    tangent = env.path.start_tangent_ned_for(env.num_envs)
+    expected_yaw = torch.atan2(tangent[:, 1], tangent[:, 0])
+    expected_pitch = torch.atan2(
+        -tangent[:, 2], torch.linalg.norm(tangent[:, :2], dim=1)
+    )
+    pitch_delta = env.eta[:, 4] - expected_pitch
+    yaw_delta = torch.remainder(env.eta[:, 5] - expected_yaw + math.pi, 2.0 * math.pi) - math.pi
+    assert float(pitch_delta.abs().max()) <= pitch_limit
+    assert float(yaw_delta.abs().max()) <= yaw_limit
+    assert float(pitch_delta.abs().max()) > 1e-3
+    assert float(yaw_delta.abs().max()) > 1e-3
+    assert float(env.nu[:, 3:6].abs().max()) <= 0.05 + 1e-12
+    assert float(env.nu[:, 3:6].abs().max()) > 1e-3
+    assert float(env._episode_initial_speed_ratio.min()) >= 0.8 - 1e-12
+    assert float(env._episode_initial_speed_ratio.max()) <= 1.2 + 1e-12
+
+
+def test_goal182_nominal_reset_contract_removes_start_randomization() -> None:
+    base = _pc_config("C0", max_episode_steps=2)
+    config = replace(
+        base,
+        reference=replace(
+            base.reference,
+            start_jitter_xy_m=0.5,
+            start_jitter_z_m=0.5,
+            start_jitter_yaw_rad=math.radians(10.0),
+            start_jitter_pitch_rad=math.radians(10.0),
+        ),
+        guidance=replace(
+            base.guidance,
+            initial_speed_ratio_range=(0.8, 1.2),
+            initial_propeller_rpm_ratio_range=(0.0, 1.0),
+            initial_angular_rate_range=(-0.05, 0.05),
+            nominal_initial_state=True,
+        ),
+    )
+    env = BatchedPCLowLevelEnv(config, num_envs=8, validate_finite=True, path_dim=8)
+    env.reset(list(range(2100, 2108)))
+    assert env.eta is not None and env.nu is not None and env.actuator is not None
+
+    start = env.path.start_ned_m_for(env.num_envs)
+    tangent = env.path.start_tangent_ned_for(env.num_envs)
+    expected_yaw = torch.atan2(tangent[:, 1], tangent[:, 0])
+    expected_pitch = torch.atan2(
+        -tangent[:, 2], torch.linalg.norm(tangent[:, :2], dim=1)
+    )
+    torch.testing.assert_close(env.eta[:, :3], start)
+    torch.testing.assert_close(env.eta[:, 3], torch.zeros(env.num_envs, dtype=env.eta.dtype))
+    torch.testing.assert_close(env.eta[:, 4], expected_pitch)
+    torch.testing.assert_close(env.eta[:, 5], expected_yaw)
+    torch.testing.assert_close(env.nu[:, 3:6], torch.zeros((env.num_envs, 3), dtype=env.nu.dtype))
+    torch.testing.assert_close(
+        env._episode_initial_speed_ratio,
+        torch.ones(env.num_envs, dtype=env.eta.dtype),
+    )
+    torch.testing.assert_close(
+        env._episode_initial_propeller_rpm_ratio,
+        torch.ones(env.num_envs, dtype=env.eta.dtype),
+    )
