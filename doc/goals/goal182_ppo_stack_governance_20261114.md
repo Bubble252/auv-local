@@ -3155,6 +3155,8 @@ git diff --cached --check
 | 2026-11-15 | D4 advantage 归一化 | 采用 full-rollout，与参考工程默认一致 | minibatch advantage 只作未来 cheap ablation |
 | 2026-11-15 | D5 探索幅度 | 仿照参考工程：`init_std=0.3`、scalar std、`clip_actions=1.0` | 首轮不加 bounds/anneal；有效 applied std 仅作 telemetry |
 | 2026-11-15 | D6 trust region | 仿照参考工程整包：`clip=0.20`、`desired_kl=0.01`、`schedule=adaptive`、初始共享 `lr=3e-4` | 使用 rsl_rl 2.3.3 内置 `1/1.5×` LR 规则；actor/critic 不拆 LR；`T3_CLIP_ONLY` 后置 |
+| 2026-11-17 | D6.3 warmstart LR 例外 | 用户确认：BCFT warmstart arm 允许拆 actor/critic LR，使用不同学习率 | BCFT finetune 使用 actor `1e-5`、critic `3e-4`、`schedule=fixed`；该例外不改变 fresh/TRRES 的参考 profile |
+| 2026-11-17 | D3/D5 warmstart 作用域 | BC warmstart arm 不启用 empirical actor normalization，`init_std=0.05` | 仅作用于 BCFT finetune；BCRES/TRRES 暂保留 reference recipe，待 C0 诊断后再定；不得把 empirical + `std=0.3` 重新带回 warmstart |
 | 2026-11-15 | D7 path partition | 一步到位：actor 5-D 非特权 path block；critic 独立 privileged path/actuator/disturbance/sensor-safety；删除 progress/remaining/curvature/endpoint | 不拆 C1–C3 训练臂；字段 mask 只用于诊断；泄漏判 `PATH_PRIVILEGE_LEAK` |
 | 2026-11-15 | D8 预算与续路 | training-only 有界续路（最多 4 段）；整次 run `600–2600` iterations；C0–C6 hard caps 合计 2600 | 60 s episode 和评价路线不变；续路不得进入评价；reward 另立因子 |
 | 2026-11-15 | D9 晋级/早停 | 仿照参考 `min=600`、`max=2600`、`window=20`、`consecutive=3`；仅用于 arm early stop；C0–C6 保留现有连续 2 次 StageGate | 20/3 不用于课程晋级；阈值在 P0 baseline 后冻结；`timeout` 只诊断，不作为 early-stop 条件 |
@@ -3163,6 +3165,7 @@ git diff --cached --check
 | 2026-11-15 | D12 训练组织 | 不照搬参考式多 stage runner；保持单 run C0–C6 StageGate，晋级不重置网络/optimizer | 每轮使用当前 stage rollout 的 reward/return 更新，不存在 C0–C6 总奖励 |
 | 2026-11-15 | D13 reward/StageGate | 选择 C；两套 route-centric reward 修改目标表已确认（§4.9）；StageGate v1 口径已确认（§4.9.1）；阈值标定政策已确认（§4.9.2） | StageGate v1：`safety` 硬否决、completion 防停滞、cross/vertical 主门控；`timeout/plane_miss/success/3D/pre-goal 3D/overshoot` 仅诊断。纯端到端/ALOS 分开标定、首轮只做总体 gate、不设 success floor、先 shadow 后 enforce |
 | 2026-11-17 | D13.6 参数冻结 | 用户确认 D13.6a–d 按推荐冻结；cross/vertical margin `0.10`，不设 `pre_goal_3d_rmse_m` margin；completion floor `0.80–0.90`；首波 shadow | `pre_goal_3d_rmse_m` 仍记录但不进入 route gate；soft cap `72/108/156/216/252/336/420`；阈值分开标定 |
+| 2026-11-17 | INFRA-D11=B 覆盖 D13.6d | 首波 MOD4 在 PE2E/ALOSB 阈值标定并冻结后直接 `enforce`，不再先跑一整轮 shadow；标定只用 reference/P0，不得用 treatment 结果回调阈值 | D13.6d 的“首波 shadow”保留为历史；launcher 已切 `--curriculum-route-gate-mode enforce`，缺阈值直接失败；标定后先跑 20/3 smoke 再启动 18-run；`INFRA-D11` 是基础设施编号，不是本文历史 baseline 的 `D11` |
 | 2026-11-15 | D14 gamma/lambda | `gamma=0.995`、`lam=0.95` | 保留 AUV 长时程信用跨度，不照搬 `0.99` |
 | 2026-11-15 | D15 entropy | `entropy_coef=0.005` 作为所有新 arm 公共配置 | Phase 4 只改变 `init_std`，不把 entropy 混入探索因子 |
 | 2026-11-15 | D16 warmstart/checkpoint | 同一 BC 底座与残差初始化；fresh optimizer；iteration=0；final/early-stop checkpoint；禁止 dev best 和跨 arm resume | 保证 arm 公平并隔离验证集 |
@@ -3230,3 +3233,42 @@ git diff --cached --check
 | 2026-11-16 | EV8 外部 suite 接入与测评命名 | 采用 A：主排名只用 `MAIN_RANKING`，前三名追加 `ROUTE_GENERALIZATION`；`EXTERNAL_GEOMETRY_SUITE`（suite D）只给最终 winner 做外部体检 | suite D 不参与 Gate、winner、前三名、early-stop 或 checkpoint 选择；只按 EV7 的正式 checkpoint 对 winner 的正式训练 seeds 逐一运行，并标 `EXTERNAL_GEOMETRY_ONLY`。命名统一为 `QUICK_SCREEN / MAIN_RANKING / SPEED_ENVELOPE / ROUTE_GENERALIZATION / DEPTH_GENERALIZATION`；旧名 `SCREEN / FORMAL_CORE / SPEED_EVAL / COLLECTION_EVAL / DEPTH_AUDIT / FORMAL_GEOMETRY` 只作 `legacy_alias`。见 §4.12.3、EV8 |
 | 2026-11-16 | EV9 canonical 产物 | 采用 A：固定 `matrix_manifest.json`、`report_rows.jsonl`、`report.md`；每个 run 使用 `summary.json`、`episodes.jsonl`、`trace.npz` | `matrix_manifest` 每张 frozen matrix 一份；`report_rows` 每个 cell 一行并聚合 `eval_seeds`；`episodes.jsonl` 每 episode 一行；两者用同一 `episode_id`，且主表必须能从明细复算。缺产物判 `INVALID_ARTIFACT_SET`，无法复算判 `INVALID_REPORT_PROVENANCE`；`trace.npz` 只作诊断，不参与 checkpoint/winner/前三名选择。见 §4.12.5、EV9 |
 | 2026-11-16 | Episode 初始状态 | 训练从路线起点 reset：`x/y ±0.5 m`、`z ±0.5 m`、roll 0、pitch/yaw 切向 `±10°`、前向速度 `0.8–1.2×` 命令、侧向/垂向 0、三轴角速度 `±0.05 rad/s`；正式评价使用无扰动名义起点 | 训练推进器 RPM 比例仍取 `U(0,1)`，但基准按初始速度前馈；动作/平滑历史清零，前两步不罚二阶平滑；history 用首帧填满。正式评价 `x/y/z/yaw/pitch` 抖动、初始角速度和速度比例扰动均为 0，RPM 比例 1.0；current/noise/plant 压力仍生效。current 估计用第一次有效测量热启动，禁止读真值。见 §4.12.10 |
+
+## 14. 基础设施决策索引（INFRA-D1…INFRA-D12）
+
+**归属**：本表是 Goal182 内部的决策与实施项，不是 goal 外前置，也不是额外实验。
+恢复 Goal182 就是继续执行本表及其后续标定、smoke 和训练。
+
+**编号**：本表统一使用 `INFRA-Dx`。`goal182_infra_audit_20261116.md` §13.3 中的短号
+`Dx` 均指本表；跨文档引用必须写 `INFRA-Dx`，避免与 §13 的 `D1–D18`
+（架构/训练决策）混淆。尤其注意：`INFRA-D8`（训练续路）对应本文 `D8`；
+`INFRA-D11`（20/3 晋级）不是本文 `D11`（历史 baseline）。
+
+| ID | 决策 | 状态 | 证据 / 下一步 |
+|---|---|---|---|
+| `INFRA-D1` | stage hard cap 逐 iteration 检查，达到即 fail-closed；launcher 拒绝 completed 但 final stage != C6 的 run；`CURRICULUM_STALLED` 暂不终止 | `FIXED` | trainer/launcher/定向测试 |
+| `INFRA-D2` | 正式训练前用冻结 5D BC + ALOS reference 标定并冻结 cross/vertical 阈值；未冻结只能 shadow/screen | `FIXED`（注入路径）/ `BLOCKER`（数值） | 缺阈值 launcher 直接失败；阈值待标定 |
+| `INFRA-D3` | 先只读诊断 C0 completion 低和 timeout 高的原因；不直接降低 `completion_min` | `DIAGNOSED / USER_DECISION_REQUIRED` | 旧 `speedv3-5d80de2` 最后 20 个 training-rollout：finetune completion `0.595`、residual `0.957`，两者 success `0`；residual vertical RMSE `31.96 m`；旧 run 在 iteration 72 记录 hard-cap 后仍继续。待决定首波前是否调整 C0 |
+| `INFRA-D4` | active 评价固定 `2.0 m`，不保留 radius 轴；缺失/非 2.0 判 `INVALID_GOAL182_RADIUS`；success/timeout/plane_miss 只作 telemetry | `FIXED` | launcher/report fail-closed，intent-to-fail 测试通过 |
+| `INFRA-D5` | 深度在训练和测评两侧都落实：训练侧 C0–C6 逐 episode `depth_m`；测评侧 `10/80/250/500 m × R_STRAIGHT/R_3D_M`，depth 与 route 分开计数 | `FIXED` | 24 个 depth cell；训练侧深度覆盖测试 |
+| `INFRA-D6` | BCRES/BCFT/TRRES 必须有同 evaluation set、同 scenario、同 seed 的 paired zero；PE2E 显式 `ZERO_BASELINE_UNPAIRED` | `FIXED` | manifest 级 pairing + report 级 seed 校验；arms builder 生成 4 个 ALOSB zero |
+| `INFRA-D7` | active formal 统一 `3000 / 60 s`；`2500 / 50 s` 只作历史/screen，禁止混表 | `FIXED`（active formal）/ `LEGACY_ONLY`（2500 env） | 两份 formal env 固定 `3000×0.02 s` |
+| `INFRA-D8` | PPO evaluator 的 `episodes.jsonl` 逐行写 `route_profile` 与 `depth_m`；`ROUTE_GENERALIZATION` 由同一 builder 生成 22 条路线 × 4 个压力档 | `FIXED`（metadata + 22-route builder） | 88 scenarios / 264 cells / 792 episodes per arm；压力映射 `nominal/current/noise/plant → nominal/current10/noise_n2/plant20`；首波不阻塞 |
+| `INFRA-D9` | 首波不做 `pc_ppo_scale=0.01/0.1/1.0` 对比，记录 `SCALE_AUDIT_DEFERRED` | 已定（效率规则） | 若要做 scale 实验，先补只读 audit |
+| `INFRA-D10` | 首波关闭 C6 early stop；第二波启动前实现并预注册 | 已定（第二波） | 不阻塞首波 |
+| `INFRA-D11` | 首波按 D18.2 20/3 training-rollout 晋级：先用 reference/P0 rollout 标定并冻结 PE2E/ALOSB cross/vertical 阈值，launcher 切 `enforce`，跑 20/3 smoke，通过后启动 18-run | `FIXED`（实现）/ `BLOCKER`（阈值与 smoke） | 当前唯一首波启动阻断；标定不得扩成矩阵外扫参 |
+| `INFRA-D12` | 首波固定路线不续路；第二波必须实现 training-only 有界续路（剩余 `<=5 m` 同 family 追加，最多 3 次/4 段，不 reset，逐次 append manifest，无法追加写 `ROUTE_EXTENSION_FALLBACK`） | 已定 A，待第二波实现 | 评价侧固定路线；append 泄漏判 `INVALID_ROUTE_PROTOCOL` |
+
+**当前结论**：`INFRA-D1/D4/D5/D6/D7/D8` 已落地；`INFRA-D3` 只读诊断；
+`INFRA-D9/D10` 按效率规则延后；`INFRA-D12` 第二波硬交付；首波唯一启动阻断是
+`INFRA-D11` 的真实阈值、20/3 smoke 和 `INFRA-D2` 的冻结数值。训练完成后由
+`scripts/build_goal182_eval_arms.py` 生成正式 arms manifest，再进入 `MAIN_RANKING`。
+`D13.6b` 另有覆盖率阻断：现有 60-iteration reference calibration 最多覆盖 C0/C1，
+但单张阈值表会套到 C0–C6；trainer/calibrator 已补 stage telemetry 和
+`--require-stages`，覆盖不足会 fail-closed。最终阈值前必须补 C0–C6 覆盖，或由用户
+显式接受 `PARTIAL_STAGE_COVERAGE`；不得把 C0 单段表写成完整冻结表。
+最小 stage sweep 已落地：7 个单 stage env + 14 个 frozen-reference training config，
+每 stage 40 iterations、`promotion_enabled=false`、单 stage mix；launcher 按
+PE2E/ALOSB 两条 control 各串行跑 C0–C6，再池化 7 份 records 冻结一张表；每个 stage
+至少要求 20 条完整 iteration record。该 sweep 只补覆盖，不是参数/seed/route 扫参；
+尚未在服务器运行，因此数值仍是 `BLOCKER`。
