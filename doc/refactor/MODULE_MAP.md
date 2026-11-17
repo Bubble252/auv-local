@@ -60,6 +60,9 @@
 | `scripts/check_goal173_protocol.py` | Goal173 预注册协议检查 | 不改 Gate 阈值或 split | `main` | `tests/test_goal173_protocol.py` | protocol | 无 |
 | `scripts/audit_goal173_artifacts.py` | Goal173 artifact 审计 | 不清理或重写 artifact | `main` | `tests/test_goal173_artifact_audit.py` | protocol | 无 |
 | `scripts/run_pc_standing_eval_suite.py` | standing evaluation matrix 调度；相对路径统一走显式 root helper | 不修改评价 cell 定义 | `main` | `tests/test_pc_standing_eval_runner.py` | evaluation | 存量文件长度 |
+| `scripts/audit_goal182_artifacts.py` | Goal182 canonical evaluation artifact 审计 | 不清理、重写或挑选结果 | `audit_run`, `audit_eval_set`, `main` | `tests/test_goal182_artifact_audit.py` | evaluation | 无 |
+| `scripts/build_goal182_eval_report.py` | 从 Goal182 eval run manifest 生成 canonical matrix/report 产物 | 不运行评估、不改变 cell 定义或排名规则 | `build_report`, `main` | `tests/test_goal182_eval_report.py` | evaluation | 无 |
+| `scripts/run_goal182_eval.py` | Goal182 formal evaluation launcher；串联协议检查、run、report 和 auditor | 不修改 evaluator、Gate 或压力阈值 | `main` | `tests/test_goal182_eval_launcher.py` | evaluation | 无 |
 
 ## 2. 边界说明
 
