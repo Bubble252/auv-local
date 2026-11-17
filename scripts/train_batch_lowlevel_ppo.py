@@ -1437,6 +1437,7 @@ def main() -> int:
                         environment.curriculum.current_speed_range_override_mps
                     ),
                     shear_scale=environment.curriculum.shear_scale_override,
+                    speed_protocol=environment.curriculum.speed_protocol,
                 )
                 curriculum_sampler = CurriculumStageSampler(
                     stages=stages,
@@ -1446,6 +1447,7 @@ def main() -> int:
                         if environment.current.time_variation is None
                         else environment.current.time_variation.speed_amplitude_mps
                     ),
+                    speed_protocol=environment.curriculum.speed_protocol,
                 )
             pc_env = BatchedPCLowLevelEnv(
                 environment,

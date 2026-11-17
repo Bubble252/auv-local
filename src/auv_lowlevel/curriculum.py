@@ -106,6 +106,35 @@ SPEED_CURRICULUM_V2_RANGES_MPS: dict[str, tuple[float, float]] = {
     "C6": (0.90, REMUS100_MAX_SPEED_MPS),
 }
 
+# Goal182's user-confirmed center-out training protocol.  This is deliberately
+# separate from the v1 default and the v2 monotonic table so historical Goals
+# cannot be silently relabelled as SPEED_V3_CENTER_OUT_5S.
+SPEED_V3_PROFILE_ID = "SPEED_V3_CENTER_OUT_5S"
+SPEED_V3_RESAMPLE_PERIOD_S = 5.0
+SPEED_V3_SEGMENT_COUNT = 12
+SPEED_V3_CENTER_OUT_RANGES_MPS: dict[str, tuple[float, float]] = {
+    "C0": (1.40, 1.60),
+    "C1": (1.40, 1.80),
+    "C2": (1.20, 1.80),
+    "C3": (1.20, 2.00),
+    "C4": (1.00, 2.00),
+    "C5": (1.00, 2.20),
+    "C6": (1.00, 2.50),
+}
+
+ROUTE_AXIS_LEGACY = "legacy"
+ROUTE_AXIS_VERTICAL_ONLY = "vert_only"
+ROUTE_AXIS_HORIZONTAL_ONLY = "horiz_only"
+ROUTE_AXIS_COUPLED = "coupled"
+ROUTE_AXIS_ISOLATED = "axis_isolated"
+SUPPORTED_ROUTE_AXES = (
+    ROUTE_AXIS_LEGACY,
+    ROUTE_AXIS_VERTICAL_ONLY,
+    ROUTE_AXIS_HORIZONTAL_ONLY,
+    ROUTE_AXIS_COUPLED,
+    ROUTE_AXIS_ISOLATED,
+)
+
 _UINT64_MASK = (1 << 64) - 1
 
 
@@ -282,6 +311,10 @@ class CurriculumStageSpec:
     soft_budget_transitions: int
     hard_cap_transitions: int
     gate: StageGate
+    vertical_amplitude_m: float = 0.0
+    vertical_cycles: float = 1.0
+    horizontal_amplitude_m: float = 0.0
+    route_axis_mode: str = ROUTE_AXIS_LEGACY
     soft_budget_iterations: int | None = None
     hard_cap_iterations: int | None = None
 
@@ -312,6 +345,16 @@ class CurriculumStageSpec:
             raise ValueError(f"{self.name}.current_estimator_level must be non-empty")
         if not math.isfinite(self.shear_scale) or self.shear_scale < 0.0:
             raise ValueError(f"{self.name}.shear_scale must be finite and non-negative")
+        for name in ("vertical_amplitude_m", "horizontal_amplitude_m"):
+            value = float(getattr(self, name))
+            if not math.isfinite(value) or value < 0.0:
+                raise ValueError(f"{self.name}.{name} must be finite and non-negative")
+        if not math.isfinite(self.vertical_cycles) or self.vertical_cycles <= 0.0:
+            raise ValueError(f"{self.name}.vertical_cycles must be finite and positive")
+        if self.route_axis_mode not in SUPPORTED_ROUTE_AXES:
+            raise ValueError(
+                f"{self.name}.route_axis_mode must be one of {SUPPORTED_ROUTE_AXES}"
+            )
         for value in (
             self.current_encoder_alpha_start,
             self.current_encoder_alpha_end,
@@ -378,6 +421,10 @@ class CurriculumStageSpec:
             ),
             "length_range_m": list(self.length_range_m),
             "speed_range_mps": list(self.speed_range_mps),
+            "vertical_amplitude_m": float(self.vertical_amplitude_m),
+            "vertical_cycles": float(self.vertical_cycles),
+            "horizontal_amplitude_m": float(self.horizontal_amplitude_m),
+            "route_axis_mode": self.route_axis_mode,
             "soft_budget_transitions": self.soft_budget_transitions,
             "hard_cap_transitions": self.hard_cap_transitions,
             "soft_budget_iterations": self.soft_budget_iterations,
@@ -403,6 +450,14 @@ class CurriculumEpisodeSpec:
     current_encoder_alpha_ramp_transitions: int
     length_m: float
     speed_mps: float
+    speed_range_mps: tuple[float, float] | None = None
+    speed_visited_range_mps: tuple[float, float] | None = None
+    speed_segment_plan_mps: tuple[float, ...] = ()
+    speed_resample_period_s: float | None = None
+    route_axis: str = ROUTE_AXIS_LEGACY
+    vertical_amplitude_m: float = 0.0
+    vertical_cycles: float = 1.0
+    horizontal_amplitude_m: float = 0.0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -425,6 +480,33 @@ class CurriculumEpisodeSpec:
             ),
             "length_m": float(self.length_m),
             "speed_mps": float(self.speed_mps),
+            "speed_range_mps": (
+                [float(self.speed_mps), float(self.speed_mps)]
+                if self.speed_range_mps is None
+                else [float(value) for value in self.speed_range_mps]
+            ),
+            "speed_visited_range_mps": (
+                [
+                    float(min(self.speed_segment_plan_mps or (self.speed_mps,))),
+                    float(max(self.speed_segment_plan_mps or (self.speed_mps,))),
+                ]
+                if self.speed_visited_range_mps is None
+                else [float(value) for value in self.speed_visited_range_mps]
+            ),
+            "speed_segment_plan_mps": (
+                [float(self.speed_mps)]
+                if not self.speed_segment_plan_mps
+                else [float(value) for value in self.speed_segment_plan_mps]
+            ),
+            "speed_resample_period_s": (
+                None
+                if self.speed_resample_period_s is None
+                else float(self.speed_resample_period_s)
+            ),
+            "route_axis": self.route_axis,
+            "vertical_amplitude_m": float(self.vertical_amplitude_m),
+            "vertical_cycles": float(self.vertical_cycles),
+            "horizontal_amplitude_m": float(self.horizontal_amplitude_m),
         }
 
 
@@ -447,6 +529,11 @@ def curriculum_stratum(
         if initial_heading_rad is None:
             return "start_heading:unspecified"
         return "start_heading:neg" if float(initial_heading_rad) < 0.0 else "start_heading:nonneg"
+    if spec.stage == "C2" and spec.route_axis in {
+        ROUTE_AXIS_VERTICAL_ONLY,
+        ROUTE_AXIS_HORIZONTAL_ONLY,
+    }:
+        return f"route_axis:{spec.route_axis}"
     if spec.stage in {"C1", "C2", "C6"}:
         return f"path:{spec.path_family}"
     stage = default_curriculum_stages()[spec.stage]
@@ -553,6 +640,10 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             soft_budget_iterations=156,
             hard_cap_iterations=260,
             gate=gates["C2"],
+            vertical_amplitude_m=1.75,
+            vertical_cycles=1.0,
+            horizontal_amplitude_m=1.75,
+            route_axis_mode=ROUTE_AXIS_ISOLATED,
         ),
         CurriculumStageSpec(
             name="C3",
@@ -574,6 +665,9 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             soft_budget_iterations=216,
             hard_cap_iterations=360,
             gate=gates["C3"],
+            vertical_amplitude_m=2.0,
+            vertical_cycles=2.0,
+            route_axis_mode=ROUTE_AXIS_COUPLED,
         ),
         CurriculumStageSpec(
             name="C4",
@@ -595,6 +689,9 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             soft_budget_iterations=252,
             hard_cap_iterations=420,
             gate=gates["C4"],
+            vertical_amplitude_m=2.0,
+            vertical_cycles=2.0,
+            route_axis_mode=ROUTE_AXIS_COUPLED,
         ),
         CurriculumStageSpec(
             name="C5",
@@ -616,6 +713,9 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             soft_budget_iterations=336,
             hard_cap_iterations=560,
             gate=gates["C5"],
+            vertical_amplitude_m=3.0,
+            vertical_cycles=1.5,
+            route_axis_mode=ROUTE_AXIS_COUPLED,
         ),
         CurriculumStageSpec(
             name="C6",
@@ -637,6 +737,9 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             soft_budget_iterations=420,
             hard_cap_iterations=700,
             gate=gates["C6"],
+            vertical_amplitude_m=5.0,
+            vertical_cycles=1.0,
+            route_axis_mode=ROUTE_AXIS_COUPLED,
         ),
     )
     return {stage.name: stage for stage in stages}
@@ -664,6 +767,7 @@ def curriculum_stages_with_overrides(
     *,
     current_speed_range_mps: tuple[float, float] | None = None,
     shear_scale: float | None = None,
+    speed_protocol: str = "legacy_v1",
 ) -> dict[str, CurriculumStageSpec]:
     """Return stage definitions with eval/training current and shear overrides.
 
@@ -671,7 +775,22 @@ def curriculum_stages_with_overrides(
     noise, length, speed) remain identical to the frozen curriculum definition.
     """
 
+    if speed_protocol not in {"legacy_v1", "v2_monotonic", SPEED_V3_PROFILE_ID}:
+        raise ValueError(
+            "speed_protocol must be one of "
+            f"{{'legacy_v1', 'v2_monotonic', {SPEED_V3_PROFILE_ID!r}}}"
+        )
     stages = default_curriculum_stages()
+    if speed_protocol == "v2_monotonic":
+        stages = high_speed_curriculum_stages()
+    elif speed_protocol == SPEED_V3_PROFILE_ID:
+        stages = {
+            name: replace(
+                stage,
+                speed_range_mps=SPEED_V3_CENTER_OUT_RANGES_MPS[name],
+            )
+            for name, stage in stages.items()
+        }
     names = list(dict.fromkeys(str(name) for name in stage_names))
     missing = sorted(set(names) - set(stages))
     if missing:
@@ -709,7 +828,13 @@ class CurriculumStageSampler:
         stages: Mapping[str, CurriculumStageSpec] | None = None,
         stage_mix: Sequence[tuple[str, float]] = (("C0", 1.0),),
         current_variation_speed_amplitude_mps: float = 0.0,
+        speed_protocol: str = "legacy_v1",
     ) -> None:
+        if speed_protocol not in {"legacy_v1", "v2_monotonic", SPEED_V3_PROFILE_ID}:
+            raise ValueError(
+                "speed_protocol must be one of "
+                f"{{'legacy_v1', 'v2_monotonic', {SPEED_V3_PROFILE_ID!r}}}"
+            )
         self.stages = dict(default_curriculum_stages() if stages is None else stages)
         missing = sorted(set(stage for stage, _weight in stage_mix) - set(self.stages))
         if missing:
@@ -725,6 +850,7 @@ class CurriculumStageSampler:
                 "current_variation_speed_amplitude_mps exceeds the REMUS100 speed envelope"
             )
         self.current_variation_speed_amplitude_mps = variation
+        self.speed_protocol = speed_protocol
 
     def set_stage_mix(self, stage_mix: Sequence[tuple[str, float]]) -> None:
         """Replace the active stage mix after a promotion/rollback decision."""
@@ -762,9 +888,6 @@ class CurriculumStageSampler:
         length = spec.length_range_m[0] + uniform(0x204) * (
             spec.length_range_m[1] - spec.length_range_m[0]
         )
-        speed = spec.speed_range_mps[0] + uniform(0x205) * (
-            spec.speed_range_mps[1] - spec.speed_range_mps[0]
-        )
         speed_limit = (
             REMUS100_MAX_SPEED_MPS - self.current_variation_speed_amplitude_mps
         )
@@ -773,13 +896,34 @@ class CurriculumStageSampler:
                 f"{spec.name} speed range cannot fit inside the REMUS100 envelope "
                 "after reserving the current variation amplitude"
             )
-        speed = min(float(speed), speed_limit)
+        if self.speed_protocol == SPEED_V3_PROFILE_ID:
+            low, high = spec.speed_range_mps
+            plan = tuple(
+                min(
+                    low + _stable_uniform(seed_value, 0x300 + index) * (high - low),
+                    speed_limit,
+                )
+                for index in range(SPEED_V3_SEGMENT_COUNT)
+            )
+            speed = plan[0]
+            speed_range = (float(spec.speed_range_mps[0]), float(spec.speed_range_mps[1]))
+            visited_range = (float(min(plan)), float(max(plan)))
+            resample_period = SPEED_V3_RESAMPLE_PERIOD_S
+        else:
+            speed = spec.speed_range_mps[0] + uniform(0x205) * (
+                spec.speed_range_mps[1] - spec.speed_range_mps[0]
+            )
+            speed = min(float(speed), speed_limit)
+            plan = (float(speed),)
+            speed_range = (float(spec.speed_range_mps[0]), float(spec.speed_range_mps[1]))
+            visited_range = (float(speed), float(speed))
+            resample_period = None
         # Preserve the requested course speed and shrink the current when the
         # worst-case current variation would exceed the REMUS100 ground-speed cap.
         current_capacity = max(
             0.0,
             REMUS100_MAX_SPEED_MPS
-            - float(speed)
+            - max(plan)
             - self.current_variation_speed_amplitude_mps,
         )
         current_speed = min(float(current_speed), current_capacity)
@@ -789,6 +933,21 @@ class CurriculumStageSampler:
             period = spec.current_period_range_s[0] + uniform(0x207) * (
                 spec.current_period_range_s[1] - spec.current_period_range_s[0]
             )
+        route_axis = spec.route_axis_mode
+        vertical_amplitude = float(spec.vertical_amplitude_m)
+        horizontal_amplitude = float(spec.horizontal_amplitude_m)
+        if route_axis == ROUTE_AXIS_ISOLATED:
+            route_axis = (
+                ROUTE_AXIS_VERTICAL_ONLY
+                if uniform(0x208) < 0.5
+                else ROUTE_AXIS_HORIZONTAL_ONLY
+            )
+            if route_axis == ROUTE_AXIS_HORIZONTAL_ONLY:
+                vertical_amplitude = 0.0
+            else:
+                horizontal_amplitude = 0.0
+        elif route_axis == ROUTE_AXIS_COUPLED:
+            horizontal_amplitude = 0.0
         return CurriculumEpisodeSpec(
             stage=spec.name,
             seed=seed_value,
@@ -807,6 +966,14 @@ class CurriculumStageSampler:
             ),
             length_m=float(length),
             speed_mps=float(speed),
+            speed_range_mps=speed_range,
+            speed_visited_range_mps=visited_range,
+            speed_segment_plan_mps=plan,
+            speed_resample_period_s=resample_period,
+            route_axis=route_axis,
+            vertical_amplitude_m=vertical_amplitude,
+            vertical_cycles=float(spec.vertical_cycles),
+            horizontal_amplitude_m=horizontal_amplitude,
         )
 
     def sample_batch(

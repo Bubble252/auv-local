@@ -1078,6 +1078,28 @@ class BatchTorchPCVecEnv:
                 "guidance_speed_rate_clipped", zero_speed
             ),
             "episode_command_speed_mps": episode_cruise_speed,
+            "speed_profile_id": result.info.get("speed_profile_id", "legacy_v1"),
+            "curriculum_stage_id": result.info.get(
+                "curriculum_stage_id", torch.zeros_like(episode_cruise_speed, dtype=torch.long)
+            ),
+            "speed_segment_index": result.info.get(
+                "speed_segment_index", torch.zeros_like(episode_cruise_speed, dtype=torch.long)
+            ),
+            "speed_segment_start_s": result.info.get(
+                "speed_segment_start_s", zero_speed
+            ),
+            "speed_resample_period_s": result.info.get(
+                "speed_resample_period_s", zero_speed
+            ),
+            "speed_target_mps": result.info.get(
+                "speed_target_mps", episode_cruise_speed
+            ),
+            "speed_target_min_mps": result.info.get(
+                "speed_target_min_mps", episode_cruise_speed
+            ),
+            "speed_target_max_mps": result.info.get(
+                "speed_target_max_mps", episode_cruise_speed
+            ),
             "log": log,
         }
         for field in fields(PCRewardBreakdown):

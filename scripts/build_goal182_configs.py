@@ -119,6 +119,7 @@ FORMAL_CURRICULUM = {
     "enabled": True,
     "promotion_enabled": True,
     "initial_stage": "C0",
+    "speed_protocol": "SPEED_V3_CENTER_OUT_5S",
     "manifest_filename": "curriculum_episodes.jsonl",
     "stage_mix": [
         {"stage": "C0", "weight": 0.90},

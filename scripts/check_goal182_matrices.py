@@ -176,12 +176,21 @@ def _validate_formal_config(
             try:
                 env_payload = _load(REPO_ROOT / env_path)
                 steps = env_payload.get("plant", {}).get("max_episode_steps")
+                speed_protocol = (
+                    env_payload.get("curriculum", {}).get("speed_protocol")
+                )
             except (OSError, ValueError):
                 steps = None
+                speed_protocol = None
             if steps != 3000:
                 errors.append(
                     f"{label}: formal env must use max_episode_steps=3000; "
                     "EPISODE_PROTOCOL_MISMATCH"
+                )
+            if speed_protocol != "SPEED_V3_CENTER_OUT_5S":
+                errors.append(
+                    f"{label}: formal env must use SPEED_V3_CENTER_OUT_5S; "
+                    "SPEED_CURRICULUM_PROTOCOL_INVALID"
                 )
     if payload.get("training_profile") != TRAINING_PROFILE:
         errors.append(f"{label}: training_profile mismatch")

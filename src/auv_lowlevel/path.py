@@ -274,6 +274,73 @@ def generate_sinusoidal_3d_path_bank(
 SUPPORTED_CURRICULUM_PATH_FAMILIES = ("P0", "P1", "P2", "P3", "P4")
 
 
+def generate_curriculum_axis_path(
+    config: ReferenceConfig,
+    *,
+    route_axis: str,
+    seed: int,
+) -> ReferencePath:
+    """Generate the C2 axis-isolated vertical or horizontal sine route.
+
+    ``route_axis`` is ``vert_only`` or ``horiz_only``.  The orthogonal
+    amplitude is exactly zero so the two C2 halves isolate one axis.
+    """
+
+    if route_axis not in {"vert_only", "horiz_only"}:
+        raise ValueError("route_axis must be 'vert_only' or 'horiz_only'")
+    sample_count = max(2, int(np.ceil(config.length_m / config.sample_spacing_m)) + 1)
+    s = np.linspace(0.0, float(config.length_m), sample_count, dtype=np.float64)
+    parameter = s / float(config.length_m)
+    if route_axis == "vert_only":
+        lateral = np.zeros_like(s)
+        depth = (
+            float(config.depth_start_m)
+            + float(config.depth_amplitude_m)
+            * np.sin(2.0 * np.pi * float(config.depth_cycles) * parameter)
+        )
+    else:
+        lateral = float(config.lateral_amplitude_m) * np.sin(
+            2.0 * np.pi * float(config.lateral_cycles) * parameter
+        )
+        depth = np.full_like(s, float(config.depth_start_m))
+    points = np.column_stack((s, lateral, depth))
+    return _make_reference_path(
+        name=f"curriculum_{route_axis}_s{int(seed)}",
+        points_ned_m=points,
+        speed_mps=config.speed_mps,
+    )
+
+
+def apply_curriculum_vertical_profile(
+    config: ReferenceConfig,
+    path: ReferencePath,
+    *,
+    amplitude_m: float,
+    cycles: float,
+) -> ReferencePath:
+    """Add the Goal182 stage vertical sine to an existing horizontal route."""
+
+    amplitude = float(amplitude_m)
+    if amplitude <= 0.0:
+        return path
+    if not np.isfinite(amplitude) or not np.isfinite(cycles) or cycles <= 0.0:
+        raise ValueError("vertical amplitude/cycles must be finite and positive")
+    points = np.asarray(path.points_ned_m, dtype=np.float64).copy()
+    cumulative = np.asarray(path.cumulative_s_m, dtype=np.float64)
+    total = float(cumulative[-1])
+    if total <= 1e-12:
+        raise ValueError("cannot add vertical profile to a zero-length path")
+    parameter = cumulative / total
+    points[:, 2] = points[:, 2] + amplitude * np.sin(
+        2.0 * np.pi * float(cycles) * parameter
+    )
+    return _make_reference_path(
+        name=f"{path.name}_vert",
+        points_ned_m=points,
+        speed_mps=path.speed_mps,
+    )
+
+
 def _make_reference_path(
     *,
     name: str,

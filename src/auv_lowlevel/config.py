@@ -1029,10 +1029,20 @@ class CurriculumConfig:
     manifest_filename: str = "curriculum_episodes.jsonl"
     current_speed_range_override_mps: tuple[float, float] | None = None
     shear_scale_override: float | None = None
+    speed_protocol: str = "legacy_v1"
 
     def __post_init__(self) -> None:
         if self.initial_stage not in SUPPORTED_PC_STAGES:
             raise ValueError("curriculum.initial_stage must be one of C0..C6")
+        if self.speed_protocol not in {
+            "legacy_v1",
+            "v2_monotonic",
+            "SPEED_V3_CENTER_OUT_5S",
+        }:
+            raise ValueError(
+                "curriculum.speed_protocol must be legacy_v1, v2_monotonic, "
+                "or SPEED_V3_CENTER_OUT_5S"
+            )
         if not self.enabled:
             if self.stage_mix:
                 raise ValueError("curriculum.stage_mix requires curriculum.enabled=true")
@@ -1093,6 +1103,7 @@ class CurriculumConfig:
                 if self.shear_scale_override is None
                 else float(self.shear_scale_override)
             ),
+            "speed_protocol": self.speed_protocol,
         }
 
 
@@ -2459,6 +2470,7 @@ def _parse_curriculum(value: Any) -> CurriculumConfig:
             "manifest_filename",
             "current_speed_range_override_mps",
             "shear_scale_override",
+            "speed_protocol",
         },
     )
     enabled = _boolean(data["enabled"], "curriculum.enabled")
@@ -2512,6 +2524,10 @@ def _parse_curriculum(value: Any) -> CurriculumConfig:
         if raw_shear_override is None
         else _number(raw_shear_override, "curriculum.shear_scale_override")
     )
+    speed_protocol = _string(
+        data.get("speed_protocol", "legacy_v1"),
+        "curriculum.speed_protocol",
+    )
     return CurriculumConfig(
         enabled=enabled,
         promotion_enabled=promotion_enabled,
@@ -2520,6 +2536,7 @@ def _parse_curriculum(value: Any) -> CurriculumConfig:
         manifest_filename=manifest_filename,
         current_speed_range_override_mps=speed_override,
         shear_scale_override=shear_override,
+        speed_protocol=speed_protocol,
     )
 
 

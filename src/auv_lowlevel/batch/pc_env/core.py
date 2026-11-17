@@ -22,6 +22,8 @@ from auv_lowlevel.curriculum import (
     EpisodeManifestWriter,
 )
 from auv_lowlevel.path import (
+    apply_curriculum_vertical_profile,
+    generate_curriculum_axis_path,
     generate_curriculum_path,
     generate_pc_path_bank,
     resample_reference_path,
@@ -179,6 +181,12 @@ class BatchedPCLowLevelEnv:
             else EpisodeManifestWriter(curriculum_manifest_path)
         )
         self._curriculum_episode_speed_mps: Tensor | None = None
+        self._curriculum_speed_segment_plan_mps: Tensor | None = None
+        self._curriculum_speed_segment_index: Tensor | None = None
+        self._curriculum_speed_segment_period_s: Tensor | None = None
+        self._curriculum_speed_target_min_mps: Tensor | None = None
+        self._curriculum_speed_target_max_mps: Tensor | None = None
+        self._curriculum_route_axis: list[str] | None = None
         self._curriculum_current_period_s: Tensor | None = None
         self._curriculum_current_shear_scale: Tensor | None = None
         self._curriculum_stage_ids: Tensor | None = None
@@ -1809,17 +1817,36 @@ class BatchedPCLowLevelEnv:
                 length_m=spec.length_m,
                 speed_mps=spec.speed_mps,
                 depth_start_m=spec.depth_m,
+                depth_amplitude_m=float(spec.vertical_amplitude_m),
+                depth_cycles=float(spec.vertical_cycles),
+                lateral_amplitude_m=float(spec.horizontal_amplitude_m),
+                lateral_cycles=float(spec.vertical_cycles),
                 path_bank_size=1,
                 path_family=spec.path_family,
                 path_family_mix=None,
                 start_progress_m=0.0,
                 start_progress_full_fraction=0.0,
             )
-            path = generate_curriculum_path(
-                reference,
-                spec.path_family,
-                seed=self._curriculum_path_seed(spec),
-            )
+            path_seed = self._curriculum_path_seed(spec)
+            if spec.route_axis in {"vert_only", "horiz_only"}:
+                path = generate_curriculum_axis_path(
+                    reference,
+                    route_axis=spec.route_axis,
+                    seed=path_seed,
+                )
+            else:
+                path = generate_curriculum_path(
+                    reference,
+                    spec.path_family,
+                    seed=path_seed,
+                )
+                if spec.route_axis == "coupled" and spec.vertical_amplitude_m > 0.0:
+                    path = apply_curriculum_vertical_profile(
+                        reference,
+                        path,
+                        amplitude_m=spec.vertical_amplitude_m,
+                        cycles=spec.vertical_cycles,
+                    )
             paths.append(resample_reference_path(path, self._curriculum_path_samples))
         points = torch.as_tensor(
             np.stack([path.points_ned_m for path in paths]),
@@ -1924,12 +1951,128 @@ class BatchedPCLowLevelEnv:
             device=self.device,
             dtype=self.dtype,
         )
+        width = max(
+            1,
+            max(len(spec.speed_segment_plan_mps) for spec in specs),
+        )
+        plan_rows = []
+        for spec in specs:
+            plan = list(spec.speed_segment_plan_mps) or [spec.speed_mps]
+            if len(plan) < width:
+                plan.extend([plan[-1]] * (width - len(plan)))
+            plan_rows.append(plan[:width])
+        plans = torch.tensor(plan_rows, device=self.device, dtype=self.dtype)
+        periods = torch.tensor(
+            [
+                0.0 if spec.speed_resample_period_s is None else spec.speed_resample_period_s
+                for spec in specs
+            ],
+            device=self.device,
+            dtype=self.dtype,
+        )
+        target_min = torch.tensor(
+            [spec.speed_range_mps[0] if spec.speed_range_mps is not None else spec.speed_mps for spec in specs],
+            device=self.device,
+            dtype=self.dtype,
+        )
+        target_max = torch.tensor(
+            [spec.speed_range_mps[1] if spec.speed_range_mps is not None else spec.speed_mps for spec in specs],
+            device=self.device,
+            dtype=self.dtype,
+        )
+        if self._curriculum_speed_segment_plan_mps is None:
+            self._curriculum_speed_segment_plan_mps = torch.zeros(
+                (self.num_envs, width), device=self.device, dtype=self.dtype
+            )
+        elif self._curriculum_speed_segment_plan_mps.shape[1] < width:
+            pad = self._curriculum_speed_segment_plan_mps[:, -1:]
+            extra = pad.expand(self.num_envs, width - pad.shape[1])
+            self._curriculum_speed_segment_plan_mps = torch.cat(
+                (self._curriculum_speed_segment_plan_mps, extra), dim=1
+            )
+        self._curriculum_speed_segment_plan_mps = self._merge_rows(
+            self._curriculum_speed_segment_plan_mps[:, :width], plans, mask
+        )
+        for name, value in (
+            ("_curriculum_speed_segment_period_s", periods),
+            ("_curriculum_speed_target_min_mps", target_min),
+            ("_curriculum_speed_target_max_mps", target_max),
+            (
+                "_curriculum_speed_segment_index",
+                torch.zeros_like(periods, dtype=torch.long),
+            ),
+        ):
+            current = getattr(self, name)
+            setattr(
+                self,
+                name,
+                value.clone() if current is None else self._merge_rows(current, value, mask),
+            )
+        if self._curriculum_route_axis is None:
+            self._curriculum_route_axis = ["legacy"] * self.num_envs
+        selected = self._curriculum_route_axis
+        row_indices = torch.nonzero(mask, as_tuple=False).flatten().tolist()
+        for row, spec in zip(row_indices, specs, strict=True):
+            selected[int(row)] = spec.route_axis
         if self._curriculum_episode_speed_mps is None:
             self._curriculum_episode_speed_mps = speeds.clone()
         else:
             self._curriculum_episode_speed_mps = self._merge_rows(
                 self._curriculum_episode_speed_mps, speeds, mask
             )
+
+    def _advance_curriculum_speed_segments(self) -> None:
+        if (
+            self.curriculum_sampler is None
+            or self.t_s is None
+            or self._curriculum_speed_segment_plan_mps is None
+            or self._curriculum_speed_segment_period_s is None
+            or self._curriculum_speed_segment_index is None
+        ):
+            return
+        period = self._curriculum_speed_segment_period_s
+        active = period > 0.0
+        if not bool(active.any()):
+            return
+        width = self._curriculum_speed_segment_plan_mps.shape[1]
+        raw_index = torch.floor(self.t_s / torch.clamp(period, min=1e-9)).to(
+            dtype=torch.long
+        )
+        target_index = torch.clamp(raw_index, max=width - 1)
+        changed = active & (target_index != self._curriculum_speed_segment_index)
+        if not bool(changed.any()):
+            return
+        self._curriculum_speed_segment_index = torch.where(
+            active, target_index, self._curriculum_speed_segment_index
+        )
+        new_speed = self._curriculum_speed_segment_plan_mps.gather(
+            1, target_index[:, None]
+        ).squeeze(1)
+        self._episode_command_speed_mps = torch.where(
+            changed, new_speed, self._episode_command_speed_mps
+        )
+        if self._curriculum_episode_speed_mps is not None:
+            self._curriculum_episode_speed_mps = torch.where(
+                changed, new_speed, self._curriculum_episode_speed_mps
+            )
+        direct = self._curriculum_direct_rows()
+        if direct is not None:
+            direct = direct & changed
+            if bool(direct.any()):
+                self._direct_target = PCCommand(
+                    heading_rad=self._direct_target.heading_rad,
+                    pitch_rad=self._direct_target.pitch_rad,
+                    speed_mps=torch.where(
+                        direct, new_speed, self._direct_target.speed_mps
+                    ),
+                )
+                self._direct_command = PCCommand(
+                    heading_rad=self._direct_command.heading_rad,
+                    pitch_rad=self._direct_command.pitch_rad,
+                    speed_mps=torch.where(
+                        direct, new_speed, self._direct_command.speed_mps
+                    ),
+                )
 
     def _set_curriculum_noise_scales(
         self,
@@ -2337,6 +2480,7 @@ class BatchedPCLowLevelEnv:
             nu_true=self.nu,
             current_true_ned_mps=self.current_ned_mps,
         )
+        self._advance_curriculum_speed_segments()
         self._advance_direct_commands()
         observation = self._build_observation()
         heading_error = wrap_angle(observation.command.heading_rad - self.eta[:, 5])

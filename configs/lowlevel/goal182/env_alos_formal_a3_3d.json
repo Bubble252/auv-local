@@ -84,6 +84,7 @@
     "initial_stage": "C0",
     "manifest_filename": "curriculum_episodes.jsonl",
     "promotion_enabled": true,
+    "speed_protocol": "SPEED_V3_CENTER_OUT_5S",
     "stage_mix": [
       {
         "stage": "C0",
