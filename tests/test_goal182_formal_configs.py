@@ -114,6 +114,30 @@ def test_goal182_c0_recipe_diagnostic_is_c0_only_and_guarded() -> None:
     assert "/diagnostic/" in payload["experiment"]["output"]
 
 
+def test_goal182_c0_reference_ablation_changes_only_lr_norm_std() -> None:
+    path = (
+        GOAL
+        / "train_c0_reference_lr_norm_std01_mod4_pe2e_finetune_5d_m_seed86201.json"
+    )
+    config = load_training_config(path)
+    payload = _module_payload(path)
+
+    assert config.iterations == 72
+    environment = load_config(ROOT / Path(config.environment_config))
+    assert environment.curriculum.initial_stage == "C0"
+    assert environment.curriculum.promotion_enabled is False
+    assert environment.curriculum.stage_mix == (("C0", 1.0),)
+    assert payload["algorithm"]["learning_rate_actor"] == 3e-4
+    assert payload["algorithm"]["learning_rate_critic"] == 3e-4
+    assert payload["algorithm"]["schedule"] == "adaptive"
+    assert payload["runner"]["empirical_normalization"] is True
+    assert payload["policy"]["init_noise_std"] == 0.1
+    assert payload["experiment"]["warmstart_actor_sha256"] == (
+        "d85718a432a287f2ae255528f645bc20f4445aba875c9fb9c44f008c578094b2"
+    )
+    assert "/reference_lr_norm_std01/" in payload["experiment"]["output"]
+
+
 def test_goal182_formal_mod2_configs_remain_labeled_as_mod2() -> None:
     paths = sorted(GOAL.glob("train_formal_mod2_*_5d_m_seed*.json"))
 
