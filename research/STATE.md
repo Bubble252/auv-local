@@ -2,20 +2,27 @@
 
 ```yaml
 scope: settled_局部规划器_反应式
-current_goal: Goal182 基础设施收尾已完成 contract smoke 与 quick screen。D13.6a–d、A0/A3、matrix freeze、formal 12 config、canonical evaluation 链路和 formal env 60 s 协议均已落地。正式训练仍被 ALOSB × BCFT/BCRES 缺少兼容 ALOS 输入 BC 阻断，等待用户选择 A/B/C/D。
-next_goal: 用户对 ALOSB BCFT/BCRES 做 A/B/C/D 决策；随后从包含 60 s 修复的新 commit 建干净服务器 worktree，重跑 profile/matrix/contract 检查并启动正式 C0→C6、3-seed 训练。
-goal182_status: ACTIVE / INFRA_VERIFIED / CONTRACT_SMOKE_PASS / QUICK_SCREEN_PASS / MATRIX_FROZEN / D13_6_FROZEN / A0_A3_DECIDED / FORMAL_ENV_60S_FIXED / ALOSB_BC_BLOCKER / TRAINING_NOT_STARTED
+current_goal: Goal182 首波 6 arm × 3 seeds 的 MOD4 正式训练已启动；BC-CURRENT-PREP、MOD4 full-width 修复、stage-boundary eval 调度和可续跑队列均已落地。
+next_goal: 轮询 18 个 run 直到 completed，核验 manifest/finite/provenance；全部完成后按冻结 evaluation matrix 跑正式评价，缺 cell 标 INVALID_INCOMPLETE_EVAL。
+goal182_status: ACTIVE / BC_CURRENT_PREP_COMPLETE / MOD4_SMOKE_PASS / FORMAL_TRAINING_RUNNING
 goal182_plan: doc/goals/goal182_ppo_stack_governance_20261114.md
 goal182_audit: doc/goals/goal182_infra_audit_20261116.md
 goal182_screen: doc/goals/goal182_screen_20261117.md
 goal182_execution_prompt: /home/bubble/水下机器人/总协调/doc/ops/GOAL182_INFRA_THEN_TRAIN_PROMPT_20261116.md
 goal182_worktree: /home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/goal182-infra-detached-20261116
 goal182_branch: goal182/infra-20261117
-goal182_server: ssh -p 43127 yhx@152.136.183.51；节点 underwater-8x4090；数据根 /data/yhx/underwater-robotics；smoke worktree 20261117-goal182-smoke-3a96fa7；run 根 /data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-smoke-3a96fa7；GPU6 评价、GPU7 训练。
+goal182_server: ssh -p 43127 yhx@152.136.183.51；节点 underwater-8x4090；formal worktree /data/yhx/underwater-robotics/worktrees/auv-local/goal182/20261117-goal182-mod4-fce2e25 @ 8485ac2；run 根 /data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-mod4-8485ac2。
+goal182_pre_goal_margin: 不设 pre_goal_3d_rmse_m margin；margin 只用于 cross/vertical 0.10；该指标只作 telemetry，单测 test_route_gate_ignores_pre_goal_3d_rmse_telemetry 固定。
 goal182_screen_result: 4 个已就绪 MOD4 × MLP arm（BCFT/BCRES/TRRES_CMD/TRRES_ACT）各 5 iterations、C3、seed 86201，全部 rc=0、5/5 finite；单 seed 评价均写出 summary/episodes/trace，success 0/1；只证明链路可执行，不是 formal 排名。
 goal182_formal_env_fix: CU2 的 max_episode_steps=3000（60 s）此前未写入 formal env；已在 build_goal182_configs.py 增加 FORMAL_MAX_EPISODE_STEPS，重生成两份 formal env，并加 60 s 与 C0–C6 sampler 覆盖测试。screen 的非 formal C3 env 保留 2500 以保持可追溯。
-goal182_formal_smoke: 从 commit 8f3e264 建干净 formal worktree；TRRES_CMD 在 formal ALOS env 跑 2 iterations（C0），2/2 finite，写出 final.pt/manifest/curriculum state；两次 frozen-dev curriculum eval 各 40 seeds 完成。run 根 /data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-formal-8f3e264。只作 contract smoke，不是 formal 结果。
-goal182_blockers: ALOSB × BCFT/BCRES 需要兼容 ALOS 输入的 5D BC；现有 PE2E BC SHA f7103f04… 不能直接作 ALOSB warmstart。可选 A 先训 ALOS BC、B 用户豁免、C 首波 4 臂后置、D 重定义契约。正式训练前必须清空此 USER_DECISION。
+goal182_fixed_interval_smoke_legacy: 8f3e264 的 formal-env smoke 使用旧 fixed-interval 调度，2 iterations 触发两次 40-seed eval；仅作历史证据，已由 8485ac2 的 stage-boundary 调度取代。
+goal182_formal_configs: 18 个 true MOD4 config（6 arm × 3 seeds）通过 profile checker；旧 12 个实际 MOD2，已改名 train_formal_mod2_*；首波只跑 train_formal_mod4_*。
+goal182_bc_current_prep: PE2E current BC SHA d85718a432a287f2ae255528f645bc20f4445aba875c9fb9c44f008c578094b2（best epoch 13, val 0.1168612539768219）；ALOS current BC SHA 47cda13ed97e77d372d1495096dd72259987c5466c13a5d2023f45000b402749（best epoch 110, val 0.006288284435868263）；ALOS demo 524288 samples / 408 episodes。
+goal182_bc_only_ablation: C3 seeds20-23 BC_ONLY: PE2E current 4/4, 3D 1.9841 m; PE2E current-zero 4/4, 1.4325 m; ALOS current 4/4, 1.6979 m; ALOS current-zero 3/4, 7.2774 m. Current encoder helps ALOS but not PE2E; pre_goal column is telemetry only.
+goal182_current_encoder_fix: 077ef84 修复 BC current encoder full d_z_total=64 与 policy active d_z_active=60 的 state_dict 尺寸冲突；69 passed / 1 skipped，4 个 MOD4 smoke 均 finite。
+goal182_stage_boundary_eval: 8485ac2 新增 --curriculum-eval-stage-boundaries；C0 首次 eval 为 iteration 72，之后每 20 iteration 重试；integration smoke 2/2 finite 且 next_eval_iteration=72。
+goal182_first_wave_queue: scripts/launch_goal182_first_wave_formal.sh，18 runs，seed-first，max_jobs=2，GPU 白名单 0/1/6/7，free>=23000 MiB，completed skip，conflict 停止；2026-11-17 12:19 启动 pe2e_finetune_seed86201@GPU7，12:22 启动 pe2e_residual_seed86201@GPU1，两者均 finite。
+goal182_blockers: 无。GPU6 free 约 18.5 GiB、GPU0 free 约 22.3 GiB，均低于 23 GiB 门槛，因此当前保持 2 并发；不杀他人进程，不占用不足门槛的 GPU。
 goal175_status: A2_COMPLETE / GATE175_FAIL / VERTICAL_GUARD_FAIL / H175C_NOT_SUPPORTED / HELDOUT_CLOSED
 goal175_result: doc/goals/goal175_result_20261114.md
 goal175_a1_result: doc/goals/goal175_a1_result_20261114.md
@@ -457,22 +464,22 @@ goal165_status: PREREGISTERED / GATE165_A_PASS / GATE165_B_PASS / GATE165_C_TRAI
 goal165_evidence: legacy bit-compatible replay 47/47 common fields identical; corrected zero peaks nominal 1.966, current07 1.998, current10 2.003, current15 2.053 m/s; over-2.5 episodes/steps 0; non-terminal and terminal overspeed both 0; normal integral estimate 11.6-13.5 rpm.
 goal165_order: preserve legacy branch; under nu_ground rebuild nu=[linear_velocity,angular_rate] and pass explicit water surge; four independent zero replays; then 3 seeds × 1M gain residual; then paired dev40 default/strict125.
 goal165_speed_contract: REMUS100 hard ceiling 2.5 m/s; every episode speed+current+variation<=2.5; zero replay uses one honest 40-episode dev block per level, not duplicated seed copies.
-goal182_plan: doc/goals/goal182_ppo_stack_governance_20261114.md
-goal182_result: doc/goals/goal182_result_20261116.md
-goal182_status: COMPLETED / CORRECTED_3SEED_600IT / C3_DEV4_EVAL / NOT_FORMAL / HELDOUT_CLOSED
-goal182_alos: C3/C4 x A0-A5 x seeds20-23 completed; old 12-arm ALOS remains INVALID_ALOS_ACTION_MODE.
-goal182_bc5d: M-tier 5D BC completed; checkpoint SHA f7103f04fdffe7155d2ab4fe4d1bec3ab19117e3ca798c204016ce66ab7e495c; BC_ONLY legacy 4/4 success, 3D RMSE 1.5376 m; same-protocol endpoint_stop rerun matches exactly (4/4 success, 3D 1.5376 m), so it is the PPO comparison baseline.
-goal182_ppo_contract: canonical PPO-FLAT-4096x48-E5-MB4; contract smoke and residual 5-iteration screen completed; screen only, not formal.
-goal182_module_priority: BC-CURRENT-PREP -> MOD4 -> MOD3 -> MOD2 -> MOD1 -> MOD0; MOD4 is priority treatment #1 and MOD2 is #2; paired controls stay adjacent; MOD0 last; Transformer deferred.
-goal182_warmstart_diagnosis: initial 600-it runs with empirical normalization + actor LR 3e-4 + std 0.3 had iteration-1 KL 34.9-70.4 and collapsed after one update; fixed normalization + actor LR 1e-5 + critic LR 3e-4 + std 0.05 restores 1-iteration 3D RMSE 1.5316 m and 5-iteration 1.5322 m.
-goal182_normalization_conflict: empirical actor normalization still degrades BC warmstart (1-iteration 3D RMSE 9.6319 m, safety 1.0) despite low actor LR; label BC_WARMSTART_NORMALIZATION_CONFLICT_PENDING_REVIEW; current corrected fine-tune uses fixed normalization.
-goal182_corrected_runs: ppo/finetune_5d_m_fixednorm_lr1e5_c3_s86201_600it, s86202_600it, s86203_600it; all status=completed, 600 iterations, 117964800 env steps, canonical PPO-FLAT-4096x48-E5-MB4, fixed normalization, C3-only, warmstart SHA f7103f04fdffe7155d2ab4fe4d1bec3ab19117e3ca798c204016ce66ab7e495c; wall times 21880.31/21580.18/21953.32 s; GPU peak allocated 19088.8/19088.6/19089.3 MiB.
-goal182_final_sha: s86201 2aead4c87d11e1afed42bec442b2913ba4cc35fcf905470eb08e5440647cbe77; s86202 cb0ce41540f3d2f8433c4f1163df778ce21da939f63957f1c18f5a81eb98e5ab; s86203 cba494efe51f83cfac874389a6f5d2c5c4c9f4c49a331f1a6f774957decd37ad.
-goal182_eval: C3, eval seeds 20-23, policy, endpoint_stop, success_frame=both, held-out closed; 86201 4/4 success, 3D 1.1854 m; 86202 4/4, 1.1816 m; 86203 3/4, 1.2349 m; pooled 11/12, 3D 1.2007 m, horizontal 1.1608 m, vertical 0.3059 m, material saturation 0.4830. Same-protocol BC: 4/4, 3D 1.5376 m, saturation 0.4114. NOT_FORMAL (C3/dev only).
-goal182_actor_metadata: policy_kind=pc_actor_critic; pc.actor_architecture=mlp; pc.actor_layout.kind=mlp; actor_hidden_dims=[512,256,128]; path_dim=5; critic_hidden_dims=[512,256,128]; critic_path_dim=30. policy_config.kind=dual_horizon_transformer is the DADE encoder metadata, not the actor.
-goal182_trace: single-env CPU/float64 C3 seed20; 86202 3D 0.9657 m success; 86203 3D 1.0445 m GOAL_PLANE_MISS. Trace is diagnostic only; 4-seed trace protocol differs from formal eval.
-goal182_next: resolve BC_WARMSTART_NORMALIZATION_CONFLICT_PENDING_REVIEW; if moving to formal, run full levels x radii x zero-baseline matrix; do not treat C3/dev 3x4 as formal PASS.
-goal182_invalid_runs: ppo/finetune_5d_m_c3_s86201_600it, s86202_600it, s86203_600it stopped and preserved as INVALID_WARMSTART_CONTRACT; do not resume or use for conclusions.
+goal182_legacy_plan: doc/goals/goal182_ppo_stack_governance_20261114.md
+goal182_legacy_result: doc/goals/goal182_result_20261116.md
+goal182_legacy_status: COMPLETED / CORRECTED_3SEED_600IT / C3_DEV4_EVAL / NOT_FORMAL / HELDOUT_CLOSED
+goal182_legacy_alos: C3/C4 x A0-A5 x seeds20-23 completed; old 12-arm ALOS remains INVALID_ALOS_ACTION_MODE.
+goal182_legacy_bc5d: M-tier 5D BC completed; checkpoint SHA f7103f04fdffe7155d2ab4fe4d1bec3ab19117e3ca798c204016ce66ab7e495c; BC_ONLY legacy 4/4 success, 3D RMSE 1.5376 m; same-protocol endpoint_stop rerun matches exactly (4/4 success, 3D 1.5376 m), so it is the PPO comparison baseline.
+goal182_legacy_ppo_contract: canonical PPO-FLAT-4096x48-E5-MB4; contract smoke and residual 5-iteration screen completed; screen only, not formal.
+goal182_legacy_module_priority: BC-CURRENT-PREP -> MOD4 -> MOD3 -> MOD2 -> MOD1 -> MOD0; MOD4 is priority treatment #1 and MOD2 is #2; paired controls stay adjacent; MOD0 last; Transformer deferred.
+goal182_legacy_warmstart_diagnosis: initial 600-it runs with empirical normalization + actor LR 3e-4 + std 0.3 had iteration-1 KL 34.9-70.4 and collapsed after one update; fixed normalization + actor LR 1e-5 + critic LR 3e-4 + std 0.05 restores 1-iteration 3D RMSE 1.5316 m and 5-iteration 1.5322 m.
+goal182_legacy_normalization_conflict: empirical actor normalization still degrades BC warmstart (1-iteration 3D RMSE 9.6319 m, safety 1.0) despite low actor LR; label BC_WARMSTART_NORMALIZATION_CONFLICT_PENDING_REVIEW; current corrected fine-tune uses fixed normalization.
+goal182_legacy_corrected_runs: ppo/finetune_5d_m_fixednorm_lr1e5_c3_s86201_600it, s86202_600it, s86203_600it; all status=completed, 600 iterations, 117964800 env steps, canonical PPO-FLAT-4096x48-E5-MB4, fixed normalization, C3-only, warmstart SHA f7103f04fdffe7155d2ab4fe4d1bec3ab19117e3ca798c204016ce66ab7e495c; wall times 21880.31/21580.18/21953.32 s; GPU peak allocated 19088.8/19088.6/19089.3 MiB.
+goal182_legacy_final_sha: s86201 2aead4c87d11e1afed42bec442b2913ba4cc35fcf905470eb08e5440647cbe77; s86202 cb0ce41540f3d2f8433c4f1163df778ce21da939f63957f1c18f5a81eb98e5ab; s86203 cba494efe51f83cfac874389a6f5d2c5c4c9f4c49a331f1a6f774957decd37ad.
+goal182_legacy_eval: C3, eval seeds 20-23, policy, endpoint_stop, success_frame=both, held-out closed; 86201 4/4 success, 3D 1.1854 m; 86202 4/4, 1.1816 m; 86203 3/4, 1.2349 m; pooled 11/12, 3D 1.2007 m, horizontal 1.1608 m, vertical 0.3059 m, material saturation 0.4830. Same-protocol BC: 4/4, 3D 1.5376 m, saturation 0.4114. NOT_FORMAL (C3/dev only).
+goal182_legacy_actor_metadata: policy_kind=pc_actor_critic; pc.actor_architecture=mlp; pc.actor_layout.kind=mlp; actor_hidden_dims=[512,256,128]; path_dim=5; critic_hidden_dims=[512,256,128]; critic_path_dim=30. policy_config.kind=dual_horizon_transformer is the DADE encoder metadata, not the actor.
+goal182_legacy_trace: single-env CPU/float64 C3 seed20; 86202 3D 0.9657 m success; 86203 3D 1.0445 m GOAL_PLANE_MISS. Trace is diagnostic only; 4-seed trace protocol differs from formal eval.
+goal182_legacy_next: resolve BC_WARMSTART_NORMALIZATION_CONFLICT_PENDING_REVIEW; if moving to formal, run full levels x radii x zero-baseline matrix; do not treat C3/dev 3x4 as formal PASS.
+goal182_legacy_invalid_runs: ppo/finetune_5d_m_c3_s86201_600it, s86202_600it, s86203_600it stopped and preserved as INVALID_WARMSTART_CONTRACT; do not resume or use for conclusions.
 last_decision: continue
-last_updated: 2026-11-16
+last_updated: 2026-11-17
 ```

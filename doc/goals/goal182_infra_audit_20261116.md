@@ -1,8 +1,8 @@
 # Goal182 基础设施审计（2026-11-16）
 
-**状态**：`ACTIVE`<br>
+**状态**：`ACTIVE / BC_CURRENT_PREP_COMPLETE / MOD4_SMOKE_PASS / FIRST_WAVE_RUNNING`<br>
 **范围**：只审计 Goal182 从“文档契约”到“可启动训练”之间的基础设施、配置、schema、checker 和服务器执行面。不重新讨论已经拍板的科学问题。<br>
-**结论先行**：actor metadata、矩阵、导航 profile、curriculum iteration hard cap、reset 初态、训练 route telemetry、warmstart/composition 一等字段、正式 TRRES config、正式评价 nominal 起点、StageGate enforce、canonical evaluation report/launcher/auditor、D13.6 参数冻结、matrix SHA-256 冻结、contract smoke 和 quick screen 均已落地；formal env 的 60 s 协议已修复。当前只剩 ALOSB BCFT/BCRES 的兼容 BC 决策（用户 A/B/C/D）和正式训练启动。
+**结论先行**：ALOSB BCFT/BCRES 的兼容 BC 阻断已按 A 方案解决；MOD4 的 18 个正式 config、current encoder full-width 修复、stage-boundary frozen-dev 调度和首波队列均已落地。首波 6 arm × 3 seeds 已从 `8485ac2` 的干净 worktree 启动，当前 GPU7 跑 `pe2e_finetune_seed86201`、GPU1 跑 `pe2e_residual_seed86201`，两者均已写出 finite iteration。`pre_goal_3d_rmse_m` 只作 telemetry，不进入 margin 或 route gate。
 
 ## 1. 审计口径
 
@@ -56,18 +56,18 @@
 | 训练 profile schema | 校验 canonical profile 和派生量 | `--schema-only` 通过 | `PASS` | `check_training_profile.py --schema-only` exit 0 |
 | 实验矩阵 schema | 校验 program / matrix schema | `--schema-only` 通过 | `PASS` | `check_experiment_matrix.py --schema-only` exit 0 |
 | 实验 program schema | 校验 program 定义 | `--schema-only` 通过 | `PASS` | `check_experiment_program.py --schema-only` exit 0 |
-| Research ledger | Goal182 记录可检查 | 通过，2 条记录 | `PASS` | 工作区 `scripts/check_research_ledger.py --goal Goal182 ... --strict` exit 0 |
+| Research ledger | Goal182 记录可检查 | 通过，4 条记录 | `PASS` | 工作区 `scripts/check_research_ledger.py --goal Goal182 ... --strict` exit 0 |
 | actor metadata | config / manifest / checkpoint 显式 | config、manifest、checkpoint 已接线；checker 可强制 | `FIXED` | 本轮测试和 config 检查通过 |
 | matrix 中的 actor metadata | 每个 arm 记录四字段 | 两张 core matrix 的每个 arm 已显式写入 `actor`，checker 强制 | `FIXED` | `check_goal182_matrices.py` 校验 60 个 arm |
-| PE2E 正式矩阵 | `goal182_core_pe2e_matrix.json` | 已生成 DRAFT，20 arms | `FIXED` | `build_goal182_matrices.py`；冻结仍需 D13.6 |
-| ALOSB 正式矩阵 | `goal182_core_alosb_matrix.json` | 已生成 DRAFT，40 arms | `FIXED` | `TRRES_CMD/ACT` 分开登记并通过 checker |
-| 核心组合索引 | `goal182_core_composition_index.json` | 已生成 DRAFT，索引两张 matrix | `FIXED` | `cross_program_pooling=false`；总计 60 arms |
-| 评价矩阵 | `goal182_eval_matrix.json` | 已生成 DRAFT，五个 tier，四压力分表 | `FIXED` | `check_goal182_eval_matrix.py`；正式 cell 仍需冻结 |
+| PE2E 正式矩阵 | `goal182_core_pe2e_matrix.json` | 已冻结，20 arms | `PASS` | `check_goal182_matrices.py --require-frozen` PASS |
+| ALOSB 正式矩阵 | `goal182_core_alosb_matrix.json` | 已冻结，40 arms | `PASS` | `TRRES_CMD/ACT` 分开登记并通过 checker |
+| 核心组合索引 | `goal182_core_composition_index.json` | 已冻结，索引两张 matrix | `PASS` | `cross_program_pooling=false`；总计 60 arms |
+| 评价矩阵 | `goal182_eval_matrix.json` | 已冻结，五个 tier，四压力分表 | `PASS` | `check_goal182_eval_matrix.py --require-frozen` PASS |
 | axis registry | 首波 screen 与 validity 一致 | `screen_a_rule/note` 已统一为 `MOD4 → MOD3 → MOD2 → MOD1 → MOD0` | `FIXED` | matrix generator 以此为单一来源 |
 | magic number provenance checker | 支持 `check_magic_number_provenance.py` | 已实现 registry、baseline 和 changed-file ratchet | `FIXED` | schema、unit tests、全仓 baseline 34 条、changed scan 均通过 |
 | 导航 profile | 默认 `unbiased_small_noise_v2`，`nav_noise_m=(0.001,0.1)` | v2 已实现，Goal182 builder/env 已切换 | `FIXED` | v1 保留历史用途；v2-only 测试通过 |
 | 初始状态 | 路线起点、抖动、速度/角速度契约 | pitch/yaw `±10°`、初始三轴角速度、速度比例 `0.8–1.2×`、current 估计首条有效测量热启动、manifest `reset_contract` 均已实现；正式评价默认强制 nominal 起点 | `FIXED` | `tests/test_lowlevel_pc_env.py`、`tests/test_pc_goal85_unbiased_contract.py`、`tests/test_g04_evaluate_pc_ppo_cli_contract.py` 覆盖 |
-| StageGate 评估节奏 | C0–C6 routine 用训练 rollout 20-iteration 滑窗、连续 3 次通过 | `enforce` 已接入训练 rollout 20/3：窗口/阈值来自训练 episode metrics，晋级前只跑一次 frozen-dev 边界安全检查；`shadow` 保留旧 frozen-dev 晋级逻辑并逐 iteration 写 route-gate telemetry | `FIXED` | `CurriculumTrainerHook._maybe_update_enforce`、`CurriculumPromotionController.promote_after_route_gate/veto_after_route_gate`；`tests/test_lowlevel_curriculum_trainer.py` 覆盖晋级、safety veto 和缺阈值失败。D13.6 数值与切换点仍待用户冻结 |
+| StageGate 评估节奏 | C0–C6 routine 用训练 rollout 20-iteration 滑窗、连续 3 次通过 | `enforce` 已接入训练 rollout 20/3；frozen-dev eval 改为在每个 stage 的 soft cap 边界触发，不再按固定 transition interval 每 iteration 触发 | `FIXED` | `8485ac2`；`--curriculum-eval-stage-boundaries`；integration smoke 的 `next_eval_iteration=72` |
 | StageGate 训练 telemetry | 每次 iteration 能输出 cross/vertical RMSE、pre-goal 3D RMSE、completion ratio | `pc_vec_env` 已逐 episode 累积并输出四个 route 指标；`metrics.py` 已纳入 episode keys | `FIXED` | `tests/test_lowlevel_pc_vec_env.py::test_pc_vec_env_logs_route_telemetry_on_episode_end` |
 | ALOS guidance telemetry | summary 必须记录实际生效的 horizontal/vertical lookahead、gain 和 terminal alignment | evaluator 原先只记录 vertical 两字段；已补 `guidance_horizontal_gain/horizontal_lookahead_m/lookahead_error_gain/speed_adaptive_lookahead_enabled/terminal_alignment_*` | `FIXED` | `_guidance_telemetry_fields`；`tests/test_g04_evaluate_pc_ppo_cli_contract.py` 10 passed，相关 evaluator/auditor 回归 16 passed |
 | 旧 ALOS 六臂 screen | 六臂必须可区分 lookahead/gain 干预 | `20261116-joint-c186c74/alos/C3` 的 A0–A5 主指标四位小数完全相同；vertical 参数虽不同，但不能证明 horizontal 干预生效 | `LEGACY_ONLY` | 旧结果不得用于 A0/A3 或 guidance 选择；新 evaluator 补齐 telemetry 后重跑才算有效 screen |
@@ -75,14 +75,17 @@
 | 正式评价起点 | 正式评价必须使用 nominal 初态 | evaluator 默认把 `guidance.nominal_initial_state` 强制为 true，并在 report 记录 `start_contract`；诊断可用 `--allow-non-nominal-start` 显式退出 | `FIXED` | `tests/test_g04_evaluate_pc_ppo_cli_contract.py` |
 | curriculum iteration hard cap | 按 iteration 而非 transition 计 | 默认 C0–C6 已改为 `72/120 … 420/700`，合计 2600 | `FIXED` | transition 只作遥测；controller 按 stage 消耗 iteration |
 | TRRES fresh init | 不借用 BC/其他 arm 权重 | config parser 和 launcher 已强制 `standard_fresh`、null checkpoint、禁止 `--warmstart-actor` | `FIXED` | manifest 记录 `learning_composition/encoder_init/encoder_init_checkpoint`；测试覆盖借用 BC 和旧 encoder |
-| 正式 TRRES config | `TRRES_CMD` / `TRRES_ACT` 可直接启动 | 已生成 `train_trres_cmd_5d_m_seed86201.json` 与 `train_trres_act_5d_m_seed86201.json`；均为 `standard_fresh`、无 warmstart、`actor/critic_command_dim=3` | `FIXED` | 两份配置通过 profile checker；command/actuator wrapper reset+step smoke 5 passed |
-| 首波 formal config 覆盖 | MOD4 × MLP 六臂 × 3 seeds | 4/6 臂已有 formal config（PE2E BCFT/BCRES、ALOSB TRRES_CMD/ACT）；ALOSB BCFT/BCRES 缺 config 和兼容 BC checkpoint | `BLOCKER` | `check_goal182_matrices.py --require-first-wave-configs` 报 6 个 `CONFIG_COVERAGE_MISSING`；不得用 PE2E 5D BC 冒充 ALOSB BC |
+| 正式 TRRES config | `TRRES_CMD` / `TRRES_ACT` 可直接启动 | 已生成 `train_formal_mod4_alosb_trres_cmd_5d_m_seed*.json` 与 `train_formal_mod4_alosb_trres_act_5d_m_seed*.json`；均为 `standard_fresh`、无 warmstart、`actor/critic_command_dim=3` | `FIXED` | 6 份 config 通过 profile checker；wrapper reset+step smoke 通过 |
 | 评价 canonical artifacts | 每个 run 固定写 `summary.json`、`episodes.jsonl`、`trace.npz` | evaluator 现在默认写 `summary.json`、`summary.md`、`episodes.jsonl`、`trace.npz`；episode 与 trace 共用 `episode_id`，episodes 增加 `path_steps/pre_goal_path_steps` 供复算 | `FIXED` | `src/auv_lowlevel/cli/evaluate_pc_ppo/main.py`、`episodes.py`、`runner.py`；canonical artifact 与 auditor 已纳入全量回归 |
 | 评价 artifact auditor | 启动器结束阶段必须审计 canonical 产物并非零退出 | `scripts/audit_goal182_artifacts.py` 审计单 run 的 `summary/episodes/trace`、`episode_id` 对齐和主指标复算；eval-set 模式进一步校验 `matrix_manifest` 完整性、`report_rows` 可复算、压力分节和未声明 run | `FIXED` | `tests/test_goal182_artifact_audit.py`、`tests/test_goal182_eval_report.py`；缺 episodes、trace id mismatch、report metric drift 均非零退出 |
 | 正式评价 launcher | 先跑协议检查，再跑评价，最后 build report + auditor，任一步失败非零退出 | 新增 `scripts/run_goal182_eval.py`：校验 eval matrix 与 held-out，调用 standing runner，生成 `matrix_manifest/report_rows/report.md`，再调用 auditor；`formal*` phase 强制 matrix/tier 均为 `FROZEN` | `FIXED` | `scripts/build_goal182_eval_report.py`；`tests/test_goal182_eval_launcher.py` 覆盖 dry-run 接线和 DRAFT 拒绝 |
-| D13.6 StageGate | 阈值和 shadow 切换点冻结 | 用户 2026-11-17 确认按推荐冻结；margin 只保留 cross/vertical，不设 pre-goal 3D margin | `FIXED` | 参数见 §8；首波 shadow，阈值表由 reference + P0 rollout 标定后切换 enforce |
-| 服务器 worktree | 从新 commit 建干净 worktree | 旧 Goal182 worktree 全是 `c186c74`，dirty 文件数分别为 12 / 40 / 66 | `LEGACY_ONLY` | 不复用旧 worktree；新 commit 推送后新建 |
-| 服务器 bare main | 与本地待执行文档一致 | 已到 `a1a62c9`，worktree `20261117-goal182-infra-a1a62c9` 干净 | `PASS` | 新 commit 推送后从新 tip 建 run worktree |
+| D13.6 StageGate | 阈值和 shadow 切换点冻结 | 用户 2026-11-17 确认按推荐冻结；margin 只保留 cross/vertical `0.10`，不设 pre-goal 3D margin | `FIXED` | 参数见 §8；`test_route_gate_ignores_pre_goal_3d_rmse_telemetry` 固定该行为 |
+| 正式 config 覆盖 | 首波 6 arm × 3 seeds 全部可启动 | 18 个 `train_formal_mod4_*.json` 均通过 profile checker；旧 12 个实际是 MOD2，已改名隔离 | `FIXED` | `check_goal182_matrices.py --require-first-wave-configs` PASS |
+| BC current prep | ALOSB BCFT/BCRES 使用兼容 current-encoder BC | PE2E / ALOS BC 均已生成；ALOS BC `actor_command_dim=3`、`path_dim=5`、SHA `47cda13e…` | `FIXED` | 详见 §12.1 |
+| current encoder layout | 从 BC 加载 current encoder 时宽度一致 | BC 输出 full `d_z_total=64`，旧 policy 期望 active `d_z_active=60`，导致 state_dict 尺寸不匹配；已修复 | `FIXED` | `077ef84`；69 passed / 1 skipped |
+| 首波正式训练 | 6 arm × 3 seeds 可续跑队列 | `launch_goal182_first_wave_formal.sh` 带锁、completed skip、conflict 停止、GPU 白名单与 23 GiB 门槛 | `PASS` | run root `20261117-goal182-mod4-8485ac2`；当前 RUNNING |
+| 服务器 worktree | 从新 commit 建干净 worktree | `20261117-goal182-mod4-fce2e25` 已 checkout `8485ac2` 且干净 | `PASS` | 不使用旧 dirty worktree |
+| 服务器 bare main | 与本地待执行文档一致 | 本地分支 `goal182/infra-20261117` 与远端已同步到 `8485ac2` | `PASS` | 后续 docs commit 继续 fast-forward push |
 
 ## 4. 冲突审计
 
@@ -225,9 +228,9 @@ cd 总协调
 
 | 门禁 | 状态 | 原因 |
 |---|---|---|
-| `CONTRACT_SMOKE` | `PASS` | `TRRES_CMD` 2 iterations：finite、checkpoint、curriculum provenance、manifest 均通过 |
+| `CONTRACT_SMOKE` | `PASS` | 4 个 MOD4 arm 在 `077ef84` 上各跑 1 iteration：BC current encoder full-width 加载、frozen BC、fresh TRRES、curriculum provenance 和 manifest 均通过 |
 | `QUICK_SCREEN` | `PASS` | 4 个已就绪 MOD4 × MLP arm 在 GPU7 各跑 5 iterations，全部 `rc=0`、5/5 finite；GPU6 单 seed C3 评价全部写出 canonical artifacts。记录：`doc/goals/goal182_screen_20261117.md` |
-| 正式训练 | `BLOCKER` | D13.6、matrix、4 臂 formal config 已就绪；ALOSB BCFT/BCRES 缺兼容 BC checkpoint，不能虚构 |
+| 正式训练 | `RUNNING` | 18 个 MOD4 formal config 已就绪；首波队列已启动，GPU7 `pe2e_finetune_seed86201`、GPU1 `pe2e_residual_seed86201`，两者均 finite |
 | 正式评价 | `PASS` | canonical launcher/report/auditor 已就绪；eval matrix 与全部 tier 已冻结并有 SHA-256 清单 |
 
 ## 7. 下一轮最小垂直切片
@@ -244,13 +247,18 @@ cd 总协调
 5b. [x] 冻结 core/eval matrix 并生成 `goal182_matrix_freeze.json` SHA-256 清单；
 5c. [x] 记录 A0/A3：A1 rudder、A2 stern、A3 3D 进入 screen，A0_HISTORICAL 只作历史锚点，3D 为正式主线；
 6. [x] 跑 1–2 iteration contract smoke 和 `QUICK_SCREEN`（1 seed × 5 iterations，固定 C3）；4 个已就绪 arm 全部 `rc=0`、5/5 finite，评价产物完整，见 §11；
-7. [ ] 生成正式 C0→C6、3-seed 训练 config：4/6 臂已生成并通过 profile 检查；ALOSB BCFT/BCRES 仍缺兼容 BC，见 §10；formal env 的 60 s 协议已修复，见 §11。
+7. [x] 生成正式 C0→C6、3-seed 训练 config：18 个 MOD4 config 全部通过 profile 检查；旧 12 个 MOD2 config 已改名隔离，见 §10；
+8. [x] 完成 BC-CURRENT-PREP：PE2E 与 ALOS current-encoder BC 均生成，ALOSB BCFT/BCRES 阻断按 A 方案解除；
+9. [x] 修复 current encoder 从 BC 加载时的 full-width 布局，并修复 frozen-dev eval 的 stage-boundary 调度，见 §12.2–§12.4；
+10. [x] 启动首波 6 arm × 3 seeds 可续跑队列；当前 `RUNNING`，见 §12.5；
+11. [ ] 18 个 run 全部 `completed` 后执行冻结的 formal 评价矩阵；缺 cell 标 `INVALID_INCOMPLETE_EVAL`。
 
 ## 8. D13.6 已冻结参数（2026-11-17）
 
 用户确认按推荐冻结。阈值公式保持不变；margin 只用于 cross/vertical，不再要求
 `pre_goal_3d_rmse_m` margin。`pre_goal_3d_rmse_m` 仍作为 telemetry 记录，但不进入
-routine route gate。
+routine route gate。该约束由 `RouteGateThresholds` 的四个字段和
+`test_route_gate_ignores_pre_goal_3d_rmse_telemetry` 固化。
 
 | 编号 | 问题 | 冻结值 | 说明 |
 |---|---|---|---|
@@ -273,44 +281,54 @@ routine route gate。
 | 2026-11-17 | D13.6 冻结 | 用户确认 D13.6a–d 按推荐冻结；margin 只保留 cross/vertical `0.10`，不设 pre-goal 3D margin；completion floor `0.80–0.90`；首波 shadow | route gate 不再消费 `pre_goal_3d_rmse_m`；该指标只作 telemetry |
 | 2026-11-17 | A0/A3 选择 | A1 rudder、A2 stern、A3 3D 进入 screen；A0_HISTORICAL 只作历史锚点；3D 为正式主线 | screen 不得引用旧 ALOS 六臂结果；正式训练用 3D authority |
 | 2026-11-17 | matrix 冻结 | core PE2E/ALOSB 与 eval matrix 全部 `FROZEN`；SHA-256 写入 `goal182_matrix_freeze.json` | formal launcher/checker 要求 FROZEN；builder 默认拒绝覆盖 |
+| 2026-11-17 | ALOSB BC 阻断按 A 解决 | 采集 ALOS 输入 5D demo 并训练 current-encoder BC；ALOSB BCFT/BCRES 使用 `47cda13e…`，不拿 PE2E BC 冒充 | 首波 6 个合法 arm 全部可启动；BCFT/BCRES/TRRES 初始化来源在 manifest 中可审计 |
+| 2026-11-17 | MOD4 config 错标修复 | 旧 12 个 `train_formal_*` 实际是 `actor_current_encoder_enabled=false`、`critic_path_dim=30`、`dade_enabled=true`，即 MOD2；已改名为 `train_formal_mod2_*`。新增 18 个真 MOD4 config | 不影响旧 MOD2 结果；首波只跑 `train_formal_mod4_*` |
+| 2026-11-17 | current encoder full-width | BC current encoder 输出 `d_z_total=64`；旧 policy 在 `bc_path_dim` 路径仍只输出 60，导致 state_dict `[64,64] vs [60,64]`。修复后仅 active 宽度才补 reserved zeros | `077ef84`；4 个 MOD4 contract smoke 通过 |
+| 2026-11-17 | frozen-dev stage-boundary 调度 | 4096×48 transitions/iteration 会让旧 100000 transition interval 每 iteration 触发 40-seed×2 eval；首波改为每个 stage soft cap 边界首次触发，之后每 20 iteration 重试 | `8485ac2`；首跑 `next_eval_iteration=72`，不生成 iteration-1 评测 |
+| 2026-11-17 | pre-goal 3D margin 复核 | 用户再次确认 margin 不需要 `pre_goal_3d_rmse_m`；该指标只作 telemetry/评价复算 | route gate 仍只消费 cross、vertical、completion、safety；单测固定 |
 
-## 10. 首波 formal config 覆盖阻断（2026-11-17）
+## 10. 首波 formal config 覆盖：已按 A 解决（2026-11-17）
 
-`MOD4 × MLP` 的六个合法 arm 中，四个已生成正式 C0→C6、3-seed config 并通过
-`check_training_profile.py`：
+历史阻断是 ALOSB × BCFT/BCRES 缺少兼容 ALOS 输入的 5D BC。按用户选择的 A 方案，
+先采集 ALOS 正式 A3 3D 环境的 teacher demo，再训练 current-encoder BC；阻断已解除。
 
-- `PE2E × BCFT`：`train_formal_finetune_5d_m_seed{86201,86202,86203}.json`
-- `PE2E × BCRES`：`train_formal_residual_5d_m_seed{86201,86202,86203}.json`
-- `ALOSB × TRRES_CMD`：`train_formal_trres_cmd_5d_m_seed{86201,86202,86203}.json`
-- `ALOSB × TRRES_ACT`：`train_formal_trres_act_5d_m_seed{86201,86202,86203}.json`
+当前 `MOD4 × MLP` 的六个合法 arm 均有 3 seeds、C0→C6、2600 iterations 的正式 config：
 
-阻断项：
+| control | learn | config stem | seeds |
+|---|---|---|---|
+| PE2E | BCFT | `train_formal_mod4_pe2e_finetune_5d_m_seed{seed}.json` | 86201–86203 |
+| PE2E | BCRES | `train_formal_mod4_pe2e_residual_5d_m_seed{seed}.json` | 86201–86203 |
+| ALOSB | BCFT | `train_formal_mod4_alosb_finetune_5d_m_seed{seed}.json` | 86201–86203 |
+| ALOSB | BCRES | `train_formal_mod4_alosb_residual_5d_m_seed{seed}.json` | 86201–86203 |
+| ALOSB | TRRES_CMD | `train_formal_mod4_alosb_trres_cmd_5d_m_seed{seed}.json` | 86201–86203 |
+| ALOSB | TRRES_ACT | `train_formal_mod4_alosb_trres_act_5d_m_seed{seed}.json` | 86201–86203 |
 
-```text
-G182_INT_STACK_MLP_ALOSB_BCFT_MOD4  -> CONFIG_COVERAGE_MISSING
-G182_INT_STACK_MLP_ALOSB_BCRES_MOD4 -> CONFIG_COVERAGE_MISSING
-```
+所有 18 个 config 都满足：
 
-原因：现有 5D BC checkpoint（`f7103f...`）是在 PE2E `path_fixed_speed` 环境训练，
-不是 ALOS 输入下的 BC。Goal182 §4.13 明确 `ALOSB × BCFT/BCRES` 需要兼容的 ALOS-BC；
-直接把 PE2E BC 作为 warmstart 会改变 actor 输入/控制契约，属于 `BC_CHECKPOINT_INCOMPATIBLE`。
+- `actor_current_encoder_enabled=true`、`bc_path_dim=5`、`critic_path_dim=30`、`dade_enabled=true`；
+- `training_profile=PPO-FLAT-4096x48-E5-MB4`、`num_envs=4096`、`num_steps_per_env=48`；
+- formal env `max_episode_steps=3000`（60 s × 0.02 s），2600 iterations，C0 起点。
+
+旧 12 个文件名为 `train_formal_*`，但内容是 MOD2：`actor_current_encoder_enabled=false`、
+`critic_path_dim=30`、`dade_enabled=true`。它们已用 `git mv` 改名为
+`train_formal_mod2_*`，内容不变，只作 MOD2 对照；首波不启动。
 
 可执行证据：
 
 ```bash
+for f in configs/lowlevel/goal182/train_formal_mod4_*.json; do
+  .venv/bin/python /home/bubble/水下机器人/总协调/scripts/check_training_profile.py \
+    --require-actor-metadata --require-mlp-critic-mirror --training-config "$f" || exit 1
+done
+# PROFILE PASS 18
+
 .venv/bin/python scripts/check_goal182_matrices.py \
   --require-frozen --require-first-wave-configs
-# exit 1, 6 x CONFIG_COVERAGE_MISSING
+# PASS goal182 matrices arms=60
+
+.venv/bin/python scripts/check_goal182_eval_matrix.py --require-frozen
+# PASS goal182 eval matrix frozen
 ```
-
-需要用户选择：
-
-| 选项 | 含义 | 影响 |
-|---|---|---|
-| A | 先训练兼容的 ALOS 输入 5D BC，再补 ALOSB BCFT/BCRES | 最符合 Goal182；需要 ALOS BC 数据与新的 BC run |
-| B | 明确豁免，允许 PE2E 5D BC 作为 ALOSB warmstart | 需写 `PASS_WITH_WAIVER`；BCFT/BCRES 与 TRRES 的初始化不同源，结论要降级 |
-| C | 首波只跑 4 个已就绪 arm，ALOSB BCFT/BCRES 后置 | 不阻塞训练；但首波 6-arm 配对不完整，formal 结论必须标注 |
-| D | 重新定义 ALOSB BCFT/BCRES 的 action/base 契约 | 需要改 Goal182 科学定义，不能由执行代理自行决定 |
 
 ## 11. Quick screen 与 formal 60 s 修复（2026-11-17）
 
@@ -343,11 +361,11 @@ G182_INT_STACK_MLP_ALOSB_BCRES_MOD4 -> CONFIG_COVERAGE_MISSING
 PYTHONPATH=src .venv/bin/python -m pytest tests/test_goal182_formal_configs.py -q
 # 4 passed
 
-for f in configs/lowlevel/goal182/train_formal_*.json; do
-  python ../scripts/check_training_profile.py --require-actor-metadata \
+for f in configs/lowlevel/goal182/train_formal_mod4_*.json; do
+  python /home/bubble/水下机器人/总协调/scripts/check_training_profile.py --require-actor-metadata \
     --require-mlp-critic-mirror --training-config "$f" || exit 1
 done
-# 12/12 PASS
+# 18/18 PASS
 
 python scripts/check_goal182_matrices.py --require-frozen
 # PASS goal182 matrices arms=60
@@ -356,7 +374,7 @@ python scripts/check_goal182_eval_matrix.py --require-frozen
 # PASS goal182 eval matrix frozen
 ```
 
-### 11.1 修复后的 formal-env contract smoke
+### 11.1 历史 formal-env contract smoke（旧 fixed-interval 调度）
 
 服务器已从分支 commit `8f3e264` 建干净 worktree：
 
@@ -383,7 +401,8 @@ python scripts/check_goal182_eval_matrix.py --require-frozen
 /data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-formal-8f3e264
 ```
 
-正式训练现在只剩用户对 ALOSB BCFT/BCRES 的 A/B/C/D 决策。
+这里两次 frozen-dev eval 是旧 fixed-interval 调度的产物；`8485ac2` 后由 §12.4 的
+stage-boundary 调度取代，正式首波不会每 iteration 跑 frozen-dev。
 
 ### 11.2 本轮提交与推送
 
@@ -414,4 +433,220 @@ git rev-parse --short HEAD   # dc1d146
 PYTHONPATH=$W/src:/data/yhx/underwater-robotics/worktrees/auv-core/g04-sync/20261114-g04-sync-0e0bfb1/src \
   /data/yhx/underwater-robotics/envs/venvs/isaaclab/bin/python \
   -m pytest tests/test_goal182_formal_configs.py -q   # 4 passed
+```
+
+## 12. BC-CURRENT-PREP、MOD4 修复与首波启动（2026-11-17）
+
+### 12.1 BC current checkpoint 与 BC-only 消融
+
+两个 BC checkpoint 都使用 current-body 输入、full `d_z_total=64`，均记录 checkpoint
+SHA、dataset SHA、config SHA、train/validation 划分和 normalization：
+
+| BC | checkpoint | SHA-256 | best epoch | best val loss | samples / episodes |
+|---|---|---|---:|---:|---:|
+| PE2E current | `pe2e_bc_current/pc_bc_actor.pt` | `d85718a432a287f2ae255528f645bc20f4445aba875c9fb9c44f008c578094b2` | 13 | 0.1168612539768219 | 421888 / 330 |
+| ALOS current | `alos_bc_current/pc_bc_actor.pt` | `47cda13ed97e77d372d1495096dd72259987c5466c13a5d2023f45000b402749` | 110 | 0.006288284435868263 | 524288 / 408 |
+
+ALOS demo 分两批采集，均为 `64 envs × 4096 steps`：seeds `90000–90063` 和
+`90500–90563`，每批 262144 samples，合并 524288 samples / 408 episodes。数据来自
+formal ALOS A3 3D 环境，`actor_command_dim=3`、`path_dim=5`，因此可合法用于
+ALOSB × BCFT/BCRES。
+
+BC-only C3、seeds 20–23、`endpoint_stop` 的结果如下。`pre_goal` 列只作 telemetry，
+没有参与任何 margin 或 gate。
+
+| BC | success | 3D RMSE | horizontal | vertical | material saturation | pre_goal 3D (telemetry) |
+|---|---:|---:|---:|---:|---:|---:|
+| PE2E current | 4/4 | 1.9841 m | 1.9060 m | 0.5514 m | 0.2091 | 2.0638 m |
+| PE2E current-zero | 4/4 | 1.4325 m | 1.3688 m | 0.4225 m | 0.2051 | 1.4239 m |
+| ALOS current | 4/4 | 1.6979 m | 1.6595 m | 0.3591 m | 0.1341 | 1.7053 m |
+| ALOS current-zero | 3/4 | 7.2774 m | 7.2218 m | 0.8976 m | 0.0798 | 8.3961 m |
+
+结论必须分开写：ALOS current encoder 在 BC-only 上明显优于 current-zero；PE2E 上
+current-zero 反而更好，因此不能用这张表宣称 “current encoder 对所有 control 都有
+收益”。正式矩阵仍按已冻结方案继续，不因该消融改科学契约。
+
+输出根目录：
+
+```text
+/data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-bc-current-prep/
+```
+
+### 12.2 MOD4/MOD2 config 错标修复
+
+旧 12 个 `train_formal_*` 文件虽然被命名为 MOD4，实际字段是：
+
+- `actor_current_encoder_enabled=false`；
+- `critic_path_dim=30`；
+- `dade_enabled=true`。
+
+这对应 MOD2，不是 MOD4。已用 `git mv` 改名为 `train_formal_mod2_*`，内容不变，
+只作 MOD2 对照。随后新增 18 个真 MOD4 config，字段为：
+
+```text
+actor_current_encoder_enabled=true
+bc_path_dim=5
+critic_path_dim=30
+dade_enabled=true
+```
+
+matrix checker 会区分 module set 与 config 实际字段，错误组合报
+`MODULE_SET_CONFIG_MISMATCH`；拿 PE2E BC 冒充 ALOSB BC 时报
+`BC_CHECKPOINT_INCOMPATIBLE`。提交：`fce2e25`。
+
+### 12.3 current encoder full-width 修复
+
+首次 PE2E BCFT smoke 失败：
+
+```text
+RuntimeError: Error(s) in loading state_dict for Sequential:
+size mismatch for 2.weight: checkpoint [64,64] vs policy [60,64]
+```
+
+根因：BC current encoder 输出 full `d_z_total=64`，而 `PCActorCritic` 在
+`actor_current_encoder` 加载路径仍按 active `d_z_active=60` 输出。`path_encoder`
+已有 full-width 分支，current encoder 漏了同一处理。
+
+修复 `077ef84`：
+
+- `PCActorCritic` 增加 `actor_current_encoder_output_dim`；
+- `bc_path_dim is not None` 时 current encoder 使用 `d_z_total`；
+- `_fuse_actor_current` 只在输出为 active 宽度时补 reserved zeros；
+- checkpoint metadata 记录实际输出宽度。
+
+验证：`tests/test_lowlevel_pc_policy.py` 新增 full-width BC contract 测试；
+targeted suite `69 passed, 1 skipped`。4 个 MOD4 smoke 均 `rc=0`、1/1 finite：
+
+| smoke | 结果 |
+|---|---|
+| `pe2e_bcft` | `loaded_from_bc`，SHA `d85718…`，DADE input scale 0.03 |
+| `alosb_bcres` | frozen BC current encoder `encoded`，SHA `47cda13e…`，residual output 归零 |
+| `alosb_trres_cmd` | fresh init，command interface，command dim 3 |
+| `alosb_trres_act` | fresh init，actuator interface，command dim 3 |
+
+smoke 根目录：
+
+```text
+/data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-mod4-077ef84/smoke_noeval
+```
+
+### 12.4 frozen-dev eval 改为 stage-boundary
+
+4096 envs × 48 steps = 196608 transitions/iteration。旧默认
+`--curriculum-eval-interval=100000` 小于一个 iteration，导致每 iteration 都触发
+40-seed × 2 tier 的 frozen-dev eval，既慢又不符合 Goal182 “frozen-dev 只在 stage
+边界”契约。
+
+修复 `8485ac2` 新增 `--curriculum-eval-stage-boundaries`：
+
+- 首次 eval 目标是当前 stage 的 `soft_budget_iterations`，C0 = 72；
+- 之后每 20 iterations 重试，复用 routine route window size；
+- promotion 后按新 stage 的 soft budget 重新排期；
+- 固定 interval 仍是默认行为，不影响历史实验。
+
+integration smoke 根目录：
+
+```text
+/data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-mod4-8485ac2/smoke_stage_boundary
+```
+
+结果：2 iterations、2/2 finite、`curriculum_eval_schedule=stage_boundary`、
+`next_eval_iteration=72`，没有生成 `curriculum_evals`。
+
+### 12.5 首波训练队列
+
+服务器 run 根：
+
+```text
+/data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-mod4-8485ac2
+```
+
+代码 worktree：
+
+```text
+/data/yhx/underwater-robotics/worktrees/auv-local/goal182/20261117-goal182-mod4-fce2e25
+# checkout 8485ac2e59301831d8d01f0fe8de0f5d22d3ab9e，status clean
+```
+
+队列脚本 `scripts/launch_goal182_first_wave_formal.sh`（远端文件名
+`launch_first_wave.sh`，SHA `9715215503a4…`）按 seed-first 排序 18 个 run，并具备：
+
+- queue-level `flock`，避免双 scheduler；
+- 已有 `training_manifest.json.status=completed` 的 run 直接 skip；
+- 输出目录存在但 manifest 未 completed 时报 `CONFLICT` 并停止后续启动；
+- GPU 只从 `0/1/6/7` 白名单选择，要求 free ≥ 23000 MiB；
+- 最多 2 个并发；任一 run 非零退出即停止后续启动并保留日志；
+- 状态写 `queue_status.tsv`、`queue_summary.txt`、`queue.log`、`logs/<run>.log`。
+
+启动记录（截至 2026-11-17 12:27 CST）：
+
+```text
+QUEUE_START  2026-11-17T12:19:17+08:00  jobs=18  max_jobs=2  min_free_mib=23000
+LAUNCH       pe2e_finetune_seed86201  gpu=7  pid=2741377  seed=86201
+LAUNCH       pe2e_residual_seed86201  gpu=1  pid=2853504  seed=86201
+```
+
+GPU1 在 12:22 出现 ≥23 GiB free 后，队列按白名单启动了第二个 run；当前两个 run
+各占约 22.3 GiB，GPU7/GPU1 均满载训练。GPU6 当前约 18.5 GiB free，低于 23 GiB
+门槛，因此不再增加并发。没有杀任何他人进程，也没有占用不足门槛的 GPU。
+
+首个 run 的 `training_manifest.json`：
+
+```text
+status=running
+training_profile=PPO-FLAT-4096x48-E5-MB4
+git_commit=8485ac2
+warmstart_actor_sha256=d85718a432a287f2ae255528f645bc20f4445aba875c9fb9c44f008c578094b2
+pc.actor_current_encoder_enabled=true
+pc.path_dim=5
+pc.bc_path_dim=5
+pc.critic_path_dim=30
+pc.dade_enabled=true
+curriculum_eval_schedule=stage_boundary
+curriculum_route_gate.mode=shadow
+curriculum_route_gate.thresholds=null
+```
+
+`curriculum_state.json`：`stage=C0`、`completed_iterations=7`、
+`next_eval_iteration=72`、`route_gate.reason=TELEMETRY_MISSING`（第一个 episode
+尚未自然结束）。`iteration_records.jsonl` 的 iteration 1 为 `losses_finite=true`；
+第二个 run 也已启动并写出 finite iteration records。
+
+后续检查命令：
+
+```bash
+R=/data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-mod4-8485ac2
+tail -20 "$R/queue_status.tsv"
+cat "$R/queue_summary.txt"
+ps -eo pid,etime,%cpu,%mem,cmd | grep train_batch_lowlevel_ppo | grep -v grep
+nvidia-smi
+```
+
+### 12.6 本轮提交与推送
+
+```bash
+cd settled_局部规划器_反应式/.worktrees/goal182-infra-detached-20261116
+
+git add tests/test_lowlevel_curriculum_sampler.py
+git diff --cached --check
+git commit -m "test(goal182): keep pre-goal rmse out of route gate"
+
+git add scripts/launch_goal182_first_wave_formal.sh
+git diff --cached --check
+git commit -m "feat(goal182): add resumable first-wave queue"
+
+git add doc/goals/goal182_infra_audit_20261116.md research/STATE.md research/LEDGER.jsonl
+git diff --cached --check
+git commit -m "docs(goal182): record mod4 formal launch"
+
+git push server goal182/infra-20261117
+git push origin goal182/infra-20261117
+```
+
+服务器复核：
+
+```bash
+ssh -p 43127 yhx@152.136.183.51 \
+  'W=/data/yhx/underwater-robotics/worktrees/auv-local/goal182/20261117-goal182-mod4-fce2e25; \
+   git -C "$W" rev-parse HEAD; git -C "$W" status --porcelain'
 ```
