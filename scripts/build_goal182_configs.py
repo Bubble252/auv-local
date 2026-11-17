@@ -52,6 +52,60 @@ BC_CHECKPOINT = (
 BC_CHECKPOINT_SHA256 = (
     "f7103f04fdffe7155d2ab4fe4d1bec3ab19117e3ca798c204016ce66ab7e495c"
 )
+PE2E_CURRENT_BC_CHECKPOINT = (
+    "/data/yhx/underwater-robotics/runs/auv-local/goal182/"
+    "20261117-goal182-bc-current-prep/pe2e_bc_current/pc_bc_actor.pt"
+)
+PE2E_CURRENT_BC_SHA256 = (
+    "d85718a432a287f2ae255528f645bc20f4445aba875c9fb9c44f008c578094b2"
+)
+ALOS_CURRENT_BC_CHECKPOINT = (
+    "/data/yhx/underwater-robotics/runs/auv-local/goal182/"
+    "20261117-goal182-bc-current-prep/alos_bc_current/pc_bc_actor.pt"
+)
+ALOS_CURRENT_BC_SHA256 = (
+    "47cda13ed97e77d372d1495096dd72259987c5466c13a5d2023f45000b402749"
+)
+
+MODULE_SET_FLAGS = {
+    "MOD0": {
+        "actor_current_encoder_enabled": False,
+        "critic_path_dim": 0,
+        "dade_enabled": False,
+    },
+    "MOD1": {
+        "actor_current_encoder_enabled": False,
+        "critic_path_dim": 0,
+        "dade_enabled": True,
+    },
+    "MOD2": {
+        "actor_current_encoder_enabled": False,
+        "critic_path_dim": 30,
+        "dade_enabled": True,
+    },
+    "MOD3": {
+        "actor_current_encoder_enabled": True,
+        "critic_path_dim": 0,
+        "dade_enabled": True,
+    },
+    "MOD4": {
+        "actor_current_encoder_enabled": True,
+        "critic_path_dim": 30,
+        "dade_enabled": True,
+    },
+}
+
+
+def _bc_for(control: str, module_set: str) -> tuple[str, str]:
+    if module_set == "MOD4":
+        if control == "pe2e":
+            return PE2E_CURRENT_BC_CHECKPOINT, PE2E_CURRENT_BC_SHA256
+        return ALOS_CURRENT_BC_CHECKPOINT, ALOS_CURRENT_BC_SHA256
+    if module_set in {"MOD1", "MOD2"} and control == "pe2e":
+        return BC_CHECKPOINT, BC_CHECKPOINT_SHA256
+    raise ValueError(
+        f"no compatible BC checkpoint is registered for {control} x {module_set}"
+    )
 
 CURRICULUM = {
     "enabled": True,
@@ -246,10 +300,20 @@ def _alos_environment(*, formal: bool = False) -> dict[str, Any]:
 def _training(
     *,
     mode: str,
+    control: str,
+    module_set: str,
     environment_path: Path,
     seed: int = TRAIN_SEED,
     formal: bool = False,
 ) -> dict[str, Any]:
+    control = control.lower()
+    if control not in {"pe2e", "alosb"}:
+        raise ValueError(f"unknown control contract: {control}")
+    if module_set not in MODULE_SET_FLAGS:
+        raise ValueError(f"unknown module set: {module_set}")
+    if control == "pe2e" and mode in {"trres_cmd", "trres_act"}:
+        raise ValueError("PE2E does not support TRRES compositions")
+    flags = MODULE_SET_FLAGS[module_set]
     payload = _load(BASE_TRAIN_PATH)
     payload["training_profile"] = TRAINING_PROFILE
     payload["actor"] = copy.deepcopy(ACTOR_METADATA)
@@ -261,11 +325,19 @@ def _training(
             "observation_schema": "pc_v1",
         }
     )
+    bc_path, bc_sha = (None, None)
+    if mode in {"residual", "finetune"}:
+        bc_path, bc_sha = _bc_for(control, module_set)
+        if bc_sha.startswith("PENDING"):
+            raise ValueError(
+                f"BC checkpoint SHA is not frozen for {control} x {module_set}"
+            )
+
     if mode == "residual":
         payload["base_policy"] = {
             "mode": "frozen_pc_bc_residual",
-            "checkpoint": BC_CHECKPOINT,
-            "checkpoint_sha256": BC_CHECKPOINT_SHA256,
+            "checkpoint": bc_path,
+            "checkpoint_sha256": bc_sha,
             "residual_scale": 1.0,
             "residual_action_mask": [1.0, 1.0, 1.0],
         }
@@ -284,8 +356,8 @@ def _training(
         payload["experiment"].update(
             {
                 "learning_composition": "BCFT",
-                "warmstart_actor": BC_CHECKPOINT,
-                "warmstart_actor_sha256": BC_CHECKPOINT_SHA256,
+                "warmstart_actor": bc_path,
+                "warmstart_actor_sha256": bc_sha,
                 "trainable_scope": "actor_critic",
             }
         )
@@ -307,9 +379,8 @@ def _training(
     else:
         raise ValueError(f"unknown mode: {mode}")
 
-    trres = mode in {"trres_cmd", "trres_act"}
-    actor_command_dim = 3 if trres else 0
-    critic_command_dim = 3 if trres else 1
+    actor_command_dim = 3 if control == "alosb" else 0
+    critic_command_dim = 3 if control == "alosb" else 1
     action_interface = {
         "residual": "environment",
         "finetune": "environment",
@@ -349,7 +420,7 @@ def _training(
             "n_in_reserved": 8,
             "n_z_reserved": 4,
             "state_encoder_hidden_dims": [128, 128],
-            "dade_enabled": True,
+            "dade_enabled": flags["dade_enabled"],
             "aux_current_coef": 0.0,
             "aux_current_steps": 0,
             "dade_warmstart_input_scale": 0.03,
@@ -358,13 +429,13 @@ def _training(
             "dade_state_mode": "full",
             "dade_history_mode": "encoded",
             "actor_state_mode": "full",
-            "actor_current_encoder_enabled": False,
+            "actor_current_encoder_enabled": flags["actor_current_encoder_enabled"],
             "actor_current_encoder_hidden_dims": [64],
             "actor_current_encoder_alpha": 1.0,
             "actor_command_dim": actor_command_dim,
             "critic_command_dim": critic_command_dim,
             "path_dim": 5,
-            "critic_path_dim": 30,
+            "critic_path_dim": flags["critic_path_dim"],
             "critic_path_encoder_hidden_dims": [64],
             "critic_path_encoder_alpha": 1.0,
             "critic_path_encoder_zero_init": False,
@@ -409,14 +480,15 @@ def _training(
     payload["experiment"].update(
         {
             "name": (
-                f"goal182_ppo_formal_{mode}_5d_m_seed{seed}"
+                f"goal182_ppo_formal_{module_set.lower()}_{control}_{mode}_5d_m_seed{seed}"
                 if formal
-                else f"goal182_ppo_{mode}_5d_m_seed{seed}"
+                else f"goal182_ppo_{module_set.lower()}_{control}_{mode}_5d_m_seed{seed}"
             ),
             "seed": seed,
             "output": (
                 "artifacts/lowlevel/goal182_ppo_stack_governance_20261114/"
-                f"train/{'formal/' if formal else ''}{mode}_seed{seed}"
+                f"train/{'formal/' if formal else ''}{module_set.lower()}/"
+                f"{control}_{mode}_seed{seed}"
             ),
             "device": "cuda",
         }
@@ -431,7 +503,24 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="generate full C0->C6 3-seed formal configs",
     )
+    parser.add_argument(
+        "--module-set",
+        choices=tuple(MODULE_SET_FLAGS),
+        default="MOD4",
+        help="module set encoded by the generated configs (default: MOD4)",
+    )
     return parser.parse_args()
+
+
+def _config_name(
+    module_set: str,
+    control: str,
+    mode: str,
+    *,
+    formal: bool,
+) -> str:
+    prefix = "train_formal_" if formal else "train_"
+    return f"{prefix}{module_set.lower()}_{control}_{mode}_5d_m_seed{{seed}}.json"
 
 
 def main() -> None:
@@ -445,22 +534,25 @@ def main() -> None:
         _write(formal_env_path, _environment(formal=True))
         _write(formal_alos_env_path, _alos_environment(formal=True))
         for seed in FORMAL_SEEDS:
-            for mode in ("residual", "finetune"):
+            specs = (
+                ("pe2e", "finetune", formal_env_path),
+                ("pe2e", "residual", formal_env_path),
+                ("alosb", "finetune", formal_alos_env_path),
+                ("alosb", "residual", formal_alos_env_path),
+                ("alosb", "trres_cmd", formal_alos_env_path),
+                ("alosb", "trres_act", formal_alos_env_path),
+            )
+            for control, mode, environment_path in specs:
+                name = _config_name(
+                    args.module_set, control, mode, formal=True
+                ).format(seed=seed)
                 _write(
-                    GOAL_ROOT / f"train_formal_{mode}_5d_m_seed{seed}.json",
+                    GOAL_ROOT / name,
                     _training(
                         mode=mode,
-                        environment_path=formal_env_path,
-                        seed=seed,
-                        formal=True,
-                    ),
-                )
-            for mode in ("trres_cmd", "trres_act"):
-                _write(
-                    GOAL_ROOT / f"train_formal_{mode}_5d_m_seed{seed}.json",
-                    _training(
-                        mode=mode,
-                        environment_path=formal_alos_env_path,
+                        control=control,
+                        module_set=args.module_set,
+                        environment_path=environment_path,
                         seed=seed,
                         formal=True,
                     ),
@@ -468,15 +560,27 @@ def main() -> None:
         return
     _write(env_path, _environment())
     _write(alos_env_path, _alos_environment())
-    for mode in ("residual", "finetune"):
+    specs = (
+        ("pe2e", "finetune", env_path),
+        ("pe2e", "residual", env_path),
+        ("alosb", "finetune", alos_env_path),
+        ("alosb", "residual", alos_env_path),
+        ("alosb", "trres_cmd", alos_env_path),
+        ("alosb", "trres_act", alos_env_path),
+    )
+    for control, mode, environment_path in specs:
+        name = _config_name(
+            args.module_set, control, mode, formal=False
+        ).format(seed=TRAIN_SEED)
         _write(
-            GOAL_ROOT / f"train_{mode}_5d_m_seed{TRAIN_SEED}.json",
-            _training(mode=mode, environment_path=env_path),
-        )
-    for mode in ("trres_cmd", "trres_act"):
-        _write(
-            GOAL_ROOT / f"train_{mode}_5d_m_seed{TRAIN_SEED}.json",
-            _training(mode=mode, environment_path=alos_env_path),
+            GOAL_ROOT / name,
+            _training(
+                mode=mode,
+                control=control,
+                module_set=args.module_set,
+                environment_path=environment_path,
+                seed=TRAIN_SEED,
+            ),
         )
 
 

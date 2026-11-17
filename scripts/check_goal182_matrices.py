@@ -40,6 +40,37 @@ ACTOR_CONTRACTS = {
         "pooling": "attention",
     },
 }
+MODULE_CONFIG_EXPECTATIONS = {
+    "MOD4": {
+        "actor_current_encoder_enabled": True,
+        "critic_path_dim": 30,
+        "dade_enabled": True,
+    },
+    "MOD3": {
+        "actor_current_encoder_enabled": True,
+        "critic_path_dim": 0,
+        "dade_enabled": True,
+    },
+    "MOD2": {
+        "actor_current_encoder_enabled": False,
+        "critic_path_dim": 30,
+        "dade_enabled": True,
+    },
+    "MOD1": {
+        "actor_current_encoder_enabled": False,
+        "critic_path_dim": 0,
+        "dade_enabled": True,
+    },
+    "MOD0": {
+        "actor_current_encoder_enabled": False,
+        "critic_path_dim": 0,
+        "dade_enabled": False,
+    },
+}
+MOD4_BC_SHA = {
+    "PE2E": "d85718a432a287f2ae255528f645bc20f4445aba875c9fb9c44f008c578094b2",
+    "ALOSB": "47cda13ed97e77d372d1495096dd72259987c5466c13a5d2023f45000b402749",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -65,17 +96,96 @@ def _sha256(path: Path) -> str:
 
 def _first_wave_config_paths(control: str, learn: str) -> list[str]:
     stem = {
-        ("PE2E", "BCFT"): "train_formal_finetune_5d_m_seed{seed}.json",
-        ("PE2E", "BCRES"): "train_formal_residual_5d_m_seed{seed}.json",
-        ("ALOSB", "BCFT"): "train_formal_alosb_finetune_5d_m_seed{seed}.json",
-        ("ALOSB", "BCRES"): "train_formal_alosb_residual_5d_m_seed{seed}.json",
-        ("ALOSB", "TRRES_CMD"): "train_formal_trres_cmd_5d_m_seed{seed}.json",
-        ("ALOSB", "TRRES_ACT"): "train_formal_trres_act_5d_m_seed{seed}.json",
+        ("PE2E", "BCFT"): "train_formal_mod4_pe2e_finetune_5d_m_seed{seed}.json",
+        ("PE2E", "BCRES"): "train_formal_mod4_pe2e_residual_5d_m_seed{seed}.json",
+        ("ALOSB", "BCFT"): "train_formal_mod4_alosb_finetune_5d_m_seed{seed}.json",
+        ("ALOSB", "BCRES"): "train_formal_mod4_alosb_residual_5d_m_seed{seed}.json",
+        ("ALOSB", "TRRES_CMD"): (
+            "train_formal_mod4_alosb_trres_cmd_5d_m_seed{seed}.json"
+        ),
+        ("ALOSB", "TRRES_ACT"): (
+            "train_formal_mod4_alosb_trres_act_5d_m_seed{seed}.json"
+        ),
     }[(control, learn)]
     return [
         f"configs/lowlevel/goal182/{stem.format(seed=seed)}"
         for seed in FORMAL_SEEDS
     ]
+
+
+def _validate_formal_config(
+    arm: dict[str, Any],
+    control: str,
+    module: str,
+    relative: str,
+) -> list[str]:
+    errors: list[str] = []
+    label = f"{arm['arm_id']}.{relative}"
+    path = REPO_ROOT / relative
+    try:
+        payload = _load(path)
+    except (OSError, ValueError) as error:
+        return [f"{label}: cannot read formal config: {error}; CONFIG_COVERAGE_MISSING"]
+    pc = payload.get("pc")
+    if not isinstance(pc, dict):
+        return [f"{label}: missing pc block; MODULE_SET_CONFIG_MISMATCH"]
+    expected = MODULE_CONFIG_EXPECTATIONS[module]
+    for key, value in expected.items():
+        if pc.get(key) != value:
+            errors.append(
+                f"{label}: pc.{key} must be {value!r}, got {pc.get(key)!r}; "
+                "MODULE_SET_CONFIG_MISMATCH"
+            )
+    expected_command_dim = 0 if control == "PE2E" else 3
+    if pc.get("actor_command_dim") != expected_command_dim:
+        errors.append(
+            f"{label}: actor_command_dim must be {expected_command_dim} for "
+            f"{control}; ACTOR_INPUT_CONTRACT_MISMATCH"
+        )
+    if pc.get("path_dim") != 5 or pc.get("bc_path_dim") != 5:
+        errors.append(f"{label}: 5D path contract required; PATH_CONTRACT_MISMATCH")
+    learn = str(arm["learning_composition"])
+    if learn in {"BCFT", "BCRES"}:
+        if module == "MOD4":
+            checkpoint_key = (
+                "warmstart_actor" if learn == "BCFT" else "base_policy"
+            )
+            if learn == "BCFT":
+                recorded_sha = payload.get("experiment", {}).get(
+                    "warmstart_actor_sha256"
+                )
+                checkpoint = payload.get("experiment", {}).get("warmstart_actor")
+            else:
+                base = payload.get("base_policy", {})
+                recorded_sha = base.get("checkpoint_sha256")
+                checkpoint = base.get("checkpoint")
+            if recorded_sha != MOD4_BC_SHA[control]:
+                errors.append(
+                    f"{label}: {checkpoint_key} SHA is not the compatible MOD4 "
+                    f"{control} current-encoder BC; BC_CHECKPOINT_INCOMPATIBLE"
+                )
+            if not isinstance(checkpoint, str) or not checkpoint:
+                errors.append(
+                    f"{label}: missing {checkpoint_key} checkpoint; "
+                    "BC_CHECKPOINT_INCOMPATIBLE"
+                )
+    environment = payload.get("environment")
+    if isinstance(environment, dict):
+        env_path = environment.get("config")
+        if isinstance(env_path, str):
+            try:
+                env_payload = _load(REPO_ROOT / env_path)
+                steps = env_payload.get("plant", {}).get("max_episode_steps")
+            except (OSError, ValueError):
+                steps = None
+            if steps != 3000:
+                errors.append(
+                    f"{label}: formal env must use max_episode_steps=3000; "
+                    "EPISODE_PROTOCOL_MISMATCH"
+                )
+    if payload.get("training_profile") != TRAINING_PROFILE:
+        errors.append(f"{label}: training_profile mismatch")
+    return errors
 
 
 def _validate_arm(arm: dict[str, Any], matrix: dict[str, Any], errors: list[str]) -> None:
@@ -230,6 +340,14 @@ def main() -> int:
                             f"{arm['arm_id']}: missing formal config {relative}; "
                             "CONFIG_COVERAGE_MISSING"
                         )
+                        continue
+                    match = ARM_RE.match(str(arm.get("arm_id", "")))
+                    module = match.group(4) if match is not None else "MOD4"
+                    errors.extend(
+                        _validate_formal_config(
+                            arm, control, module, relative
+                        )
+                    )
         overlap = all_ids & ids
         if overlap:
             errors.append(f"{matrix['matrix_id']}: arm duplicated across programs: {sorted(overlap)}")
