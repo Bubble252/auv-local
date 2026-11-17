@@ -18,6 +18,7 @@ INDEX_PATH = GOVERNANCE / "goal182_core_composition_index.json"
 FREEZE_MANIFEST = GOVERNANCE / "goal182_matrix_freeze.json"
 MATRIX_SCHEMA = "auv_core_composition_matrix.v1"
 TRAINING_PROFILE = "PPO-FLAT-4096x48-E5-MB4"
+FORMAL_SEEDS = (86201, 86202, 86203)
 ARM_RE = re.compile(r"^G182_INT_STACK_(MLP|TA)_(PE2E|ALOSB)_(BCFT|BCRES|TRRES_CMD|TRRES_ACT)_(MOD[0-4])$")
 MODULE_SETS = {
     "MOD0": "MS_NONE",
@@ -47,6 +48,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--index", type=Path, default=INDEX_PATH)
     parser.add_argument("--freeze-manifest", type=Path, default=FREEZE_MANIFEST)
     parser.add_argument("--require-frozen", action="store_true")
+    parser.add_argument("--require-first-wave-configs", action="store_true")
     return parser.parse_args()
 
 
@@ -59,6 +61,21 @@ def _load(path: Path) -> dict[str, Any]:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _first_wave_config_paths(control: str, learn: str) -> list[str]:
+    stem = {
+        ("PE2E", "BCFT"): "train_formal_finetune_5d_m_seed{seed}.json",
+        ("PE2E", "BCRES"): "train_formal_residual_5d_m_seed{seed}.json",
+        ("ALOSB", "BCFT"): "train_formal_alosb_finetune_5d_m_seed{seed}.json",
+        ("ALOSB", "BCRES"): "train_formal_alosb_residual_5d_m_seed{seed}.json",
+        ("ALOSB", "TRRES_CMD"): "train_formal_trres_cmd_5d_m_seed{seed}.json",
+        ("ALOSB", "TRRES_ACT"): "train_formal_trres_act_5d_m_seed{seed}.json",
+    }[(control, learn)]
+    return [
+        f"configs/lowlevel/goal182/{stem.format(seed=seed)}"
+        for seed in FORMAL_SEEDS
+    ]
 
 
 def _validate_arm(arm: dict[str, Any], matrix: dict[str, Any], errors: list[str]) -> None:
@@ -200,6 +217,19 @@ def main() -> int:
             if ref.get(key) != matrix.get(key):
                 errors.append(f"index: {key} mismatch for {ref['path']}")
         ids = validate_matrix(matrix, axis_sha, errors)
+        if args.require_first_wave_configs:
+            control = "PE2E" if matrix["control_contract"] == "CC_PE2E" else "ALOSB"
+            for arm in matrix["arms"]:
+                if arm.get("first_wave_order") != 1:
+                    continue
+                for relative in _first_wave_config_paths(
+                    control, str(arm["learning_composition"])
+                ):
+                    if not (REPO_ROOT / relative).is_file():
+                        errors.append(
+                            f"{arm['arm_id']}: missing formal config {relative}; "
+                            "CONFIG_COVERAGE_MISSING"
+                        )
         overlap = all_ids & ids
         if overlap:
             errors.append(f"{matrix['matrix_id']}: arm duplicated across programs: {sorted(overlap)}")

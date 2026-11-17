@@ -76,6 +76,7 @@
 | curriculum iteration hard cap | 按 iteration 而非 transition 计 | 默认 C0–C6 已改为 `72/120 … 420/700`，合计 2600 | `FIXED` | transition 只作遥测；controller 按 stage 消耗 iteration |
 | TRRES fresh init | 不借用 BC/其他 arm 权重 | config parser 和 launcher 已强制 `standard_fresh`、null checkpoint、禁止 `--warmstart-actor` | `FIXED` | manifest 记录 `learning_composition/encoder_init/encoder_init_checkpoint`；测试覆盖借用 BC 和旧 encoder |
 | 正式 TRRES config | `TRRES_CMD` / `TRRES_ACT` 可直接启动 | 已生成 `train_trres_cmd_5d_m_seed86201.json` 与 `train_trres_act_5d_m_seed86201.json`；均为 `standard_fresh`、无 warmstart、`actor/critic_command_dim=3` | `FIXED` | 两份配置通过 profile checker；command/actuator wrapper reset+step smoke 5 passed |
+| 首波 formal config 覆盖 | MOD4 × MLP 六臂 × 3 seeds | 4/6 臂已有 formal config（PE2E BCFT/BCRES、ALOSB TRRES_CMD/ACT）；ALOSB BCFT/BCRES 缺 config 和兼容 BC checkpoint | `BLOCKER` | `check_goal182_matrices.py --require-first-wave-configs` 报 6 个 `CONFIG_COVERAGE_MISSING`；不得用 PE2E 5D BC 冒充 ALOSB BC |
 | 评价 canonical artifacts | 每个 run 固定写 `summary.json`、`episodes.jsonl`、`trace.npz` | evaluator 现在默认写 `summary.json`、`summary.md`、`episodes.jsonl`、`trace.npz`；episode 与 trace 共用 `episode_id`，episodes 增加 `path_steps/pre_goal_path_steps` 供复算 | `FIXED` | `src/auv_lowlevel/cli/evaluate_pc_ppo/main.py`、`episodes.py`、`runner.py`；canonical artifact 与 auditor 已纳入全量回归 |
 | 评价 artifact auditor | 启动器结束阶段必须审计 canonical 产物并非零退出 | `scripts/audit_goal182_artifacts.py` 审计单 run 的 `summary/episodes/trace`、`episode_id` 对齐和主指标复算；eval-set 模式进一步校验 `matrix_manifest` 完整性、`report_rows` 可复算、压力分节和未声明 run | `FIXED` | `tests/test_goal182_artifact_audit.py`、`tests/test_goal182_eval_report.py`；缺 episodes、trace id mismatch、report metric drift 均非零退出 |
 | 正式评价 launcher | 先跑协议检查，再跑评价，最后 build report + auditor，任一步失败非零退出 | 新增 `scripts/run_goal182_eval.py`：校验 eval matrix 与 held-out，调用 standing runner，生成 `matrix_manifest/report_rows/report.md`，再调用 auditor；`formal*` phase 强制 matrix/tier 均为 `FROZEN` | `FIXED` | `scripts/build_goal182_eval_report.py`；`tests/test_goal182_eval_launcher.py` 覆盖 dry-run 接线和 DRAFT 拒绝 |
@@ -224,9 +225,9 @@ cd 总协调
 
 | 门禁 | 状态 | 原因 |
 |---|---|---|
-| `CONTRACT_SMOKE` | `READY` | 服务器 worktree 干净；TRRES_CMD C3 smoke 待跑 |
-| `QUICK_SCREEN` | `READY` | 等待 `CONTRACT_SMOKE`；首波 matrix 已冻结 |
-| 正式训练 | `BLOCKER` | D13.6 与 matrix 已冻结；仍缺正式 C0→C6、3-seed 训练 config 生成与 profile 检查 |
+| `CONTRACT_SMOKE` | `PASS` | `TRRES_CMD` 2 iterations：finite、checkpoint、curriculum provenance、manifest 均通过 |
+| `QUICK_SCREEN` | `IN_PROGRESS` | 6 个 MOD4 × MLP 中 4 个有 config；PE2E BCFT/BCRES 与 ALOSB TRRES_CMD/ACT 正在 GPU7 顺序跑 5 iterations |
+| 正式训练 | `BLOCKER` | D13.6、matrix、4 臂 formal config 已就绪；ALOSB BCFT/BCRES 缺兼容 BC checkpoint，不能虚构 |
 | 正式评价 | `PASS` | canonical launcher/report/auditor 已就绪；eval matrix 与全部 tier 已冻结并有 SHA-256 清单 |
 
 ## 7. 下一轮最小垂直切片
@@ -243,7 +244,7 @@ cd 总协调
 5b. [x] 冻结 core/eval matrix 并生成 `goal182_matrix_freeze.json` SHA-256 清单；
 5c. [x] 记录 A0/A3：A1 rudder、A2 stern、A3 3D 进入 screen，A0_HISTORICAL 只作历史锚点，3D 为正式主线；
 6. [ ] 跑 1–2 iteration contract smoke 和 `QUICK_SCREEN`（1 seed × 5 iterations，固定 C3）；
-7. [ ] 生成正式 C0→C6、3-seed 训练 config，跑 profile 检查后再启动正式训练。
+7. [ ] 生成正式 C0→C6、3-seed 训练 config：4/6 臂已生成并通过 profile 检查；ALOSB BCFT/BCRES 仍缺兼容 BC，见 §10。
 
 ## 8. D13.6 已冻结参数（2026-11-17）
 
@@ -272,3 +273,41 @@ routine route gate。
 | 2026-11-17 | D13.6 冻结 | 用户确认 D13.6a–d 按推荐冻结；margin 只保留 cross/vertical `0.10`，不设 pre-goal 3D margin；completion floor `0.80–0.90`；首波 shadow | route gate 不再消费 `pre_goal_3d_rmse_m`；该指标只作 telemetry |
 | 2026-11-17 | A0/A3 选择 | A1 rudder、A2 stern、A3 3D 进入 screen；A0_HISTORICAL 只作历史锚点；3D 为正式主线 | screen 不得引用旧 ALOS 六臂结果；正式训练用 3D authority |
 | 2026-11-17 | matrix 冻结 | core PE2E/ALOSB 与 eval matrix 全部 `FROZEN`；SHA-256 写入 `goal182_matrix_freeze.json` | formal launcher/checker 要求 FROZEN；builder 默认拒绝覆盖 |
+
+## 10. 首波 formal config 覆盖阻断（2026-11-17）
+
+`MOD4 × MLP` 的六个合法 arm 中，四个已生成正式 C0→C6、3-seed config 并通过
+`check_training_profile.py`：
+
+- `PE2E × BCFT`：`train_formal_finetune_5d_m_seed{86201,86202,86203}.json`
+- `PE2E × BCRES`：`train_formal_residual_5d_m_seed{86201,86202,86203}.json`
+- `ALOSB × TRRES_CMD`：`train_formal_trres_cmd_5d_m_seed{86201,86202,86203}.json`
+- `ALOSB × TRRES_ACT`：`train_formal_trres_act_5d_m_seed{86201,86202,86203}.json`
+
+阻断项：
+
+```text
+G182_INT_STACK_MLP_ALOSB_BCFT_MOD4  -> CONFIG_COVERAGE_MISSING
+G182_INT_STACK_MLP_ALOSB_BCRES_MOD4 -> CONFIG_COVERAGE_MISSING
+```
+
+原因：现有 5D BC checkpoint（`f7103f...`）是在 PE2E `path_fixed_speed` 环境训练，
+不是 ALOS 输入下的 BC。Goal182 §4.13 明确 `ALOSB × BCFT/BCRES` 需要兼容的 ALOS-BC；
+直接把 PE2E BC 作为 warmstart 会改变 actor 输入/控制契约，属于 `BC_CHECKPOINT_INCOMPATIBLE`。
+
+可执行证据：
+
+```bash
+.venv/bin/python scripts/check_goal182_matrices.py \
+  --require-frozen --require-first-wave-configs
+# exit 1, 6 x CONFIG_COVERAGE_MISSING
+```
+
+需要用户选择：
+
+| 选项 | 含义 | 影响 |
+|---|---|---|
+| A | 先训练兼容的 ALOS 输入 5D BC，再补 ALOSB BCFT/BCRES | 最符合 Goal182；需要 ALOS BC 数据与新的 BC run |
+| B | 明确豁免，允许 PE2E 5D BC 作为 ALOSB warmstart | 需写 `PASS_WITH_WAIVER`；BCFT/BCRES 与 TRRES 的初始化不同源，结论要降级 |
+| C | 首波只跑 4 个已就绪 arm，ALOSB BCFT/BCRES 后置 | 不阻塞训练；但首波 6-arm 配对不完整，formal 结论必须标注 |
+| D | 重新定义 ALOSB BCFT/BCRES 的 action/base 契约 | 需要改 Goal182 科学定义，不能由执行代理自行决定 |

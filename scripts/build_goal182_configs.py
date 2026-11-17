@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import copy
 import json
 import os
@@ -33,6 +34,8 @@ PPO_LEARNING_EPOCHS = 5
 PPO_MINI_BATCHES = 4
 PPO_ITERATIONS = 5
 TRAIN_SEED = 86201
+FORMAL_SEEDS = (86201, 86202, 86203)
+FORMAL_ITERATIONS = 2600
 
 START_JITTER_YAW_RAD = 0.1745329252
 START_JITTER_PITCH_RAD = 0.1745329252
@@ -53,6 +56,17 @@ CURRICULUM = {
     "initial_stage": "C3",
     "manifest_filename": "curriculum_episodes.jsonl",
     "stage_mix": [{"stage": "C3", "weight": 1.0}],
+}
+
+FORMAL_CURRICULUM = {
+    "enabled": True,
+    "promotion_enabled": True,
+    "initial_stage": "C0",
+    "manifest_filename": "curriculum_episodes.jsonl",
+    "stage_mix": [
+        {"stage": "C0", "weight": 0.90},
+        {"stage": "C1", "weight": 0.10},
+    ],
 }
 
 REWARD = {
@@ -137,9 +151,11 @@ def _relative(path: Path) -> str:
     return str(path.relative_to(REPO_ROOT))
 
 
-def _environment() -> dict[str, Any]:
+def _environment(*, formal: bool = False) -> dict[str, Any]:
     payload = _load(BASE_ENV_PATH)
-    payload["curriculum"] = copy.deepcopy(CURRICULUM)
+    payload["curriculum"] = copy.deepcopy(
+        FORMAL_CURRICULUM if formal else CURRICULUM
+    )
     payload["reward"] = copy.deepcopy(REWARD)
     payload["termination"] = copy.deepcopy(TERMINATION)
     payload["guidance"].update(
@@ -160,7 +176,11 @@ def _environment() -> dict[str, Any]:
     payload["sensors"] = {"profile": "unbiased_small_noise_v2", "seed": 81300}
     payload["experiment"].update(
         {
-            "name": "goal182_path_fixed_speed_c3",
+            "name": (
+                "goal182_path_fixed_speed_formal"
+                if formal
+                else "goal182_path_fixed_speed_c3"
+            ),
             "output": "artifacts/lowlevel/goal182_ppo_stack_governance_20261114/env",
             "pc_control_mode": "path_fixed_speed",
             "pc_stage": "C3",
@@ -172,11 +192,15 @@ def _environment() -> dict[str, Any]:
     return payload
 
 
-def _alos_environment() -> dict[str, Any]:
-    payload = _environment()
+def _alos_environment(*, formal: bool = False) -> dict[str, Any]:
+    payload = _environment(formal=formal)
     payload["experiment"].update(
         {
-            "name": "goal182_alos_c3_a0_base",
+            "name": (
+                "goal182_alos_formal_a3_3d"
+                if formal
+                else "goal182_alos_c3_a0_base"
+            ),
             "output": "artifacts/lowlevel/goal182_ppo_stack_governance_20261114/env_alos",
             "pc_control_mode": "alos",
         }
@@ -185,7 +209,7 @@ def _alos_environment() -> dict[str, Any]:
         {
             "horizontal_gain": 2.5,
             "horizontal_lookahead_m": 3.0,
-            "vertical_gain": 1.0,
+            "vertical_gain": 2.5 if formal else 1.0,
             "vertical_lookahead_m": 2.0,
         }
     )
@@ -214,7 +238,13 @@ def _alos_environment() -> dict[str, Any]:
     return payload
 
 
-def _training(*, mode: str, environment_path: Path) -> dict[str, Any]:
+def _training(
+    *,
+    mode: str,
+    environment_path: Path,
+    seed: int = TRAIN_SEED,
+    formal: bool = False,
+) -> dict[str, Any]:
     payload = _load(BASE_TRAIN_PATH)
     payload["training_profile"] = TRAINING_PROFILE
     payload["actor"] = copy.deepcopy(ACTOR_METADATA)
@@ -296,7 +326,7 @@ def _training(*, mode: str, environment_path: Path) -> dict[str, Any]:
         "write_iteration_records": True,
     }
     payload["training"] = {
-        "iterations": PPO_ITERATIONS,
+        "iterations": FORMAL_ITERATIONS if formal else PPO_ITERATIONS,
         "initial_residual_zero": False,
         "initial_residual_output_std": 0.0,
         "privileged_current_critic": False,
@@ -345,7 +375,7 @@ def _training(*, mode: str, environment_path: Path) -> dict[str, Any]:
     )
     payload["runner"] = {
         "num_steps_per_env": PPO_STEPS_PER_ENV,
-        "save_interval": 50,
+        "save_interval": 100 if formal else 50,
         "empirical_normalization": True,
         "logger": "tensorboard",
     }
@@ -373,11 +403,15 @@ def _training(*, mode: str, environment_path: Path) -> dict[str, Any]:
     }
     payload["experiment"].update(
         {
-            "name": f"goal182_ppo_{mode}_5d_m_seed{TRAIN_SEED}",
-            "seed": TRAIN_SEED,
+            "name": (
+                f"goal182_ppo_formal_{mode}_5d_m_seed{seed}"
+                if formal
+                else f"goal182_ppo_{mode}_5d_m_seed{seed}"
+            ),
+            "seed": seed,
             "output": (
                 "artifacts/lowlevel/goal182_ppo_stack_governance_20261114/"
-                f"train/{mode}_seed{TRAIN_SEED}"
+                f"train/{'formal/' if formal else ''}{mode}_seed{seed}"
             ),
             "device": "cuda",
         }
@@ -385,10 +419,48 @@ def _training(*, mode: str, environment_path: Path) -> dict[str, Any]:
     return payload
 
 
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--formal",
+        action="store_true",
+        help="generate full C0->C6 3-seed formal configs",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = _parse_args()
     os.chdir(REPO_ROOT)
     env_path = GOAL_ROOT / "env_path_fixed_speed_c3.json"
     alos_env_path = GOAL_ROOT / "env_alos_c3_a0_base.json"
+    if args.formal:
+        formal_env_path = GOAL_ROOT / "env_path_fixed_speed_formal.json"
+        formal_alos_env_path = GOAL_ROOT / "env_alos_formal_a3_3d.json"
+        _write(formal_env_path, _environment(formal=True))
+        _write(formal_alos_env_path, _alos_environment(formal=True))
+        for seed in FORMAL_SEEDS:
+            for mode in ("residual", "finetune"):
+                _write(
+                    GOAL_ROOT / f"train_formal_{mode}_5d_m_seed{seed}.json",
+                    _training(
+                        mode=mode,
+                        environment_path=formal_env_path,
+                        seed=seed,
+                        formal=True,
+                    ),
+                )
+            for mode in ("trres_cmd", "trres_act"):
+                _write(
+                    GOAL_ROOT / f"train_formal_{mode}_5d_m_seed{seed}.json",
+                    _training(
+                        mode=mode,
+                        environment_path=formal_alos_env_path,
+                        seed=seed,
+                        formal=True,
+                    ),
+                )
+        return
     _write(env_path, _environment())
     _write(alos_env_path, _alos_environment())
     for mode in ("residual", "finetune"):
