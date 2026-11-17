@@ -2,7 +2,7 @@
 
 **状态**：`ACTIVE`<br>
 **范围**：只审计 Goal182 从“文档契约”到“可启动训练”之间的基础设施、配置、schema、checker 和服务器执行面。不重新讨论已经拍板的科学问题。<br>
-**结论先行**：actor metadata、矩阵、导航 profile、curriculum iteration hard cap、reset 初态、训练 route telemetry、warmstart/composition 一等字段、正式 TRRES config 和正式评价 nominal 起点已落地；但正式训练仍被 StageGate enforce 语义、Goal182 artifact auditor、D13.6 和服务器干净 worktree 阻断。
+**结论先行**：actor metadata、矩阵、导航 profile、curriculum iteration hard cap、reset 初态、训练 route telemetry、warmstart/composition 一等字段、正式 TRRES config、正式评价 nominal 起点、StageGate enforce、canonical evaluation report/launcher/auditor 均已落地；正式训练仍被 D13.6 决策、A0/A3 选择和服务器干净 worktree 阻断。
 
 ## 1. 审计口径
 
@@ -75,7 +75,8 @@
 | TRRES fresh init | 不借用 BC/其他 arm 权重 | config parser 和 launcher 已强制 `standard_fresh`、null checkpoint、禁止 `--warmstart-actor` | `FIXED` | manifest 记录 `learning_composition/encoder_init/encoder_init_checkpoint`；测试覆盖借用 BC 和旧 encoder |
 | 正式 TRRES config | `TRRES_CMD` / `TRRES_ACT` 可直接启动 | 已生成 `train_trres_cmd_5d_m_seed86201.json` 与 `train_trres_act_5d_m_seed86201.json`；均为 `standard_fresh`、无 warmstart、`actor/critic_command_dim=3` | `FIXED` | 两份配置通过 profile checker；command/actuator wrapper reset+step smoke 5 passed |
 | 评价 canonical artifacts | 每个 run 固定写 `summary.json`、`episodes.jsonl`、`trace.npz` | evaluator 现在默认写 `summary.json`、`summary.md`、`episodes.jsonl`、`trace.npz`；episode 与 trace 共用 `episode_id`，episodes 增加 `path_steps/pre_goal_path_steps` 供复算 | `FIXED` | `src/auv_lowlevel/cli/evaluate_pc_ppo/main.py`、`episodes.py`、`runner.py`；canonical artifact 与 auditor 已纳入全量回归 |
-| 评价 artifact auditor | 启动器结束阶段必须审计 canonical 产物并非零退出 | 已新增 `scripts/audit_goal182_artifacts.py`：audit 单 run 的 `summary/episodes/trace`、`episode_id` 对齐与主指标复算；eval-set 模式检查 `matrix_manifest/report_rows/report.md` 是否存在 | `FIXED` | `tests/test_goal182_artifact_audit.py` 覆盖通过、缺 episodes、trace id mismatch；正式 launcher 接线仍需在 launcher 实现时调用 |
+| 评价 artifact auditor | 启动器结束阶段必须审计 canonical 产物并非零退出 | `scripts/audit_goal182_artifacts.py` 审计单 run 的 `summary/episodes/trace`、`episode_id` 对齐和主指标复算；eval-set 模式进一步校验 `matrix_manifest` 完整性、`report_rows` 可复算、压力分节和未声明 run | `FIXED` | `tests/test_goal182_artifact_audit.py`、`tests/test_goal182_eval_report.py`；缺 episodes、trace id mismatch、report metric drift 均非零退出 |
+| 正式评价 launcher | 先跑协议检查，再跑评价，最后 build report + auditor，任一步失败非零退出 | 新增 `scripts/run_goal182_eval.py`：校验 eval matrix 与 held-out，调用 standing runner，生成 `matrix_manifest/report_rows/report.md`，再调用 auditor；`formal*` phase 强制 matrix/tier 均为 `FROZEN` | `FIXED` | `scripts/build_goal182_eval_report.py`；`tests/test_goal182_eval_launcher.py` 覆盖 dry-run 接线和 DRAFT 拒绝 |
 | D13.6 StageGate | 阈值和 shadow 切换点冻结 | 仍待用户定夺 | `USER_DECISION` | 只实现 shadow telemetry 和标定入口，不拍数字；冻结前不能启动正式训练 |
 | 服务器 worktree | 从新 commit 建干净 worktree | 旧 Goal182 worktree 全是 `c186c74`，dirty 文件数分别为 12 / 40 / 66 | `LEGACY_ONLY` | 不复用旧 worktree；新 commit 推送后新建 |
 | 服务器 bare main | 与本地待执行文档一致 | 仍为 `c186c74 fix(goal175): keep A1 pressure configs from curriculum override` | `BLOCKER` | 本地 commit/push 经用户批准后再同步 |
@@ -183,8 +184,14 @@ export PVS_SOURCE_DIR=/home/bubble/水下机器人/python/PythonVehicleSimulator
 export MSS_SOURCE_DIR=/home/bubble/水下机器人/simulator/MSS-master
 export PYTHONPATH=$PWD/src
 
-.venv/bin/python -m pytest -q tests
-# 2159 passed, 11 skipped (86.16s)
+# 使用主 checkout 的完整 venv；worktree 内的精简 .venv 缺 gymnasium，不能跑全量
+/home/bubble/水下机器人/settled_局部规划器_反应式/.venv/bin/python -m pytest -q tests
+# 2165 passed, 11 skipped (88.10s)
+
+.venv/bin/python -m pytest tests/test_goal182_eval_report.py \
+  tests/test_goal182_eval_launcher.py tests/test_goal182_artifact_audit.py \
+  tests/test_pc_standing_eval_runner.py -q
+# 16 passed
 
 .venv/bin/python -m pytest tests/test_lowlevel_ppo_config.py tests/test_lowlevel_pc_env.py \
   tests/test_lowlevel_pc_vec_env.py tests/test_pc_goal85_unbiased_contract.py \
@@ -207,7 +214,7 @@ cd 总协调
 | `CONTRACT_SMOKE` | `BLOCKER` | 基础设施已闭环；服务器干净 worktree 需要用户批准 commit/push |
 | `QUICK_SCREEN` | `BLOCKER` | 等待 `CONTRACT_SMOKE`；首波 matrix 已生成 |
 | 正式训练 | `BLOCKER` | D13.6 未冻结；matrix 仍为 DRAFT；服务器 bare main 仍是旧 commit |
-| 正式评价 | `BLOCKER` | eval matrix 已生成 DRAFT 且四压力分表已定义；正式冻结待 D13.6 |
+| 正式评价 | `BLOCKER` | canonical launcher/report/auditor 已就绪；eval matrix 仍为 DRAFT，正式冻结待 D13.6 |
 
 ## 7. 下一轮最小垂直切片
 
@@ -215,7 +222,8 @@ cd 总协调
 
 1. [x] 实现 §4.12.10 reset 契约：pitch 抖动、初始角速度、current 估计热启动、manifest 字段，以及评价名义起点；
 2. [x] 实现 routine StageGate 的训练 rollout 20/3 语义，并保留 frozen-dev 只在 stage 边界/最终评价使用；默认仍为 `shadow`；
-2b. [x] 把 `episodes.jsonl` 和标准 `trace.npz` 设为 evaluator 默认产物，并实现 Goal182 artifact auditor；正式评价 launcher 的非零退出门禁待 launcher 落地时接线；
+2b. [x] 把 `episodes.jsonl` 和标准 `trace.npz` 设为 evaluator 默认产物，并实现 Goal182 artifact auditor；
+2c. [x] 实现正式评价 launcher：协议检查 → evaluation → canonical report → auditor，任一步失败非零退出；`formal*` phase 拒绝 DRAFT matrix/tier；
 3. [x] 生成正式 TRRES config，并让 launcher 自动运行 training-profile checker；
 4. [x] 把 `LC_BC_FINETUNE` 的 warmstart SHA 和可训练范围写成一等字段；
 5. 等 D13.6 阈值和行为决策；
@@ -243,3 +251,4 @@ telemetry，不能把 route gate 切到 enforce。
 | 2026-11-16 | 正式评价 nominal 起点 | evaluator 默认强制 `guidance.nominal_initial_state=true`，report 记录 `start_contract`；仅诊断可显式 `--allow-non-nominal-start` | 正式评价不会把训练随机初态混入 ranking；诊断仍保留 |
 | 2026-11-17 | StageGate enforce 接线 | routine 晋级改为训练 rollout 20/3；frozen-dev 只在 20/3 触发晋级时做一次边界 safety 检查，失败则否决并清空窗口；默认仍为 shadow | 只有显式 `--curriculum-route-gate-mode enforce` 且传入冻结阈值才生效；缺阈值直接失败，避免伪 enforce |
 | 2026-11-17 | canonical 评价产物 | evaluator 默认写 `episodes.jsonl` 与 `trace.npz`；episode/trace 共用 `episode_id`，并增加可复算所需的 path-step 权重 | 正式 run 不再依赖显式 `--trace-output`；artifact auditor 可对单 run 和 eval set 做非零退出检查 |
+| 2026-11-17 | formal evaluation launcher | 新增 `run_goal182_eval.py` 和 `build_goal182_eval_report.py`；报告按 pressure 分节，eval-set auditor 从 run 明细复算 report rows，正式 phase 只接受 FROZEN matrix/tier | 正式评价产物链路闭环；不再需要手工散表或手填主表数字 |

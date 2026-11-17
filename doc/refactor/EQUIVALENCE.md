@@ -608,6 +608,11 @@ training_started: false
 - 新增 `scripts/audit_goal182_artifacts.py`，校验单 run canonical 产物、
   episode/trace 对齐和主指标复算；eval-set 模式校验
   `matrix_manifest.json`、`report_rows.jsonl` 和 `report.md`；
+- 新增 `scripts/build_goal182_eval_report.py`：从 run manifest 和 episode 明细生成
+  canonical report，`report.md` 按 pressure 分节，禁止 pooled 主表；
+- 新增 `scripts/run_goal182_eval.py`：串联 eval-matrix 检查、standing runner、
+  canonical report builder 和 auditor；任一步失败非零退出，`formal*` phase 只接受
+  FROZEN matrix/tier；
 - current 估计热启动改变了一个 trace digest 和一个 LPF 测试的前置条件；
   两处测试已按新契约修正，不是放宽断言。
 
@@ -621,15 +626,17 @@ export PYTHONPATH=$PWD/src
 .venv/bin/python -m pytest -q tests
 ```
 
-- 全量测试：`2159 passed, 11 skipped`；
+- 全量测试：`2165 passed, 11 skipped`；
 - 本轮受影响回归：`59 passed`；修正后的两个既有测试：`2 passed`；
   `test_batch_remus100.py`：`5 passed`；
+- 新增 eval report/launcher/auditor 回归：`16 passed`；
 - matrix checker：`PASS goal182 matrices arms=60`；
 - eval matrix checker：`PASS goal182 eval matrix`；
-- magic-number provenance：`PASS checked=49 findings=0`；
+- magic-number provenance：`PASS checked=3 findings=0`；
 - research ledger：`PASS (Goal182, entries=2)`；
 - 四份正式 config 的 training-profile checker：全部 `PASS`；
 - experiment matrix/program schema：`PASS`；
+- code shape：`0 new violations, 0 suppressed`；
 - ruff：改动文件 `All checks passed!`；
 - 是否新增失败：`no`；
 - 结论：`PASS`（仅基础设施；训练与正式评价尚未启动）。
