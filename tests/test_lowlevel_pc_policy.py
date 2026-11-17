@@ -1111,3 +1111,50 @@ def test_pc_actor_current_encoder_is_zero_initialized_and_then_used() -> None:
         trained_zero = policy.act_inference(obs_zero)
         trained_shifted = policy.act_inference(obs_shifted)
     assert not torch.allclose(trained_zero, trained_shifted)
+
+
+def test_pc_actor_current_encoder_uses_full_width_with_bc_path_contract() -> None:
+    actor_layout = PCPolicyLayout(
+        state_dim=12,
+        path_dim=5,
+        current_dim=3,
+        command_dim=0,
+        short_window=1,
+        long_window=2,
+    )
+    critic_layout = PCPolicyLayout(
+        state_dim=15,
+        command_dim=0,
+        short_window=1,
+        long_window=2,
+    )
+    policy = PCActorCritic(
+        actor_layout.flat_dim,
+        critic_layout.flat_dim,
+        3,
+        history_short_window=1,
+        history_long_window=2,
+        d_z_total=32,
+        n_in_reserved=8,
+        n_z_reserved=4,
+        state_encoder_hidden_dims=(16,),
+        actor_hidden_dims=(32, 16),
+        critic_hidden_dims=(32, 16),
+        dade_enabled=False,
+        actor_command_dim=0,
+        critic_command_dim=0,
+        path_dim=5,
+        path_encoder_hidden_dims=(16,),
+        bc_path_dim=5,
+        actor_current_encoder_enabled=True,
+        actor_current_encoder_hidden_dims=(16,),
+    )
+    assert policy.actor_current_encoder is not None
+    assert policy.actor_current_encoder_output_dim == 32
+    assert policy.actor_current_encoder[-1].out_features == 32
+
+    z = torch.zeros(4, 32)
+    current = torch.randn(4, 3)
+    with torch.inference_mode():
+        fused = policy._fuse_actor_current(current, z)
+    assert fused.shape == (4, 32)

@@ -770,12 +770,15 @@ class PCActorCritic(nn.Module):
             ][-1]
             nn.init.zeros_(final.weight)
             nn.init.zeros_(final.bias)
+        self.actor_current_encoder_output_dim = self.actor_encoder.d_z_active
+        if bc_path_dim is not None:
+            self.actor_current_encoder_output_dim = self.actor_encoder.d_z_total
         self.actor_current_encoder: nn.Sequential | None = None
         if self.actor_current_encoder_enabled:
             self.actor_current_encoder = _mlp(
                 PC_SIDE_CHANNEL_DIM,
                 self.actor_current_encoder_hidden_dims,
-                self.actor_encoder.d_z_active,
+                self.actor_current_encoder_output_dim,
                 _activation(activation),
             )
             final = [
@@ -1135,7 +1138,10 @@ class PCActorCritic(nn.Module):
         if current is None:
             raise ValueError("current observations are missing from the actor layout")
         active = self.actor_current_encoder(current)
-        if self.actor_encoder.n_z_reserved:
+        if (
+            active.shape[1] == self.actor_encoder.d_z_active
+            and self.actor_encoder.n_z_reserved
+        ):
             active = torch.cat(
                 [
                     active,
@@ -1504,7 +1510,7 @@ class PCActorCritic(nn.Module):
                 else {
                     "input_dim": PC_SIDE_CHANNEL_DIM,
                     "hidden_dims": list(self.actor_current_encoder_hidden_dims),
-                    "output_dim": self.actor_encoder.d_z_active,
+                    "output_dim": self.actor_current_encoder_output_dim,
                     "alpha": self.actor_current_encoder_alpha,
                     "initialization": "zero_final_linear",
                 }
