@@ -15,18 +15,18 @@ from .curriculum import (
     CurriculumStageSampler,
     RouteGateThresholds,
     RouteGateWindow,
+    StageBudgetStatus,
     StageEvaluation,
-    StageGate,
     curriculum_stage_mix_target,
 )
 
 
-def parse_eval_summary(
-    summary: Mapping[str, Any],
-    *,
-    require_stratified: bool = False,
-) -> StageEvaluation:
-    """Convert one frozen evaluation summary into a stage evaluation."""
+def parse_eval_summary(summary: Mapping[str, Any]) -> StageEvaluation:
+    """Convert one frozen evaluation summary into a stage evaluation.
+
+    Only safety, completion, and route RMSE feed the StageGate.  Success,
+    timeout, plane-miss, 3D RMSE, and pre-goal 3D RMSE remain diagnostics.
+    """
 
     episodes = summary.get("episodes")
     if not isinstance(episodes, list) or not episodes:
@@ -36,73 +36,40 @@ def parse_eval_summary(
         values = [bool(row.get(name, False)) for row in episodes]
         return float(sum(values)) / float(len(values))
 
+    def mean_metric(name: str) -> float | None:
+        values = [float(row[name]) for row in episodes if row.get(name) is not None]
+        if not values:
+            return None
+        return float(sum(values)) / float(len(values))
+
     default_success = rate("success")
-    strict_success = rate("success_eta_tight_at_done")
+    eta_tight_success_rate = rate("success_eta_tight_at_done")
     timeout_rate = rate("timeout")
     if "goal_plane_miss" in episodes[0]:
         plane_miss_rate = rate("goal_plane_miss")
     else:
         plane_miss_rate = rate("plane_miss")
     safety_rate = rate("safety")
-    stratified_default_success: dict[str, float] | None = None
-    if any(isinstance(row.get("curriculum"), Mapping) for row in episodes):
-        groups: dict[str, list[bool]] = {}
-        for index, row in enumerate(episodes):
-            metadata = row.get("curriculum")
-            stratum = metadata.get("stratum") if isinstance(metadata, Mapping) else None
-            if not isinstance(stratum, str) or not stratum:
-                if require_stratified:
-                    raise ValueError(
-                        "evaluation episode "
-                        f"{index} is missing curriculum.stratum; refusing to "
-                        "evaluate a stratified Gate with unstratified data"
-                    )
-                groups = {}
-                break
-            groups.setdefault(stratum, []).append(bool(row.get("success", False)))
-        if groups:
-            stratified_default_success = {
-                stratum: float(sum(values)) / float(len(values))
-                for stratum, values in groups.items()
-            }
-    elif require_stratified:
+    completion = mean_metric("path_completion_ratio")
+    if completion is None:
+        fallback = summary.get("path_completion_ratio_mean")
+        completion = None if fallback is None else float(fallback)
+    if completion is None:
         raise ValueError(
-            "evaluation summary has no curriculum.stratum metadata; refusing to "
-            "evaluate a stratified Gate with unstratified data"
+            "evaluation summary is missing path_completion_ratio; the StageGate "
+            "cannot run without its completion guard"
         )
     return StageEvaluation(
+        safety_rate=safety_rate,
+        path_completion_ratio=completion,
+        cross_track_rmse_m=mean_metric("path_horizontal_rmse_m"),
+        vertical_rmse_m=mean_metric("path_vertical_rmse_m"),
         default_success=default_success,
-        strict_success=strict_success,
+        eta_tight_success_rate=eta_tight_success_rate,
         timeout_rate=timeout_rate,
         plane_miss_rate=plane_miss_rate,
-        safety_rate=safety_rate,
-        stratified_default_success=stratified_default_success,
-    )
-
-
-def combine_eval_summaries(
-    default_summary: Mapping[str, Any],
-    strict_summary: Mapping[str, Any],
-    *,
-    gate: StageGate | None = None,
-) -> StageEvaluation:
-    """Combine default-radius and strict-radius summaries into one evaluation."""
-
-    require_stratified = (
-        gate is not None and gate.stratified_default_success_min is not None
-    )
-    default_eval = parse_eval_summary(
-        default_summary,
-        require_stratified=require_stratified,
-    )
-    strict_eval = parse_eval_summary(strict_summary)
-    return StageEvaluation(
-        default_success=default_eval.default_success,
-        strict_success=strict_eval.default_success,
-        timeout_rate=max(default_eval.timeout_rate, strict_eval.timeout_rate),
-        plane_miss_rate=max(default_eval.plane_miss_rate, strict_eval.plane_miss_rate),
-        safety_rate=max(default_eval.safety_rate, strict_eval.safety_rate),
-        stratified_default_success=default_eval.stratified_default_success,
+        path_three_d_rmse_m=mean_metric("path_three_d_rmse_m"),
+        pre_goal_3d_rmse_m=mean_metric("pre_goal_3d_rmse_m"),
     )
 
 
@@ -165,9 +132,7 @@ class CurriculumTrainerHook:
         self.evaluate = evaluate
         self.mix_ramp_transitions = int(mix_ramp_transitions)
         self.preview_enabled = bool(preview_enabled)
-        self.force_current_encoder_alpha_zero = bool(
-            force_current_encoder_alpha_zero
-        )
+        self.force_current_encoder_alpha_zero = bool(force_current_encoder_alpha_zero)
         self.promotion_enabled = bool(promotion_enabled)
         self.routine_gate = routine_gate
         self.route_gate_thresholds = route_gate_thresholds
@@ -191,13 +156,12 @@ class CurriculumTrainerHook:
             and routine_gate.mode == "enforce"
             and route_gate_thresholds is None
         ):
-            raise ValueError(
-                "route gate enforce mode requires frozen route thresholds"
-            )
+            raise ValueError("route gate enforce mode requires frozen route thresholds")
         self._next_eval_transition = int(eval_interval_transitions)
         self._mix_ramp: CurriculumMixRamp | None = None
         self._stage_entered_at = 0
         self.decisions_path = self.output_dir / "curriculum_decisions.jsonl"
+        self.budget_path = self.output_dir / "curriculum_stage_budget.jsonl"
         self.route_gate_path = self.output_dir / "curriculum_route_gate.jsonl"
         self.state_path = self.output_dir / "curriculum_state.json"
         self._write_state(0, None)
@@ -235,9 +199,7 @@ class CurriculumTrainerHook:
             "last_decision": None if decision is None else decision.value,
             "rollbacks_used": self.controller.rollbacks_used,
             "force_current_encoder_alpha_zero": self.force_current_encoder_alpha_zero,
-            "eval_schedule": (
-                "stage_boundary" if self.stage_boundary_evals else "fixed_interval"
-            ),
+            "eval_schedule": ("stage_boundary" if self.stage_boundary_evals else "fixed_interval"),
             "next_eval_transition": (
                 None if self.stage_boundary_evals else self._next_eval_transition
             ),
@@ -250,9 +212,7 @@ class CurriculumTrainerHook:
         if self._mix_ramp is None:
             return
         self.sampler.set_stage_mix(self._mix_ramp.mix_at(completed_transitions))
-        if completed_transitions >= (
-            self._mix_ramp.start_transition + self._mix_ramp.transitions
-        ):
+        if completed_transitions >= (self._mix_ramp.start_transition + self._mix_ramp.transitions):
             self._mix_ramp = None
 
     def maybe_update(
@@ -295,10 +255,7 @@ class CurriculumTrainerHook:
                 completed_iterations=completed_iterations,
             )
             return None
-        if (
-            self.routine_gate is not None
-            and self.routine_gate.mode == "enforce"
-        ):
+        if self.routine_gate is not None and self.routine_gate.mode == "enforce":
             return self._maybe_update_enforce(
                 completed_transitions,
                 completed_iterations,
@@ -306,9 +263,7 @@ class CurriculumTrainerHook:
             )
         if self.stage_boundary_evals:
             if completed_iterations is None:
-                raise ValueError(
-                    "stage-boundary evaluation requires completed_iterations"
-                )
+                raise ValueError("stage-boundary evaluation requires completed_iterations")
             assert self._next_stage_eval_iteration is not None
             if completed_iterations < self._next_stage_eval_iteration:
                 self._write_state(
@@ -338,9 +293,7 @@ class CurriculumTrainerHook:
             self._stage_entered_at = int(completed_transitions)
             if self.stage_boundary_evals:
                 assert completed_iterations is not None
-                self._next_stage_eval_iteration = self._stage_boundary_target(
-                    completed_iterations
-                )
+                self._next_stage_eval_iteration = self._stage_boundary_target(completed_iterations)
         elif self.stage_boundary_evals:
             assert completed_iterations is not None
             assert self.stage_boundary_retry_iterations is not None
@@ -374,6 +327,43 @@ class CurriculumTrainerHook:
             completed_iterations=completed_iterations,
         )
         return decision
+
+    def check_stage_budget(
+        self,
+        completed_transitions: int,
+        completed_iterations: int | None,
+    ) -> StageBudgetStatus | None:
+        """Fail-closed per-iteration hard-cap check.
+
+        Unlike ``maybe_update`` this never runs a frozen-dev evaluation, so the
+        training loop can call it every iteration without changing the
+        evaluation schedule.
+        """
+
+        if isinstance(completed_transitions, bool) or completed_transitions < 0:
+            raise ValueError("completed_transitions must be a non-negative integer")
+        if not self.promotion_enabled:
+            return None
+        if completed_iterations is None:
+            return None
+        status = self.controller.check_stage_budget(int(completed_iterations))
+        if not status.exhausted:
+            return None
+        record = {
+            "schema_version": "auv_pc_curriculum_stage_budget.v1",
+            "decision": CurriculumDecision.STAGE_BUDGET_EXHAUSTED.value,
+            "reason": "stage iteration hard-cap exhausted before promotion",
+            "completed_transitions": int(completed_transitions),
+            **status.as_dict(),
+        }
+        with self.budget_path.open("a") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        self._write_state(
+            completed_transitions,
+            CurriculumDecision.STAGE_BUDGET_EXHAUSTED,
+            completed_iterations=int(completed_iterations),
+        )
+        return status
 
     def _maybe_update_enforce(
         self,
@@ -465,13 +455,10 @@ class CurriculumTrainerHook:
         if spec.current_encoder_alpha_ramp_transitions <= 0:
             return float(spec.current_encoder_alpha_end)
         elapsed = max(0, int(completed_transitions) - int(self._stage_entered_at))
-        fraction = min(
-            elapsed / float(spec.current_encoder_alpha_ramp_transitions), 1.0
-        )
+        fraction = min(elapsed / float(spec.current_encoder_alpha_ramp_transitions), 1.0)
         return float(
             spec.current_encoder_alpha_start
-            + (spec.current_encoder_alpha_end - spec.current_encoder_alpha_start)
-            * fraction
+            + (spec.current_encoder_alpha_end - spec.current_encoder_alpha_start) * fraction
         )
 
     @property

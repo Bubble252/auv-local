@@ -196,19 +196,16 @@ def curriculum_stage_mix_target(
     if stage not in CURRICULUM_STAGE_ORDER:
         raise ValueError(f"unknown curriculum stage {stage!r}")
     source = CURRICULUM_STAGE_MIX_TARGETS[stage]
-    preview_key = CURRICULUM_STAGE_ORDER[CURRICULUM_STAGE_ORDER.index(stage) + 1] if stage != "C6" else None
+    preview_key = (
+        CURRICULUM_STAGE_ORDER[CURRICULUM_STAGE_ORDER.index(stage) + 1] if stage != "C6" else None
+    )
     components = {
-        key: (weight if preview_enabled or key != preview_key else 0.0)
-        for key, weight in source
+        key: (weight if preview_enabled or key != preview_key else 0.0) for key, weight in source
     }
     total = sum(components.values())
     if total <= 0.0:
         raise ValueError(f"curriculum stage {stage} mix has no positive weight")
-    return tuple(
-        (key, weight / total)
-        for key, weight in components.items()
-        if weight > 0.0
-    )
+    return tuple((key, weight / total) for key, weight in components.items() if weight > 0.0)
 
 
 @dataclass(frozen=True)
@@ -247,48 +244,55 @@ class CurriculumMixRamp:
                 (start.get(key, 0.0) + fraction * (target.get(key, 0.0) - start.get(key, 0.0))),
             )
             for key in keys
-            if start.get(key, 0.0) + fraction * (
-                target.get(key, 0.0) - start.get(key, 0.0)
-            )
-            > 0.0
+            if start.get(key, 0.0) + fraction * (target.get(key, 0.0) - start.get(key, 0.0)) > 0.0
         )
 
 
 @dataclass(frozen=True)
 class StageGate:
-    default_success_min: float
-    strict_success_min: float
-    timeout_max: float
-    plane_miss_max: float
+    """Goal182 StageGate v1.
+
+    Only safety, completion, and (once calibrated) cross/vertical route RMSE
+    participate in pass/fail.  Success, timeout, plane-miss, 3D RMSE, and
+    pre-goal 3D RMSE are diagnostics written to the decision log.
+    """
+
     safety_max: float
-    stratified_default_success_min: float | None = None
-    anchor_drop_max: float = 0.05
+    completion_min: float
+    cross_track_rmse_max_m: float | None = None
+    vertical_rmse_max_m: float | None = None
 
     def __post_init__(self) -> None:
         for name, value in (
-            ("default_success_min", self.default_success_min),
-            ("strict_success_min", self.strict_success_min),
-            ("timeout_max", self.timeout_max),
-            ("plane_miss_max", self.plane_miss_max),
             ("safety_max", self.safety_max),
-            ("anchor_drop_max", self.anchor_drop_max),
+            ("completion_min", self.completion_min),
         ):
             if not math.isfinite(value) or value < 0.0 or value > 1.0:
                 raise ValueError(f"StageGate.{name} must lie in [0, 1]")
-        if self.stratified_default_success_min is not None:
-            value = float(self.stratified_default_success_min)
-            if not math.isfinite(value) or value < 0.0 or value > 1.0:
-                raise ValueError("StageGate.stratified_default_success_min must lie in [0, 1]")
+        for name, value in (
+            ("cross_track_rmse_max_m", self.cross_track_rmse_max_m),
+            ("vertical_rmse_max_m", self.vertical_rmse_max_m),
+        ):
+            if value is None:
+                continue
+            number = float(value)
+            if not math.isfinite(number) or number < 0.0:
+                raise ValueError(f"StageGate.{name} must be finite and non-negative")
 
     def as_dict(self) -> dict[str, Any]:
         return {
-            "default_success_min": self.default_success_min,
-            "strict_success_min": self.strict_success_min,
-            "timeout_max": self.timeout_max,
-            "plane_miss_max": self.plane_miss_max,
             "safety_max": self.safety_max,
-            "stratified_default_success_min": self.stratified_default_success_min,
-            "anchor_drop_max": self.anchor_drop_max,
+            "completion_min": self.completion_min,
+            "cross_track_rmse_max_m": self.cross_track_rmse_max_m,
+            "vertical_rmse_max_m": self.vertical_rmse_max_m,
+            "diagnostic_metrics": [
+                "success_rate",
+                "eta_tight_success_rate",
+                "timeout_rate",
+                "plane_miss_rate",
+                "path_three_d_rmse_m",
+                "pre_goal_3d_rmse_m",
+            ],
         }
 
 
@@ -352,9 +356,7 @@ class CurriculumStageSpec:
         if not math.isfinite(self.vertical_cycles) or self.vertical_cycles <= 0.0:
             raise ValueError(f"{self.name}.vertical_cycles must be finite and positive")
         if self.route_axis_mode not in SUPPORTED_ROUTE_AXES:
-            raise ValueError(
-                f"{self.name}.route_axis_mode must be one of {SUPPORTED_ROUTE_AXES}"
-            )
+            raise ValueError(f"{self.name}.route_axis_mode must be one of {SUPPORTED_ROUTE_AXES}")
         for value in (
             self.current_encoder_alpha_start,
             self.current_encoder_alpha_end,
@@ -368,12 +370,9 @@ class CurriculumStageSpec:
                 f"{self.name}.current_encoder_alpha_ramp_transitions must be non-negative"
             )
         if not self.actor_current_encoder and (
-            self.current_encoder_alpha_start != 0.0
-            or self.current_encoder_alpha_end != 0.0
+            self.current_encoder_alpha_start != 0.0 or self.current_encoder_alpha_end != 0.0
         ):
-            raise ValueError(
-                f"{self.name}: disabled actor current encoder requires zero alpha"
-            )
+            raise ValueError(f"{self.name}: disabled actor current encoder requires zero alpha")
         for name, value in (
             ("soft_budget_transitions", self.soft_budget_transitions),
             ("hard_cap_transitions", self.hard_cap_transitions),
@@ -382,12 +381,8 @@ class CurriculumStageSpec:
                 raise ValueError(f"{self.name}.{name} must be a positive integer")
         if self.soft_budget_transitions > self.hard_cap_transitions:
             raise ValueError(f"{self.name} soft budget exceeds hard cap")
-        if (self.soft_budget_iterations is None) != (
-            self.hard_cap_iterations is None
-        ):
-            raise ValueError(
-                f"{self.name} iteration soft/hard caps must be set together"
-            )
+        if (self.soft_budget_iterations is None) != (self.hard_cap_iterations is None):
+            raise ValueError(f"{self.name} iteration soft/hard caps must be set together")
         if self.hard_cap_iterations is not None:
             for name, value in (
                 ("soft_budget_iterations", self.soft_budget_iterations),
@@ -407,18 +402,14 @@ class CurriculumStageSpec:
             "noise_scale_range": list(self.noise_scale_range),
             "current_speed_range_mps": list(self.current_speed_range_mps),
             "current_period_range_s": (
-                None
-                if self.current_period_range_s is None
-                else list(self.current_period_range_s)
+                None if self.current_period_range_s is None else list(self.current_period_range_s)
             ),
             "shear_scale": self.shear_scale,
             "current_estimator_level": self.current_estimator_level,
             "actor_current_encoder": self.actor_current_encoder,
             "current_encoder_alpha_start": self.current_encoder_alpha_start,
             "current_encoder_alpha_end": self.current_encoder_alpha_end,
-            "current_encoder_alpha_ramp_transitions": (
-                self.current_encoder_alpha_ramp_transitions
-            ),
+            "current_encoder_alpha_ramp_transitions": (self.current_encoder_alpha_ramp_transitions),
             "length_range_m": list(self.length_range_m),
             "speed_range_mps": list(self.speed_range_mps),
             "vertical_amplitude_m": float(self.vertical_amplitude_m),
@@ -543,9 +534,7 @@ def curriculum_stratum(
     if spec.stage == "C5":
         if stage.current_period_range_s is None or spec.current_period_s is None:
             return f"path:{spec.path_family}"
-        midpoint = 0.5 * (
-            stage.current_period_range_s[0] + stage.current_period_range_s[1]
-        )
+        midpoint = 0.5 * (stage.current_period_range_s[0] + stage.current_period_range_s[1])
         return "current_period:slow" if spec.current_period_s < midpoint else "current_period:fast"
     raise ValueError(f"no stratum rule for curriculum stage {spec.stage!r}")
 
@@ -569,13 +558,13 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
     """Frozen C0-C6 stage definitions from the Goal136 protocol."""
 
     gates = {
-        "C0": StageGate(0.90, 0.70, 0.10, 0.10, 0.0, 0.80),
-        "C1": StageGate(0.90, 0.65, 0.10, 0.10, 0.0, 0.80),
-        "C2": StageGate(0.85, 0.60, 0.12, 0.15, 0.0, 0.55),
-        "C3": StageGate(0.80, 0.55, 0.15, 0.20, 0.0, 0.55),
-        "C4": StageGate(0.80, 0.55, 0.15, 0.20, 0.0, 0.55),
-        "C5": StageGate(0.75, 0.50, 0.18, 0.20, 0.01, 0.50),
-        "C6": StageGate(0.70, 0.45, 0.20, 0.25, 0.01, 0.45),
+        "C0": StageGate(safety_max=0.0, completion_min=0.80),
+        "C1": StageGate(safety_max=0.0, completion_min=0.80),
+        "C2": StageGate(safety_max=0.0, completion_min=0.80),
+        "C3": StageGate(safety_max=0.0, completion_min=0.80),
+        "C4": StageGate(safety_max=0.0, completion_min=0.80),
+        "C5": StageGate(safety_max=0.01, completion_min=0.80),
+        "C6": StageGate(safety_max=0.01, completion_min=0.80),
     }
     stages = (
         CurriculumStageSpec(
@@ -798,12 +787,8 @@ def curriculum_stages_with_overrides(
     if current_speed_range_mps is not None:
         if len(current_speed_range_mps) != 2:
             raise ValueError("current_speed_range_mps must contain exactly two values")
-        speed_min = _finite_nonnegative(
-            current_speed_range_mps[0], "current_speed_range_mps[0]"
-        )
-        speed_max = _finite_nonnegative(
-            current_speed_range_mps[1], "current_speed_range_mps[1]"
-        )
+        speed_min = _finite_nonnegative(current_speed_range_mps[0], "current_speed_range_mps[0]")
+        speed_max = _finite_nonnegative(current_speed_range_mps[1], "current_speed_range_mps[1]")
         if speed_max < speed_min:
             raise ValueError("current_speed_range_mps requires MIN <= MAX")
         current_speed_range_mps = (speed_min, speed_max)
@@ -888,9 +873,7 @@ class CurriculumStageSampler:
         length = spec.length_range_m[0] + uniform(0x204) * (
             spec.length_range_m[1] - spec.length_range_m[0]
         )
-        speed_limit = (
-            REMUS100_MAX_SPEED_MPS - self.current_variation_speed_amplitude_mps
-        )
+        speed_limit = REMUS100_MAX_SPEED_MPS - self.current_variation_speed_amplitude_mps
         if spec.speed_range_mps[0] > speed_limit + 1e-12:
             raise ValueError(
                 f"{spec.name} speed range cannot fit inside the REMUS100 envelope "
@@ -922,9 +905,7 @@ class CurriculumStageSampler:
         # worst-case current variation would exceed the REMUS100 ground-speed cap.
         current_capacity = max(
             0.0,
-            REMUS100_MAX_SPEED_MPS
-            - max(plan)
-            - self.current_variation_speed_amplitude_mps,
+            REMUS100_MAX_SPEED_MPS - max(plan) - self.current_variation_speed_amplitude_mps,
         )
         current_speed = min(float(current_speed), current_capacity)
         path_family = _choose_weighted(spec.path_family_mix, uniform(0x206))
@@ -938,9 +919,7 @@ class CurriculumStageSampler:
         horizontal_amplitude = float(spec.horizontal_amplitude_m)
         if route_axis == ROUTE_AXIS_ISOLATED:
             route_axis = (
-                ROUTE_AXIS_VERTICAL_ONLY
-                if uniform(0x208) < 0.5
-                else ROUTE_AXIS_HORIZONTAL_ONLY
+                ROUTE_AXIS_VERTICAL_ONLY if uniform(0x208) < 0.5 else ROUTE_AXIS_HORIZONTAL_ONLY
             )
             if route_axis == ROUTE_AXIS_HORIZONTAL_ONLY:
                 vertical_amplitude = 0.0
@@ -961,9 +940,7 @@ class CurriculumStageSampler:
             actor_current_encoder=spec.actor_current_encoder,
             current_encoder_alpha_start=spec.current_encoder_alpha_start,
             current_encoder_alpha_end=spec.current_encoder_alpha_end,
-            current_encoder_alpha_ramp_transitions=(
-                spec.current_encoder_alpha_ramp_transitions
-            ),
+            current_encoder_alpha_ramp_transitions=(spec.current_encoder_alpha_ramp_transitions),
             length_m=float(length),
             speed_mps=float(speed),
             speed_range_mps=speed_range,
@@ -984,59 +961,88 @@ class CurriculumStageSampler:
 
 @dataclass(frozen=True)
 class StageEvaluation:
-    default_success: float
-    strict_success: float
-    timeout_rate: float
-    plane_miss_rate: float
     safety_rate: float
-    anchor_default_success: float | None = None
-    stratified_default_success: Mapping[str, float] | None = None
+    path_completion_ratio: float
+    cross_track_rmse_m: float | None = None
+    vertical_rmse_m: float | None = None
+    default_success: float = 0.0
+    eta_tight_success_rate: float = 0.0
+    timeout_rate: float = 0.0
+    plane_miss_rate: float = 0.0
+    path_three_d_rmse_m: float | None = None
+    pre_goal_3d_rmse_m: float | None = None
     current_encoder_constant_degradation: float | None = None
     current_encoder_fast_layer_compensation: float | None = None
 
     def __post_init__(self) -> None:
         for name in (
+            "safety_rate",
+            "path_completion_ratio",
             "default_success",
-            "strict_success",
+            "eta_tight_success_rate",
             "timeout_rate",
             "plane_miss_rate",
-            "safety_rate",
         ):
             value = float(getattr(self, name))
             if not math.isfinite(value) or value < 0.0 or value > 1.0:
                 raise ValueError(f"StageEvaluation.{name} must lie in [0, 1]")
-        if self.anchor_default_success is not None:
-            value = float(self.anchor_default_success)
-            if not math.isfinite(value) or value < 0.0 or value > 1.0:
-                raise ValueError("anchor_default_success must lie in [0, 1]")
-        if self.stratified_default_success is not None:
-            for key, value in self.stratified_default_success.items():
-                number = float(value)
-                if not math.isfinite(number) or number < 0.0 or number > 1.0:
-                    raise ValueError(
-                        f"stratified_default_success[{key!r}] must lie in [0, 1]"
-                    )
+        for name in (
+            "cross_track_rmse_m",
+            "vertical_rmse_m",
+            "path_three_d_rmse_m",
+            "pre_goal_3d_rmse_m",
+        ):
+            value = getattr(self, name)
+            if value is None:
+                continue
+            number = float(value)
+            if not math.isfinite(number) or number < 0.0:
+                raise ValueError(f"StageEvaluation.{name} must be finite and non-negative")
+
+    def gate_failures(self, gate: StageGate) -> tuple[str, ...]:
+        failures: list[str] = []
+        if self.safety_rate > gate.safety_max:
+            failures.append(f"safety_rate {self.safety_rate:.6f} > {gate.safety_max:.6f}")
+        if self.path_completion_ratio < gate.completion_min:
+            failures.append(
+                "path_completion_ratio "
+                f"{self.path_completion_ratio:.6f} < {gate.completion_min:.6f}"
+            )
+        for name, limit in (
+            ("cross_track_rmse_m", gate.cross_track_rmse_max_m),
+            ("vertical_rmse_m", gate.vertical_rmse_max_m),
+        ):
+            if limit is None:
+                continue
+            value = getattr(self, name)
+            if value is None:
+                failures.append(f"{name} telemetry missing")
+            elif value > limit:
+                failures.append(f"{name} {value:.6f} > {limit:.6f}")
+        return tuple(failures)
 
     def gate_passes(self, gate: StageGate) -> bool:
-        if self.default_success < gate.default_success_min:
-            return False
-        if self.strict_success < gate.strict_success_min:
-            return False
-        if self.timeout_rate > gate.timeout_max:
-            return False
-        if self.plane_miss_rate > gate.plane_miss_max:
-            return False
-        if self.safety_rate > gate.safety_max:
-            return False
-        if gate.stratified_default_success_min is not None:
-            if self.stratified_default_success is None:
-                return False
-            if any(
-                value < gate.stratified_default_success_min
-                for value in self.stratified_default_success.values()
-            ):
-                return False
-        return True
+        return not self.gate_failures(gate)
+
+
+@dataclass(frozen=True)
+class StageBudgetStatus:
+    """Per-iteration view of the current stage's hard iteration budget."""
+
+    stage: str
+    completed_iterations: int
+    consumed_iterations: int
+    hard_cap_iterations: int | None
+    exhausted: bool
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "stage": self.stage,
+            "completed_iterations": self.completed_iterations,
+            "consumed_iterations": self.consumed_iterations,
+            "hard_cap_iterations": self.hard_cap_iterations,
+            "exhausted": self.exhausted,
+        }
 
 
 @dataclass(frozen=True)
@@ -1068,8 +1074,7 @@ class RouteGateThresholds:
         missing = required.difference(value)
         if missing:
             raise ValueError(
-                "route gate thresholds are missing fields: "
-                + ", ".join(sorted(missing))
+                "route gate thresholds are missing fields: " + ", ".join(sorted(missing))
             )
         return cls(
             cross_track_rmse_max_m=float(value["cross_track_rmse_max_m"]),
@@ -1181,10 +1186,14 @@ class RouteGateWindow:
         self._samples = self._samples[-self.window_size :]
         window_full = len(self._samples) == self.window_size
         eligible = window_full and int(iteration) >= int(min_iterations)
-        means = {
-            name: sum(item[name] for item in self._samples) / len(self._samples)
-            for name in sample
-        } if self._samples else {}
+        means = (
+            {
+                name: sum(item[name] for item in self._samples) / len(self._samples)
+                for name in sample
+            }
+            if self._samples
+            else {}
+        )
         would_pass: bool | None = None
         reason = "WINDOW_NOT_FULL"
         if window_full and not eligible:
@@ -1239,6 +1248,18 @@ class CurriculumDecision(str, Enum):
     CURRENT_ENCODER_REJECTED = "CURRENT_ENCODER_REJECTED"
 
 
+class StageBudgetExhausted(RuntimeError):
+    """Fail-closed signal raised when a stage reaches its hard iteration cap."""
+
+    def __init__(self, status: StageBudgetStatus) -> None:
+        self.status = status
+        super().__init__(
+            "stage iteration hard-cap exhausted: "
+            f"stage={status.stage} consumed={status.consumed_iterations} "
+            f"hard_cap={status.hard_cap_iterations}"
+        )
+
+
 @dataclass(frozen=True)
 class CurriculumDecisionRecord:
     stage: str
@@ -1257,23 +1278,34 @@ class CurriculumDecisionRecord:
             "reason": self.reason,
             "next_stage": self.next_stage,
             "evaluation": {
+                "safety_rate": self.evaluation.safety_rate,
+                "path_completion_ratio": self.evaluation.path_completion_ratio,
+                "cross_track_rmse_m": self.evaluation.cross_track_rmse_m,
+                "vertical_rmse_m": self.evaluation.vertical_rmse_m,
                 "default_success": self.evaluation.default_success,
-                "strict_success": self.evaluation.strict_success,
+                "eta_tight_success_rate": (self.evaluation.eta_tight_success_rate),
                 "timeout_rate": self.evaluation.timeout_rate,
                 "plane_miss_rate": self.evaluation.plane_miss_rate,
-                "safety_rate": self.evaluation.safety_rate,
-                "anchor_default_success": self.evaluation.anchor_default_success,
-                "stratified_default_success": (
-                    None
-                    if self.evaluation.stratified_default_success is None
-                    else dict(self.evaluation.stratified_default_success)
-                ),
+                "path_three_d_rmse_m": self.evaluation.path_three_d_rmse_m,
+                "pre_goal_3d_rmse_m": self.evaluation.pre_goal_3d_rmse_m,
+                "diagnostic_only": [
+                    "default_success",
+                    "eta_tight_success_rate",
+                    "timeout_rate",
+                    "plane_miss_rate",
+                    "path_three_d_rmse_m",
+                    "pre_goal_3d_rmse_m",
+                ],
+                "gate_inputs": [
+                    "safety_rate",
+                    "path_completion_ratio",
+                    "cross_track_rmse_m",
+                    "vertical_rmse_m",
+                ],
             },
             "completed_transitions": self.completed_transitions,
             "completed_iterations": self.completed_iterations,
-            "route_gate": (
-                None if self.route_gate is None else dict(self.route_gate)
-            ),
+            "route_gate": (None if self.route_gate is None else dict(self.route_gate)),
         }
 
 
@@ -1291,17 +1323,12 @@ class CurriculumPromotionController:
             raise ValueError(f"unknown start_stage {start_stage!r}")
         self.stage = start_stage
         self._consecutive_passes = 0
-        self._consecutive_severe_failures = 0
         self._consecutive_unsafe = 0
         self._consecutive_stalls = 0
         self._rollback_counts: dict[str, int] = {}
-        self._last_default_success: float | None = None
-        self._stage_consumed: dict[str, int] = {
-            stage: 0 for stage in self.stages
-        }
-        self._stage_consumed_iterations: dict[str, int] = {
-            stage: 0 for stage in self.stages
-        }
+        self._last_completion_ratio: float | None = None
+        self._stage_consumed: dict[str, int] = {stage: 0 for stage in self.stages}
+        self._stage_consumed_iterations: dict[str, int] = {stage: 0 for stage in self.stages}
         self._stage_entry_transition: int | None = 0
         self._stage_entry_iteration: int | None = 0
         self.history: list[CurriculumDecisionRecord] = []
@@ -1321,9 +1348,7 @@ class CurriculumPromotionController:
         completed = int(completed_transitions)
         if self._stage_entry_transition is not None:
             elapsed = max(0, completed - self._stage_entry_transition)
-            self._stage_consumed[self.stage] = (
-                self._stage_consumed.get(self.stage, 0) + elapsed
-            )
+            self._stage_consumed[self.stage] = self._stage_consumed.get(self.stage, 0) + elapsed
         self._stage_entry_transition = completed
 
     @property
@@ -1346,6 +1371,28 @@ class CurriculumPromotionController:
     @property
     def stage_consumed_iterations(self) -> int:
         return int(self._stage_consumed_iterations.get(self.stage, 0))
+
+    def check_stage_budget(self, completed_iterations: int) -> StageBudgetStatus:
+        """Consume the iteration clock and report whether the hard cap is hit.
+
+        This is intentionally independent of frozen-dev evaluation so the
+        training loop can call it every iteration.  Repeated calls with the same
+        completed iteration value are idempotent.
+        """
+
+        if isinstance(completed_iterations, bool) or completed_iterations < 0:
+            raise ValueError("completed_iterations must be a non-negative integer")
+        self._consume_iterations(int(completed_iterations))
+        spec = self.stages[self.stage]
+        consumed = self.stage_consumed_iterations
+        cap = spec.hard_cap_iterations
+        return StageBudgetStatus(
+            stage=self.stage,
+            completed_iterations=int(completed_iterations),
+            consumed_iterations=consumed,
+            hard_cap_iterations=cap,
+            exhausted=cap is not None and consumed >= cap,
+        )
 
     def _record(
         self,
@@ -1382,9 +1429,7 @@ class CurriculumPromotionController:
     ) -> CurriculumDecision:
         index = self._stage_index(self.stage)
         next_stage = (
-            CURRICULUM_STAGE_ORDER[index + 1]
-            if index + 1 < len(CURRICULUM_STAGE_ORDER)
-            else None
+            CURRICULUM_STAGE_ORDER[index + 1] if index + 1 < len(CURRICULUM_STAGE_ORDER) else None
         )
         decision = self._record(
             CurriculumDecision.PROMOTE,
@@ -1398,10 +1443,9 @@ class CurriculumPromotionController:
         if next_stage is not None:
             self.stage = next_stage
         self._consecutive_passes = 0
-        self._consecutive_severe_failures = 0
         self._consecutive_unsafe = 0
         self._consecutive_stalls = 0
-        self._last_default_success = None
+        self._last_completion_ratio = None
         return decision
 
     def _budget_decision(
@@ -1436,10 +1480,13 @@ class CurriculumPromotionController:
             if isinstance(completed_transitions, bool) or int(completed_transitions) < 0:
                 raise ValueError("completed_transitions must be a non-negative integer")
             self._consume_transitions(int(completed_transitions))
-            if self.stage_consumed_transitions >= spec.hard_cap_transitions:
+            if (
+                spec.hard_cap_iterations is None
+                and self.stage_consumed_transitions >= spec.hard_cap_transitions
+            ):
                 return self._record(
                     CurriculumDecision.STAGE_BUDGET_EXHAUSTED,
-                    "stage hard-cap exhausted before promotion",
+                    "stage transition hard-cap exhausted before promotion",
                     evaluation,
                     int(completed_transitions),
                     None,
@@ -1476,18 +1523,9 @@ class CurriculumPromotionController:
                     self.stage,
                 )
 
-        if evaluation.anchor_default_success is not None:
-            if evaluation.anchor_default_success < spec.gate.default_success_min - spec.gate.anchor_drop_max:
-                return self._rollback(
-                    evaluation,
-                    completed_transitions,
-                    "previous-stage anchor regressed beyond the forgetting guard",
-                )
-
         passed = evaluation.gate_passes(spec.gate)
         if passed:
             self._consecutive_passes += 1
-            self._consecutive_severe_failures = 0
             self._consecutive_unsafe = 0
             self._consecutive_stalls = 0
             if self._consecutive_passes >= 2:
@@ -1496,7 +1534,7 @@ class CurriculumPromotionController:
                     completed_transitions,
                     completed_iterations=completed_iterations,
                 )
-            self._last_default_success = evaluation.default_success
+            self._last_completion_ratio = evaluation.path_completion_ratio
             return self._record(
                 CurriculumDecision.CONTINUE,
                 "first gate pass; hysteresis requires a second consecutive pass",
@@ -1506,44 +1544,31 @@ class CurriculumPromotionController:
             )
 
         self._consecutive_passes = 0
-        severe = (
-            evaluation.default_success < spec.gate.default_success_min - 0.10
-            or evaluation.strict_success < spec.gate.strict_success_min - 0.10
-        )
-        self._consecutive_severe_failures = (
-            self._consecutive_severe_failures + 1 if severe else 0
-        )
-        unsafe = (
-            evaluation.safety_rate > spec.gate.safety_max
-            or evaluation.timeout_rate > spec.gate.timeout_max
-        )
+        unsafe = evaluation.safety_rate > spec.gate.safety_max
         self._consecutive_unsafe = self._consecutive_unsafe + 1 if unsafe else 0
-        if self._last_default_success is None:
+        if self._last_completion_ratio is None:
             self._consecutive_stalls = 0
         else:
-            improved = evaluation.default_success - self._last_default_success >= 0.01
+            improved = evaluation.path_completion_ratio - self._last_completion_ratio >= 0.01
             self._consecutive_stalls = 0 if improved else self._consecutive_stalls + 1
-        self._last_default_success = evaluation.default_success
+        self._last_completion_ratio = evaluation.path_completion_ratio
 
         if self._consecutive_unsafe >= 2:
-            return self._rollback(
-                evaluation, completed_transitions, "safety/timeout guard failed twice"
-            )
-        if self._consecutive_severe_failures >= 2:
-            return self._rollback(
-                evaluation, completed_transitions, "gate missed by 0.10 twice"
-            )
+            return self._rollback(evaluation, completed_transitions, "safety guard failed twice")
         if self._consecutive_stalls >= 2:
             return self._record(
                 CurriculumDecision.CURRICULUM_STALLED,
-                "two evaluations improved by less than 0.01 while still below gate",
+                "completion improved by less than 0.01 twice while below gate: "
+                + "; ".join(evaluation.gate_failures(spec.gate)),
                 evaluation,
                 completed_transitions,
                 self.stage,
             )
         return self._record(
             CurriculumDecision.CONTINUE,
-            "gate not met; continue current stage",
+            "gate not met (diagnostic only: "
+            + "; ".join(evaluation.gate_failures(spec.gate))
+            + ")",
             evaluation,
             completed_transitions,
             self.stage,
@@ -1594,7 +1619,6 @@ class CurriculumPromotionController:
         """Keep the current stage when the boundary check vetoes promotion."""
 
         self._consecutive_passes = 0
-        self._consecutive_severe_failures = 0
         self._consecutive_unsafe = 0
         self._consecutive_stalls = 0
         return self._record(
@@ -1642,10 +1666,9 @@ class CurriculumPromotionController:
         self._rollback_counts[source] = self._rollback_counts.get(source, 0) + 1
         self.stage = previous
         self._consecutive_passes = 0
-        self._consecutive_severe_failures = 0
         self._consecutive_unsafe = 0
         self._consecutive_stalls = 0
-        self._last_default_success = None
+        self._last_completion_ratio = None
         return decision
 
 

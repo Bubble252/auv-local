@@ -74,16 +74,18 @@ from auv_lowlevel.batch.pc_vec_env import BatchTorchPCVecEnv
 from auv_lowlevel.batch.vec_env import BatchTorchVecEnv
 from auv_lowlevel.config import load_config
 from auv_lowlevel.curriculum import (
+    CurriculumDecision,
     CurriculumPromotionController,
     CurriculumStageSampler,
     LinearAlphaSchedule,
     RouteGateThresholds,
     RouteGateWindow,
+    StageBudgetExhausted,
     curriculum_stages_with_overrides,
 )
 from auv_lowlevel.curriculum_trainer import (
     CurriculumTrainerHook,
-    combine_eval_summaries,
+    parse_eval_summary,
     run_eval_command,
 )
 from auv_lowlevel.experiment_contract import require_training_curriculum
@@ -139,21 +141,13 @@ def _configure_optimizer_learning_rates(
     critic_lr = float(algorithm["learning_rate_critic"])
     dade_head_lr = algorithm.get("learning_rate_dade_head")
     warmup_iterations = int(algorithm["critic_warmup_iterations"])
-    separate_dade_head_lr = (
-        dade_head_lr is not None and float(dade_head_lr) != actor_lr
-    )
-    if (
-        actor_lr == critic_lr
-        and warmup_iterations == 0
-        and not separate_dade_head_lr
-    ):
+    separate_dade_head_lr = dade_head_lr is not None and float(dade_head_lr) != actor_lr
+    if actor_lr == critic_lr and warmup_iterations == 0 and not separate_dade_head_lr:
         return
     if not is_pc:
         raise ValueError("separate actor/critic learning rates are only supported for PC")
     if algorithm["schedule"] != "fixed":
-        raise ValueError(
-            "separate actor/critic learning rates require algorithm.schedule='fixed'"
-        )
+        raise ValueError("separate actor/critic learning rates require algorithm.schedule='fixed'")
 
     actor_parameters = []
     critic_parameters = []
@@ -164,9 +158,10 @@ def _configure_optimizer_learning_rates(
             continue
         if name.startswith("actor_dade_head"):
             dade_head_parameters.append(parameter)
-        elif name.startswith(
-            ("actor", "path_encoder", "path_endpoint_encoder")
-        ) or name in {"std", "log_std"}:
+        elif name.startswith(("actor", "path_encoder", "path_endpoint_encoder")) or name in {
+            "std",
+            "log_std",
+        }:
             actor_parameters.append(parameter)
         elif name.startswith("critic"):
             critic_parameters.append(parameter)
@@ -174,8 +169,7 @@ def _configure_optimizer_learning_rates(
             unassigned.append(name)
     if unassigned:
         raise ValueError(
-            "cannot assign policy parameters to actor/critic optimizer groups: "
-            f"{unassigned}"
+            f"cannot assign policy parameters to actor/critic optimizer groups: {unassigned}"
         )
     if not actor_parameters or not critic_parameters:
         raise ValueError("separate learning rates require both actor and critic parameters")
@@ -201,9 +195,7 @@ def _configure_optimizer_learning_rates(
     runner.alg.learning_rate = actor_lr
     runner._actor_target_learning_rate = actor_lr
     runner._critic_target_learning_rate = critic_lr
-    runner._dade_head_target_learning_rate = (
-        float(dade_head_lr) if separate_dade_head_lr else None
-    )
+    runner._dade_head_target_learning_rate = float(dade_head_lr) if separate_dade_head_lr else None
     runner._critic_warmup_iterations = warmup_iterations
     _apply_learning_rate_for_iteration(runner, 0)
 
@@ -232,16 +224,12 @@ def _frozen_bc_parameter_audit(
 ) -> dict[str, Any]:
     """Verify that the frozen BC branch is bit-identical after training."""
 
-    initial_checkpoint = torch.load(
-        initial_checkpoint_path, map_location="cpu", weights_only=False
-    )
+    initial_checkpoint = torch.load(initial_checkpoint_path, map_location="cpu", weights_only=False)
     initial_state = initial_checkpoint.get("model_state_dict")
     final_state = final_checkpoint.get("model_state_dict")
     if not isinstance(initial_state, dict) or not isinstance(final_state, dict):
         raise RuntimeError("frozen BC audit requires model_state_dict checkpoints")
-    frozen_keys = sorted(
-        name for name in initial_state if name.startswith("frozen_bc_")
-    )
+    frozen_keys = sorted(name for name in initial_state if name.startswith("frozen_bc_"))
     if not frozen_keys:
         raise RuntimeError("frozen BC audit found no frozen_bc_ state entries")
     missing = sorted(set(frozen_keys) - set(final_state))
@@ -261,8 +249,7 @@ def _frozen_bc_parameter_audit(
         max_abs_drift = max(max_abs_drift, drift)
     if max_abs_drift != 0.0:
         raise RuntimeError(
-            "frozen BC parameters changed during training: "
-            f"max abs drift={max_abs_drift}"
+            f"frozen BC parameters changed during training: max abs drift={max_abs_drift}"
         )
 
     frozen_parameters = [
@@ -313,12 +300,6 @@ def _parse_args() -> argparse.Namespace:
         type=Path,
         default=None,
         help="environment config used for the default-radius curriculum dev evaluation",
-    )
-    parser.add_argument(
-        "--curriculum-eval-strict-config",
-        type=Path,
-        default=None,
-        help="environment config used for the strict125 curriculum dev evaluation",
     )
     parser.add_argument(
         "--curriculum-eval-interval",
@@ -455,8 +436,7 @@ def _check_training_profile(training_path: Path, training: Any) -> None:
     checker = governance / "scripts" / "check_training_profile.py"
     if not checker.is_file():
         raise RuntimeError(
-            "canonical training-profile checker not found at "
-            f"{checker}; set AUV_GOVERNANCE_ROOT"
+            f"canonical training-profile checker not found at {checker}; set AUV_GOVERNANCE_ROOT"
         )
     completed = subprocess.run(
         [
@@ -603,11 +583,7 @@ def main() -> int:
     warmstart_path = (
         _resolve(args.warmstart_actor)
         if args.warmstart_actor
-        else (
-            _resolve(training.warmstart_actor)
-            if training.warmstart_actor is not None
-            else None
-        )
+        else (_resolve(training.warmstart_actor) if training.warmstart_actor is not None else None)
     )
     if warmstart_path is not None and training.warmstart_actor_sha256 is not None:
         actual_warmstart_sha = sha256_file(warmstart_path)
@@ -616,9 +592,7 @@ def main() -> int:
                 "actor warm-start SHA mismatch: "
                 f"expected {training.warmstart_actor_sha256}, got {actual_warmstart_sha}"
             )
-    residual_warmstart_path = (
-        _resolve(args.warmstart_residual) if args.warmstart_residual else None
-    )
+    residual_warmstart_path = _resolve(args.warmstart_residual) if args.warmstart_residual else None
     frozen_bc_residual = training.base_mode == "frozen_pc_bc_residual"
     if iterations <= 0 or num_envs <= 0 or num_steps <= 0 or num_mini_batches <= 0:
         raise ValueError("iterations, num_envs, num_steps and num_mini_batches must be positive")
@@ -639,10 +613,7 @@ def main() -> int:
         raise ValueError("--warmstart-actor requires training.initial_residual_zero=false")
     if warmstart_path is not None and not warmstart_path.is_file():
         raise FileNotFoundError(f"actor warm-start checkpoint not found: {warmstart_path}")
-    if (
-        training.learning_composition in TRRES_LEARNING_COMPOSITIONS
-        and warmstart_path is not None
-    ):
+    if training.learning_composition in TRRES_LEARNING_COMPOSITIONS and warmstart_path is not None:
         raise ValueError(
             f"{training.learning_composition} must not use --warmstart-actor; "
             "TRRES_ENCODER_INIT_INVALID"
@@ -685,10 +656,7 @@ def main() -> int:
             environment.pc_control_mode.startswith("path_")
             and training.pc.path_dim not in PC_PATH_DIMS
         ):
-            raise ValueError(
-                "ALOS-free path_* PC control requires pc.path_dim in "
-                f"{PC_PATH_DIMS}"
-            )
+            raise ValueError(f"ALOS-free path_* PC control requires pc.path_dim in {PC_PATH_DIMS}")
         actor_layout = PCPolicyLayout(
             state_dim=PC_ACTOR_STATE_DIM,
             path_dim=training.pc.path_dim,
@@ -815,9 +783,7 @@ def main() -> int:
             if self._record_device.type == "cuda":
                 torch.cuda.reset_peak_memory_stats(self._record_device)
             if self._current_encoder_alpha_schedule is not None:
-                self.alg.policy.set_actor_current_encoder_alpha(
-                    self._current_encoder_alpha
-                )
+                self.alg.policy.set_actor_current_encoder_alpha(self._current_encoder_alpha)
             original_update = self.alg.update
 
             def update_with_metrics() -> dict[str, float]:
@@ -904,6 +870,7 @@ def main() -> int:
             iteration_steps = collection_steps / max(
                 locs["collection_time"] + locs["learn_time"], 1e-12
             )
+            curriculum_hook = getattr(self, "_curriculum_hook", None)
             record: dict[str, Any] = {
                 "schema_version": "auv_odarrl_batch_iteration_record.v1",
                 "iteration": int(locs["it"]) + 1,
@@ -928,6 +895,12 @@ def main() -> int:
                 if locs["lenbuffer"]
                 else None,
                 "episode_metrics": episode_metrics,
+                "curriculum_stage": (None if curriculum_hook is None else curriculum_hook.stage),
+                "curriculum_stage_mix": (
+                    None
+                    if curriculum_hook is None
+                    else [list(item) for item in curriculum_hook.stage_mix]
+                ),
                 "step_latency": self.env.drain_step_latency_stats(),
                 "gpu_memory_iter": self._gpu_memory_mib(reset_peak=True),
                 "policy_update_metrics": self._latest_policy_metrics,
@@ -953,11 +926,23 @@ def main() -> int:
                     _path_blocks_for_iteration(training.pc, int(locs["it"]) + 1)
                 )
             if self._curriculum_hook is not None:
-                self._curriculum_hook.maybe_update(
+                completed_iterations = int(locs["it"]) + 1
+                budget_status = self._curriculum_hook.check_stage_budget(
                     int(self.env.total_env_steps),
-                    completed_iterations=int(locs["it"]) + 1,
+                    completed_iterations,
+                )
+                if budget_status is not None:
+                    raise StageBudgetExhausted(budget_status)
+                decision = self._curriculum_hook.maybe_update(
+                    int(self.env.total_env_steps),
+                    completed_iterations=completed_iterations,
                     training_metrics=episode_metrics,
                 )
+                if decision is CurriculumDecision.STAGE_BUDGET_EXHAUSTED:
+                    budget_status = self._curriculum_hook.controller.check_stage_budget(
+                        completed_iterations
+                    )
+                    raise StageBudgetExhausted(budget_status)
 
         def gpu_peak_summary(self) -> dict[str, float | None]:
             if self._record_device.type != "cuda":
@@ -993,13 +978,9 @@ def main() -> int:
         critic_input_mask = [True] * PC_CRITIC_STATE_DIM + [False] * training.pc.n_in_reserved
         d_z_active = training.pc.d_z_total - training.pc.n_z_reserved
         output_mask = [True] * d_z_active + [False] * training.pc.n_z_reserved
-        final_path_blocks = (
-            _final_path_blocks(training.pc) if training.pc.path_dim else ()
-        )
+        final_path_blocks = _final_path_blocks(training.pc) if training.pc.path_dim else ()
         final_path_mask = (
-            path_block_column_mask(final_path_blocks).tolist()
-            if training.pc.path_dim
-            else []
+            path_block_column_mask(final_path_blocks).tolist() if training.pc.path_dim else []
         )
         resolved_pc_action_interface = resolve_pc_action_interface(
             training.pc.action_interface,
@@ -1095,16 +1076,13 @@ def main() -> int:
                 "active_column_mask": final_path_mask,
                 "feature_indices": path_feature_indices,
                 "schema_hash": (
-                    pc_path_schema_hash(final_path_blocks)
-                    if training.pc.path_dim
-                    else None
+                    pc_path_schema_hash(final_path_blocks) if training.pc.path_dim else None
                 ),
                 "encoder_hidden_dims": list(training.pc.path_encoder_hidden_dims),
                 "encoder_alpha": training.pc.path_encoder_alpha,
                 "encoder_initialization": "zero_final_linear",
                 "curriculum": [
-                    [int(start), list(blocks)]
-                    for start, blocks in training.pc.path_curriculum
+                    [int(start), list(blocks)] for start, blocks in training.pc.path_curriculum
                 ],
             },
             "critic_encoder": {
@@ -1121,9 +1099,7 @@ def main() -> int:
             "critic_path": {
                 "dim": training.pc.critic_path_dim,
                 "feature_names": (
-                    list(PC_CRITIC_PRIV_FEATURE_NAMES)
-                    if training.pc.critic_path_dim
-                    else []
+                    list(PC_CRITIC_PRIV_FEATURE_NAMES) if training.pc.critic_path_dim else []
                 ),
                 "groups": {
                     name: list(PC_CRITIC_PRIV_GROUP_SLICES[name])
@@ -1131,14 +1107,10 @@ def main() -> int:
                 }
                 if training.pc.critic_path_dim
                 else {},
-                "encoder_hidden_dims": list(
-                    training.pc.critic_path_encoder_hidden_dims
-                ),
+                "encoder_hidden_dims": list(training.pc.critic_path_encoder_hidden_dims),
                 "encoder_alpha": training.pc.critic_path_encoder_alpha,
                 "encoder_initialization": (
-                    "zero_final_linear"
-                    if training.pc.critic_path_encoder_zero_init
-                    else "default"
+                    "zero_final_linear" if training.pc.critic_path_encoder_zero_init else "default"
                 ),
             },
             "dade_enabled": training.pc.dade_enabled,
@@ -1169,15 +1141,9 @@ def main() -> int:
             "frozen_bc_residual_enabled": frozen_bc_residual,
             "frozen_bc_residual_scale": training.base_residual_scale,
             "frozen_bc_residual_output_mode": training.base_output_mode,
-            "residual_terminal_gate_enabled": (
-                training.pc.residual_terminal_gate_enabled
-            ),
-            "residual_terminal_gate_enter_m": (
-                training.pc.residual_terminal_gate_enter_m
-            ),
-            "residual_terminal_gate_full_m": (
-                training.pc.residual_terminal_gate_full_m
-            ),
+            "residual_terminal_gate_enabled": (training.pc.residual_terminal_gate_enabled),
+            "residual_terminal_gate_enter_m": (training.pc.residual_terminal_gate_enter_m),
+            "residual_terminal_gate_full_m": (training.pc.residual_terminal_gate_full_m),
             "base_residual_bias": list(training.pc.base_residual_bias),
             "frozen_bc_checkpoint_sha256": (
                 training.base_checkpoint_sha256 if frozen_bc_residual else None
@@ -1225,9 +1191,7 @@ def main() -> int:
         checkpoint_infos[CHECKPOINT_METADATA_KEY]["lam_per_physics_step"] = (
             training.lam_per_physics_step
         )
-        checkpoint_infos[CHECKPOINT_METADATA_KEY]["lam_per_decision"] = (
-            training.lam_per_decision
-        )
+        checkpoint_infos[CHECKPOINT_METADATA_KEY]["lam_per_decision"] = training.lam_per_decision
     else:
         checkpoint_infos = build_checkpoint_infos(
             observation_schema=observation_schema_version,
@@ -1288,9 +1252,7 @@ def main() -> int:
             "start_jitter_xy_m": float(environment.reference.start_jitter_xy_m),
             "start_jitter_z_m": float(environment.reference.start_jitter_z_m),
             "start_jitter_yaw_rad": float(environment.reference.start_jitter_yaw_rad),
-            "start_jitter_pitch_rad": float(
-                environment.reference.start_jitter_pitch_rad
-            ),
+            "start_jitter_pitch_rad": float(environment.reference.start_jitter_pitch_rad),
             "initial_speed_ratio_range": list(
                 environment.guidance.initial_speed_ratio_range
                 or (
@@ -1388,20 +1350,13 @@ def main() -> int:
         ),
         "pvs_comparison_config_sha256": environment.config_sha256,
         "curriculum": environment.curriculum.as_dict(),
-        "curriculum_promotion_enabled": bool(
-            environment.curriculum.promotion_enabled
-        ),
-        "curriculum_force_current_alpha_zero": bool(
-            args.curriculum_force_current_alpha_zero
-        ),
-        "curriculum_direct_commands_enabled": not bool(
-            args.curriculum_disable_direct_command
-        ),
+        "curriculum_promotion_enabled": bool(environment.curriculum.promotion_enabled),
+        "curriculum_force_current_alpha_zero": bool(args.curriculum_force_current_alpha_zero),
+        "curriculum_direct_commands_enabled": not bool(args.curriculum_disable_direct_command),
         "curriculum_eval_schedule": (
-            "stage_boundary"
-            if args.curriculum_eval_stage_boundaries
-            else "fixed_interval"
+            "stage_boundary" if args.curriculum_eval_stage_boundaries else "fixed_interval"
         ),
+        "curriculum_current_gate": None,
         "curriculum_eval_interval_transitions": int(args.curriculum_eval_interval),
         "requested_total_env_steps": num_envs * num_steps * iterations,
         "requested_total_physics_steps": (
@@ -1464,9 +1419,7 @@ def main() -> int:
                     if curriculum_sampler is not None
                     else None
                 ),
-                curriculum_direct_commands_enabled=(
-                    not args.curriculum_disable_direct_command
-                ),
+                curriculum_direct_commands_enabled=(not args.curriculum_disable_direct_command),
             )
             action_interface = resolve_pc_action_interface(
                 training.pc.action_interface,
@@ -1490,9 +1443,7 @@ def main() -> int:
                 pc_env = BatchedPCActuatorResidualEnv(
                     pc_env,
                     residual_scale=training.pc.actuator_residual_scale,
-                    residual_channel_gains=(
-                        training.pc.actuator_residual_channel_gains
-                    ),
+                    residual_channel_gains=(training.pc.actuator_residual_channel_gains),
                     max_action=training.pc.actuator_max_action,
                     controller_state="actor",
                     terminal_gate_enabled=training.pc.actuator_terminal_gate_enabled,
@@ -1577,8 +1528,7 @@ def main() -> int:
             checkpoint_infos=checkpoint_infos,
             current_encoder_alpha_schedule=(
                 None
-                if training.pc is None
-                or training.pc.actor_current_encoder_alpha_schedule is None
+                if training.pc is None or training.pc.actor_current_encoder_alpha_schedule is None
                 else LinearAlphaSchedule(
                     *training.pc.actor_current_encoder_alpha_schedule,
                     name="pc.actor_current_encoder_alpha",
@@ -1594,27 +1544,18 @@ def main() -> int:
                 if args.curriculum_eval_default_config is None
                 else _resolve(args.curriculum_eval_default_config)
             )
-            strict_eval_config = (
-                environment_path
-                if args.curriculum_eval_strict_config is None
-                else _resolve(args.curriculum_eval_strict_config)
-            )
             eval_script = REPO_ROOT / "scripts" / "evaluate_pc_ppo.py"
             eval_root = output / "curriculum_evals"
             checkpoint_root = output / "curriculum_checkpoints"
 
             def _evaluate_curriculum(stage: str, completed_transitions: int):
                 checkpoint_root.mkdir(parents=True, exist_ok=True)
-                checkpoint_path = (
-                    checkpoint_root / f"{stage}_{completed_transitions:09d}.pt"
-                )
+                checkpoint_path = checkpoint_root / f"{stage}_{completed_transitions:09d}.pt"
                 if not checkpoint_path.is_file():
                     runner.save(str(checkpoint_path))
 
                 def _run(config_path: Path, label: str) -> dict[str, Any]:
-                    eval_output = (
-                        eval_root / f"{stage}_{completed_transitions:09d}" / label
-                    )
+                    eval_output = eval_root / f"{stage}_{completed_transitions:09d}" / label
                     command = [
                         sys.executable,
                         str(eval_script),
@@ -1645,18 +1586,12 @@ def main() -> int:
                         timeout_s=args.curriculum_eval_timeout_s,
                     )
 
-                return combine_eval_summaries(
-                    _run(default_eval_config, "default"),
-                    _run(strict_eval_config, "strict125"),
-                    gate=curriculum_sampler.stages[stage].gate,
-                )
+                return parse_eval_summary(_run(default_eval_config, "default"))
 
             route_thresholds = None
             if args.curriculum_route_thresholds is not None:
                 threshold_path = _resolve(args.curriculum_route_thresholds)
-                threshold_payload = json.loads(
-                    threshold_path.read_text(encoding="utf-8")
-                )
+                threshold_payload = json.loads(threshold_path.read_text(encoding="utf-8"))
                 if isinstance(threshold_payload.get("thresholds"), dict):
                     threshold_payload = threshold_payload["thresholds"]
                 route_thresholds = RouteGateThresholds.from_dict(threshold_payload)
@@ -1670,9 +1605,7 @@ def main() -> int:
                 evaluate=_evaluate_curriculum,
                 mix_ramp_transitions=args.curriculum_mix_ramp_transitions,
                 preview_enabled=True,
-                force_current_encoder_alpha_zero=(
-                    args.curriculum_force_current_alpha_zero
-                ),
+                force_current_encoder_alpha_zero=(args.curriculum_force_current_alpha_zero),
                 promotion_enabled=environment.curriculum.promotion_enabled,
                 routine_gate=RouteGateWindow(
                     window_size=20,
@@ -1683,18 +1616,27 @@ def main() -> int:
                 stage_boundary_evals=args.curriculum_eval_stage_boundaries,
             )
             runner._curriculum_hook = curriculum_hook
+            if args.curriculum_route_gate_mode == "enforce":
+                current_gate = "TRAINING_ROLLOUT_20_3"
+            elif args.curriculum_eval_stage_boundaries:
+                current_gate = "STAGE_BOUNDARY_FROZEN_DEV_2PASS"
+            else:
+                current_gate = "LEGACY_EVAL_INTERVAL"
+            manifest["curriculum_current_gate"] = current_gate
             curriculum_route_gate_manifest = {
                 "window_size": 20,
                 "consecutive_required": 3,
                 "mode": args.curriculum_route_gate_mode,
+                "current_gate": current_gate,
+                "formal_scope": (
+                    "D18_2" if current_gate == "TRAINING_ROLLOUT_20_3" else "CURRENT_GATE_ONLY"
+                ),
                 "thresholds_path": (
                     None
                     if args.curriculum_route_thresholds is None
                     else str(_resolve(args.curriculum_route_thresholds))
                 ),
-                "thresholds": (
-                    None if route_thresholds is None else route_thresholds.as_dict()
-                ),
+                "thresholds": (None if route_thresholds is None else route_thresholds.as_dict()),
             }
             initial_alpha = curriculum_hook.current_encoder_alpha(0)
             runner._current_encoder_alpha = initial_alpha
@@ -1817,12 +1759,8 @@ def main() -> int:
             initial_residual_l2_mean = float(
                 torch.linalg.vector_norm(residual_actions, dim=-1).mean().item()
             )
-            base_l2_mean = float(
-                torch.linalg.vector_norm(base_actions, dim=-1).mean().item()
-            )
-            initial_residual_to_base_l2 = (
-                initial_residual_l2_mean / max(base_l2_mean, 1e-12)
-            )
+            base_l2_mean = float(torch.linalg.vector_norm(base_actions, dim=-1).mean().item())
+            initial_residual_to_base_l2 = initial_residual_l2_mean / max(base_l2_mean, 1e-12)
             if not np.isfinite(initial_residual_abs_max):
                 raise RuntimeError("frozen BC residual initialization is non-finite")
             if residual_warmstart_path is None:
@@ -1837,12 +1775,8 @@ def main() -> int:
                         if training.base_output_mode == "residual"
                         else initial_actions
                     )
-                    if not torch.allclose(
-                        executed_actions, base_actions, atol=1e-7, rtol=0.0
-                    ):
-                        raise RuntimeError(
-                            "frozen BC residual init does not reproduce BC actions"
-                        )
+                    if not torch.allclose(executed_actions, base_actions, atol=1e-7, rtol=0.0):
+                        raise RuntimeError("frozen BC residual init does not reproduce BC actions")
                     initial_residual_zero_applied = True
                 elif initial_residual_abs_max <= 1e-7:
                     raise RuntimeError(
@@ -1872,7 +1806,7 @@ def main() -> int:
                 "residual_warmstart_metadata": residual_warmstart_metadata,
             }
         )
-        if frozen_bc_residual:
+        if is_pc:
             initial_checkpoint_path = output / "model_initial.pt"
             runner.save(str(initial_checkpoint_path))
             manifest.update(
@@ -1932,6 +1866,11 @@ def main() -> int:
                 "wall_time_s": wall_time_s,
                 "total_env_steps": env.total_env_steps,
                 "current_encoder_alpha_final": runner._current_encoder_alpha,
+                "curriculum_final_stage": (
+                    None
+                    if runner._curriculum_hook is None
+                    else runner._curriculum_hook.controller.stage
+                ),
                 "collection_env_step_rate_hz": env.env_step_rate_hz,
                 "iteration_records": runner.records,
                 "gpu_memory_peak": runner.gpu_peak_summary(),
@@ -1952,10 +1891,32 @@ def main() -> int:
         )
         return 0
     except BaseException as error:
+        failure_code = (
+            "STAGE_BUDGET_EXHAUSTED"
+            if isinstance(error, StageBudgetExhausted)
+            else type(error).__name__
+        )
+        failure_fields: dict[str, Any] = {"failure_code": failure_code}
+        if isinstance(error, StageBudgetExhausted):
+            failure_fields.update(
+                {
+                    "failure_stage": error.status.stage,
+                    "stage_consumed_iterations": error.status.consumed_iterations,
+                    "stage_hard_cap_iterations": error.status.hard_cap_iterations,
+                    "stage_budget_completed_iterations": (error.status.completed_iterations),
+                }
+            )
+        final_stage = (
+            None
+            if runner is None or getattr(runner, "_curriculum_hook", None) is None
+            else runner._curriculum_hook.controller.stage
+        )
         manifest.update(
             {
                 "status": "failed",
                 "error": f"{type(error).__name__}: {error}",
+                **failure_fields,
+                "curriculum_final_stage": final_stage,
                 "wall_time_s": time.monotonic() - started,
                 "total_env_steps": 0 if env is None else env.total_env_steps,
                 "iteration_records": [] if runner is None else runner.records,

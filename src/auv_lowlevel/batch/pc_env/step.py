@@ -151,7 +151,7 @@ def build_step_info(
         if self._curriculum_stage_ids is None
         else self._curriculum_stage_ids
     )
-    return {
+    info = {
         "seed": self.episode_seed,
         "plant_scale_factors": self.plant_scales,
         "plant_drag_scale": self.plant_scales[:, 0],
@@ -173,18 +173,6 @@ def build_step_info(
             dim=1,
         ),
         "episode_command_speed_mps": self._episode_command_speed_mps,
-        "speed_profile_id": (
-            "legacy_v1"
-            if self.curriculum_sampler is None
-            else self.curriculum_sampler.speed_protocol
-        ),
-        "curriculum_stage_id": stage_ids,
-        "speed_segment_index": speed_segment_index,
-        "speed_segment_start_s": speed_segment_index.to(self.dtype) * speed_segment_period,
-        "speed_resample_period_s": speed_segment_period,
-        "speed_target_mps": self._episode_command_speed_mps,
-        "speed_target_min_mps": speed_target_min,
-        "speed_target_max_mps": speed_target_max,
         "episode_initial_speed_ratio": self._episode_initial_speed_ratio,
         "episode_initial_propeller_rpm_ratio": self._episode_initial_propeller_rpm_ratio,
         "command_speed_filtered_below_range": self._command_speed_filtered_below_range,
@@ -274,6 +262,20 @@ def build_step_info(
         "solution": observation.solution,
         "hold_fraction": self.hold_fraction,
     }
+    if self.curriculum_sampler is not None:
+        info.update(
+            {
+                "speed_profile_id": self.curriculum_sampler.speed_protocol,
+                "curriculum_stage_id": stage_ids,
+                "speed_segment_index": speed_segment_index,
+                "speed_segment_start_s": speed_segment_index.to(self.dtype) * speed_segment_period,
+                "speed_resample_period_s": speed_segment_period,
+                "speed_target_mps": self._episode_command_speed_mps,
+                "speed_target_min_mps": speed_target_min,
+                "speed_target_max_mps": speed_target_max,
+            }
+        )
+    return info
 
 
 __all__ = ["build_step_info"]
