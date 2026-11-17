@@ -26,7 +26,7 @@ GOAL182_TRRES_CONFIGS = (
         / "configs"
         / "lowlevel"
         / "goal182"
-        / "train_trres_cmd_5d_m_seed86201.json",
+        / "train_mod2_alosb_trres_cmd_5d_m_seed86201.json",
         "command",
     ),
     (
@@ -34,7 +34,7 @@ GOAL182_TRRES_CONFIGS = (
         / "configs"
         / "lowlevel"
         / "goal182"
-        / "train_trres_act_5d_m_seed86201.json",
+        / "train_mod2_alosb_trres_act_5d_m_seed86201.json",
         "actuator",
     ),
 )

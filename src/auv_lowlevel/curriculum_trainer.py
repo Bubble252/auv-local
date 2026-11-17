@@ -150,6 +150,8 @@ class CurriculumTrainerHook:
         promotion_enabled: bool = True,
         routine_gate: RouteGateWindow | None = None,
         route_gate_thresholds: RouteGateThresholds | None = None,
+        stage_boundary_evals: bool = False,
+        stage_boundary_retry_iterations: int | None = None,
     ) -> None:
         if isinstance(eval_interval_transitions, bool) or eval_interval_transitions <= 0:
             raise ValueError("eval_interval_transitions must be a positive integer")
@@ -169,6 +171,21 @@ class CurriculumTrainerHook:
         self.promotion_enabled = bool(promotion_enabled)
         self.routine_gate = routine_gate
         self.route_gate_thresholds = route_gate_thresholds
+        self.stage_boundary_evals = bool(stage_boundary_evals)
+        self.stage_boundary_retry_iterations: int | None = None
+        self._next_stage_eval_iteration: int | None = None
+        if self.stage_boundary_evals:
+            retry_iterations = stage_boundary_retry_iterations
+            if retry_iterations is None and routine_gate is not None:
+                retry_iterations = int(routine_gate.window_size)
+            if retry_iterations is None:
+                raise ValueError(
+                    "stage-boundary evaluation requires a retry interval or routine gate"
+                )
+            if retry_iterations <= 0:
+                raise ValueError("stage boundary retry iterations must be positive")
+            self.stage_boundary_retry_iterations = int(retry_iterations)
+            self._next_stage_eval_iteration = self._stage_boundary_target(0)
         if (
             routine_gate is not None
             and routine_gate.mode == "enforce"
@@ -184,6 +201,15 @@ class CurriculumTrainerHook:
         self.route_gate_path = self.output_dir / "curriculum_route_gate.jsonl"
         self.state_path = self.output_dir / "curriculum_state.json"
         self._write_state(0, None)
+
+    def _stage_boundary_target(self, entry_iteration: int) -> int:
+        spec = self.controller.stages[self.controller.stage]
+        budget = spec.soft_budget_iterations
+        if budget is None:
+            if self.stage_boundary_retry_iterations is None:
+                raise RuntimeError("stage boundary retry interval is not configured")
+            budget = self.stage_boundary_retry_iterations
+        return int(entry_iteration) + int(budget)
 
     def _write_state(
         self,
@@ -209,6 +235,13 @@ class CurriculumTrainerHook:
             "last_decision": None if decision is None else decision.value,
             "rollbacks_used": self.controller.rollbacks_used,
             "force_current_encoder_alpha_zero": self.force_current_encoder_alpha_zero,
+            "eval_schedule": (
+                "stage_boundary" if self.stage_boundary_evals else "fixed_interval"
+            ),
+            "next_eval_transition": (
+                None if self.stage_boundary_evals else self._next_eval_transition
+            ),
+            "next_eval_iteration": self._next_stage_eval_iteration,
             "finalized": bool(finalized),
         }
         self.state_path.write_text(json.dumps(payload, indent=1) + "\n")
@@ -250,7 +283,10 @@ class CurriculumTrainerHook:
             with self.route_gate_path.open("a") as handle:
                 handle.write(json.dumps(route_status, sort_keys=True) + "\n")
         if not self.promotion_enabled:
-            if completed_transitions >= self._next_eval_transition:
+            if (
+                not self.stage_boundary_evals
+                and completed_transitions >= self._next_eval_transition
+            ):
                 while completed_transitions >= self._next_eval_transition:
                     self._next_eval_transition += self.eval_interval_transitions
             self._write_state(
@@ -268,15 +304,29 @@ class CurriculumTrainerHook:
                 completed_iterations,
                 route_status,
             )
-        if completed_transitions < self._next_eval_transition:
-            self._write_state(
-                completed_transitions,
-                None,
-                completed_iterations=completed_iterations,
-            )
-            return None
-        while completed_transitions >= self._next_eval_transition:
-            self._next_eval_transition += self.eval_interval_transitions
+        if self.stage_boundary_evals:
+            if completed_iterations is None:
+                raise ValueError(
+                    "stage-boundary evaluation requires completed_iterations"
+                )
+            assert self._next_stage_eval_iteration is not None
+            if completed_iterations < self._next_stage_eval_iteration:
+                self._write_state(
+                    completed_transitions,
+                    None,
+                    completed_iterations=completed_iterations,
+                )
+                return None
+        else:
+            if completed_transitions < self._next_eval_transition:
+                self._write_state(
+                    completed_transitions,
+                    None,
+                    completed_iterations=completed_iterations,
+                )
+                return None
+            while completed_transitions >= self._next_eval_transition:
+                self._next_eval_transition += self.eval_interval_transitions
         evaluation = self.evaluate(self.controller.stage, completed_transitions)
         previous_stage = self.controller.stage
         decision = self.controller.observe(
@@ -286,6 +336,17 @@ class CurriculumTrainerHook:
         )
         if self.controller.stage != previous_stage:
             self._stage_entered_at = int(completed_transitions)
+            if self.stage_boundary_evals:
+                assert completed_iterations is not None
+                self._next_stage_eval_iteration = self._stage_boundary_target(
+                    completed_iterations
+                )
+        elif self.stage_boundary_evals:
+            assert completed_iterations is not None
+            assert self.stage_boundary_retry_iterations is not None
+            self._next_stage_eval_iteration = (
+                int(completed_iterations) + self.stage_boundary_retry_iterations
+            )
         record = self.controller.history[-1].as_dict()
         with self.decisions_path.open("a") as handle:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")

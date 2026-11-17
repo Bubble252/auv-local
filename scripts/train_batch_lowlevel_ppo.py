@@ -344,6 +344,14 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--curriculum-eval-device", default="cpu")
     parser.add_argument(
+        "--curriculum-eval-stage-boundaries",
+        action="store_true",
+        help=(
+            "schedule frozen-dev curriculum evaluations from each stage's soft "
+            "iteration budget instead of a fixed transition interval"
+        ),
+    )
+    parser.add_argument(
         "--curriculum-force-current-alpha-zero",
         action="store_true",
         help=(
@@ -1389,6 +1397,12 @@ def main() -> int:
         "curriculum_direct_commands_enabled": not bool(
             args.curriculum_disable_direct_command
         ),
+        "curriculum_eval_schedule": (
+            "stage_boundary"
+            if args.curriculum_eval_stage_boundaries
+            else "fixed_interval"
+        ),
+        "curriculum_eval_interval_transitions": int(args.curriculum_eval_interval),
         "requested_total_env_steps": num_envs * num_steps * iterations,
         "requested_total_physics_steps": (
             num_envs * num_steps * iterations * training.actor_decision_stride
@@ -1664,6 +1678,7 @@ def main() -> int:
                     mode=args.curriculum_route_gate_mode,
                 ),
                 route_gate_thresholds=route_thresholds,
+                stage_boundary_evals=args.curriculum_eval_stage_boundaries,
             )
             runner._curriculum_hook = curriculum_hook
             curriculum_route_gate_manifest = {

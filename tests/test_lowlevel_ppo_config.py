@@ -85,28 +85,28 @@ GOAL182_FINETUNE_CONFIG_PATH = (
     / "configs"
     / "lowlevel"
     / "goal182"
-    / "train_finetune_5d_m_seed86201.json"
+    / "train_mod2_pe2e_finetune_5d_m_seed86201.json"
 )
 GOAL182_RESIDUAL_CONFIG_PATH = (
     Path(__file__).resolve().parents[1]
     / "configs"
     / "lowlevel"
     / "goal182"
-    / "train_residual_5d_m_seed86201.json"
+    / "train_mod2_pe2e_residual_5d_m_seed86201.json"
 )
 GOAL182_TRRES_CMD_CONFIG_PATH = (
     Path(__file__).resolve().parents[1]
     / "configs"
     / "lowlevel"
     / "goal182"
-    / "train_trres_cmd_5d_m_seed86201.json"
+    / "train_mod2_alosb_trres_cmd_5d_m_seed86201.json"
 )
 GOAL182_TRRES_ACT_CONFIG_PATH = (
     Path(__file__).resolve().parents[1]
     / "configs"
     / "lowlevel"
     / "goal182"
-    / "train_trres_act_5d_m_seed86201.json"
+    / "train_mod2_alosb_trres_act_5d_m_seed86201.json"
 )
 GOAL182_ALOS_ENV_PATH = (
     Path(__file__).resolve().parents[1]

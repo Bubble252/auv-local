@@ -150,6 +150,53 @@ def test_hook_promotes_after_two_passes(tmp_path: Path) -> None:
     assert [row["decision"] for row in records] == ["CONTINUE", "PROMOTE"]
 
 
+def test_stage_boundary_eval_waits_for_soft_budget_and_retries_after_window(
+    tmp_path: Path,
+) -> None:
+    sampler = CurriculumStageSampler(stage_mix=(("C0", 1.0),))
+    controller = CurriculumPromotionController(start_stage="C0")
+    evaluations = [
+        StageEvaluation(
+            0.95, 0.80, 0.0, 0.0, 0.0,
+            stratified_default_success={"default": 0.95},
+        ),
+        StageEvaluation(
+            0.95, 0.80, 0.0, 0.0, 0.0,
+            stratified_default_success={"default": 0.95},
+        ),
+    ]
+    calls: list[tuple[str, int]] = []
+
+    def evaluate(stage: str, transitions: int) -> StageEvaluation:
+        calls.append((stage, transitions))
+        return evaluations.pop(0)
+
+    hook = CurriculumTrainerHook(
+        controller=controller,
+        sampler=sampler,
+        output_dir=tmp_path,
+        eval_interval_transitions=1,
+        evaluate=evaluate,
+        stage_boundary_evals=True,
+        stage_boundary_retry_iterations=20,
+    )
+
+    assert hook.maybe_update(10_000, completed_iterations=71) is None
+    assert calls == []
+    assert hook.maybe_update(20_000, completed_iterations=72) == CurriculumDecision.CONTINUE
+    assert calls == [("C0", 20_000)]
+    assert hook.maybe_update(30_000, completed_iterations=91) is None
+    assert len(calls) == 1
+    assert hook.maybe_update(40_000, completed_iterations=92) == CurriculumDecision.PROMOTE
+    assert calls == [("C0", 20_000), ("C0", 40_000)]
+    assert hook.stage == "C1"
+    assert hook._next_stage_eval_iteration == 200
+
+    state = json.loads((tmp_path / "curriculum_state.json").read_text())
+    assert state["eval_schedule"] == "stage_boundary"
+    assert state["next_eval_iteration"] == 200
+
+
 def test_hook_rolls_back_after_two_severe_failures(tmp_path: Path) -> None:
     sampler = CurriculumStageSampler(stage_mix=(("C2", 1.0),))
     controller = CurriculumPromotionController(start_stage="C2")
