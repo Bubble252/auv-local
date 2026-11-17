@@ -15,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 GOVERNANCE = REPO_ROOT / "configs" / "governance"
 AXIS_PATH = GOVERNANCE / "goal182_axis_registry.json"
 INDEX_PATH = GOVERNANCE / "goal182_core_composition_index.json"
+FREEZE_MANIFEST = GOVERNANCE / "goal182_matrix_freeze.json"
 MATRIX_SCHEMA = "auv_core_composition_matrix.v1"
 TRAINING_PROFILE = "PPO-FLAT-4096x48-E5-MB4"
 ARM_RE = re.compile(r"^G182_INT_STACK_(MLP|TA)_(PE2E|ALOSB)_(BCFT|BCRES|TRRES_CMD|TRRES_ACT)_(MOD[0-4])$")
@@ -44,6 +45,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--schema-only", action="store_true")
     parser.add_argument("--index", type=Path, default=INDEX_PATH)
+    parser.add_argument("--freeze-manifest", type=Path, default=FREEZE_MANIFEST)
+    parser.add_argument("--require-frozen", action="store_true")
     return parser.parse_args()
 
 
@@ -150,6 +153,23 @@ def main() -> int:
         return 0
     errors: list[str] = []
     axis_sha = _sha256(AXIS_PATH)
+    manifest_entries: dict[str, dict[str, Any]] = {}
+    if args.require_frozen:
+        if not args.freeze_manifest.is_file():
+            errors.append(f"freeze manifest not found: {args.freeze_manifest}")
+        else:
+            manifest = _load(args.freeze_manifest)
+            if manifest.get("schema_version") != "auv_goal182_matrix_freeze.v1":
+                errors.append("freeze manifest: wrong schema_version")
+            if manifest.get("goal_id") != "Goal182":
+                errors.append("freeze manifest: wrong goal_id")
+            if manifest.get("training_profile") != TRAINING_PROFILE:
+                errors.append("freeze manifest: wrong training_profile")
+            manifest_entries = {
+                str(entry.get("path")): entry
+                for entry in manifest.get("matrices", [])
+                if isinstance(entry, dict)
+            }
     index = _load(args.index)
     if index.get("schema_version") != "auv_core_composition_index.v1":
         errors.append("index: wrong schema_version")
@@ -167,6 +187,15 @@ def main() -> int:
             errors.append(f"index: missing matrix file {ref['path']}")
             continue
         matrix = _load(path)
+        relative = str(path.relative_to(REPO_ROOT))
+        if args.require_frozen:
+            if matrix.get("matrix_status") != "FROZEN":
+                errors.append(f"{relative}: matrix_status must be FROZEN")
+            entry = manifest_entries.get(relative)
+            if entry is None:
+                errors.append(f"freeze manifest: missing {relative}")
+            elif entry.get("sha256") != _sha256(path):
+                errors.append(f"freeze manifest: SHA mismatch for {relative}")
         for key in ("matrix_id", "program_group_id", "control_contract", "arm_count"):
             if ref.get(key) != matrix.get(key):
                 errors.append(f"index: {key} mismatch for {ref['path']}")

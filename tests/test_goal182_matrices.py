@@ -20,6 +20,19 @@ def run_checker() -> subprocess.CompletedProcess[str]:
     )
 
 
+def test_goal182_core_matrices_are_frozen_with_matching_sha() -> None:
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--require-frozen"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "PASS" in result.stdout
+    assert "arms=60" in result.stdout
+
+
 def test_goal182_core_matrices_have_60_unique_arms() -> None:
     pe2e = json.loads(PE2E.read_text(encoding="utf-8"))
     alosb = json.loads(ALOSB.read_text(encoding="utf-8"))

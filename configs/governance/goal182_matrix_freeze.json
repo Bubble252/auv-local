@@ -1,0 +1,36 @@
+{
+  "frozen_at": "2026-11-17",
+  "frozen_by": "user-confirmed D13.6 freeze and A0/A3 3D priority (2026-11-17)",
+  "goal_id": "Goal182",
+  "matrices": [
+    {
+      "arm_count": 20,
+      "matrix_id": "G182-CORE-PE2E",
+      "matrix_status": "FROZEN",
+      "path": "configs/governance/goal182_core_pe2e_matrix.json",
+      "sha256": "3b6c4c21386ace325c99e6c011ba9ce559b605129fcb49cddf95941c6c7cd3a8"
+    },
+    {
+      "arm_count": 40,
+      "matrix_id": "G182-CORE-ALOSB",
+      "matrix_status": "FROZEN",
+      "path": "configs/governance/goal182_core_alosb_matrix.json",
+      "sha256": "43d22c3d6ac34bb3b4a3e4c292fe08514d2d17e67bd6b012082b0435bb9fad20"
+    },
+    {
+      "matrix_id": "G182-EVAL",
+      "matrix_status": "FROZEN",
+      "path": "configs/governance/goal182_eval_matrix.json",
+      "sha256": "dafaeef2aac45fed9f496a4b88c33c07b2b4ba78051f1b60568bb9cc7049a491",
+      "tiers": {
+        "DEPTH_GENERALIZATION": "FROZEN",
+        "EXTERNAL_GEOMETRY_SUITE": "FROZEN",
+        "MAIN_RANKING": "FROZEN",
+        "ROUTE_GENERALIZATION": "FROZEN",
+        "SPEED_ENVELOPE": "FROZEN"
+      }
+    }
+  ],
+  "schema_version": "auv_goal182_matrix_freeze.v1",
+  "training_profile": "PPO-FLAT-4096x48-E5-MB4"
+}

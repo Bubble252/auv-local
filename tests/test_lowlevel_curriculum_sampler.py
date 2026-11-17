@@ -452,7 +452,6 @@ def test_route_gate_window_requires_three_consecutive_passes_in_enforce_mode() -
     thresholds = RouteGateThresholds(
         cross_track_rmse_max_m=0.25,
         vertical_rmse_max_m=0.25,
-        pre_goal_3d_rmse_max_m=0.35,
         completion_min=0.8,
         safety_max=0.01,
     )

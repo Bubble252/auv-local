@@ -2,7 +2,7 @@
 
 **状态**：`ACTIVE`<br>
 **范围**：只审计 Goal182 从“文档契约”到“可启动训练”之间的基础设施、配置、schema、checker 和服务器执行面。不重新讨论已经拍板的科学问题。<br>
-**结论先行**：actor metadata、矩阵、导航 profile、curriculum iteration hard cap、reset 初态、训练 route telemetry、warmstart/composition 一等字段、正式 TRRES config、正式评价 nominal 起点、StageGate enforce、canonical evaluation report/launcher/auditor 均已落地；正式训练仍被 D13.6 决策、A0/A3 选择和服务器干净 worktree 阻断。
+**结论先行**：actor metadata、矩阵、导航 profile、curriculum iteration hard cap、reset 初态、训练 route telemetry、warmstart/composition 一等字段、正式 TRRES config、正式评价 nominal 起点、StageGate enforce、canonical evaluation report/launcher/auditor、D13.6 参数冻结和 matrix SHA-256 冻结均已落地；当前只剩服务器 contract smoke / quick screen 与正式 C0→C6 训练 config 生成。
 
 ## 1. 审计口径
 
@@ -79,9 +79,9 @@
 | 评价 canonical artifacts | 每个 run 固定写 `summary.json`、`episodes.jsonl`、`trace.npz` | evaluator 现在默认写 `summary.json`、`summary.md`、`episodes.jsonl`、`trace.npz`；episode 与 trace 共用 `episode_id`，episodes 增加 `path_steps/pre_goal_path_steps` 供复算 | `FIXED` | `src/auv_lowlevel/cli/evaluate_pc_ppo/main.py`、`episodes.py`、`runner.py`；canonical artifact 与 auditor 已纳入全量回归 |
 | 评价 artifact auditor | 启动器结束阶段必须审计 canonical 产物并非零退出 | `scripts/audit_goal182_artifacts.py` 审计单 run 的 `summary/episodes/trace`、`episode_id` 对齐和主指标复算；eval-set 模式进一步校验 `matrix_manifest` 完整性、`report_rows` 可复算、压力分节和未声明 run | `FIXED` | `tests/test_goal182_artifact_audit.py`、`tests/test_goal182_eval_report.py`；缺 episodes、trace id mismatch、report metric drift 均非零退出 |
 | 正式评价 launcher | 先跑协议检查，再跑评价，最后 build report + auditor，任一步失败非零退出 | 新增 `scripts/run_goal182_eval.py`：校验 eval matrix 与 held-out，调用 standing runner，生成 `matrix_manifest/report_rows/report.md`，再调用 auditor；`formal*` phase 强制 matrix/tier 均为 `FROZEN` | `FIXED` | `scripts/build_goal182_eval_report.py`；`tests/test_goal182_eval_launcher.py` 覆盖 dry-run 接线和 DRAFT 拒绝 |
-| D13.6 StageGate | 阈值和 shadow 切换点冻结 | 仍待用户定夺 | `USER_DECISION` | 只实现 shadow telemetry 和标定入口，不拍数字；冻结前不能启动正式训练 |
+| D13.6 StageGate | 阈值和 shadow 切换点冻结 | 用户 2026-11-17 确认按推荐冻结；margin 只保留 cross/vertical，不设 pre-goal 3D margin | `FIXED` | 参数见 §8；首波 shadow，阈值表由 reference + P0 rollout 标定后切换 enforce |
 | 服务器 worktree | 从新 commit 建干净 worktree | 旧 Goal182 worktree 全是 `c186c74`，dirty 文件数分别为 12 / 40 / 66 | `LEGACY_ONLY` | 不复用旧 worktree；新 commit 推送后新建 |
-| 服务器 bare main | 与本地待执行文档一致 | 仍为 `c186c74 fix(goal175): keep A1 pressure configs from curriculum override` | `BLOCKER` | 本地 commit/push 经用户批准后再同步 |
+| 服务器 bare main | 与本地待执行文档一致 | 已到 `a1a62c9`，worktree `20261117-goal182-infra-a1a62c9` 干净 | `PASS` | 新 commit 推送后从新 tip 建 run worktree |
 
 ## 4. 冲突审计
 
@@ -224,10 +224,10 @@ cd 总协调
 
 | 门禁 | 状态 | 原因 |
 |---|---|---|
-| `CONTRACT_SMOKE` | `BLOCKER` | 基础设施已闭环；服务器干净 worktree 需要用户批准 commit/push |
-| `QUICK_SCREEN` | `BLOCKER` | 等待 `CONTRACT_SMOKE`；首波 matrix 已生成 |
-| 正式训练 | `BLOCKER` | D13.6 未冻结；matrix 仍为 DRAFT；服务器 bare main 仍是旧 commit |
-| 正式评价 | `BLOCKER` | canonical launcher/report/auditor 已就绪；eval matrix 仍为 DRAFT，正式冻结待 D13.6 |
+| `CONTRACT_SMOKE` | `READY` | 服务器 worktree 干净；TRRES_CMD C3 smoke 待跑 |
+| `QUICK_SCREEN` | `READY` | 等待 `CONTRACT_SMOKE`；首波 matrix 已冻结 |
+| 正式训练 | `BLOCKER` | D13.6 与 matrix 已冻结；仍缺正式 C0→C6、3-seed 训练 config 生成与 profile 检查 |
+| 正式评价 | `PASS` | canonical launcher/report/auditor 已就绪；eval matrix 与全部 tier 已冻结并有 SHA-256 清单 |
 
 ## 7. 下一轮最小垂直切片
 
@@ -239,21 +239,24 @@ cd 总协调
 2c. [x] 实现正式评价 launcher：协议检查 → evaluation → canonical report → auditor，任一步失败非零退出；`formal*` phase 拒绝 DRAFT matrix/tier；
 3. [x] 生成正式 TRRES config，并让 launcher 自动运行 training-profile checker；
 4. [x] 把 `LC_BC_FINETUNE` 的 warmstart SHA 和可训练范围写成一等字段；
-5. 等 D13.6 阈值和行为决策；
-6. 跑 1–2 iteration contract smoke 和 `QUICK_SCREEN`（1 seed × 5 iterations，固定 C3）；
-7. 达到可启动状态后，等用户明确批准 commit/push，再同步服务器并新建干净 worktree。
+5. [x] D13.6 阈值和行为决策：按推荐冻结，margin 去掉 pre-goal 3D；
+5b. [x] 冻结 core/eval matrix 并生成 `goal182_matrix_freeze.json` SHA-256 清单；
+5c. [x] 记录 A0/A3：A1 rudder、A2 stern、A3 3D 进入 screen，A0_HISTORICAL 只作历史锚点，3D 为正式主线；
+6. [ ] 跑 1–2 iteration contract smoke 和 `QUICK_SCREEN`（1 seed × 5 iterations，固定 C3）；
+7. [ ] 生成正式 C0→C6、3-seed 训练 config，跑 profile 检查后再启动正式训练。
 
-## 8. D13.6 待拍板项（不涉及具体噪声值）
+## 8. D13.6 已冻结参数（2026-11-17）
 
-阈值公式已经冻结，但下面四个执行参数仍需要用户确认；在确认前只能做 shadow
-telemetry，不能把 route gate 切到 enforce。
+用户确认按推荐冻结。阈值公式保持不变；margin 只用于 cross/vertical，不再要求
+`pre_goal_3d_rmse_m` margin。`pre_goal_3d_rmse_m` 仍作为 telemetry 记录，但不进入
+routine route gate。
 
-| 编号 | 问题 | 推荐 | 理由 |
+| 编号 | 问题 | 冻结值 | 说明 |
 |---|---|---|---|
-| `D13.6a` | routine gate 是否必须先跑满 stage 的 soft iteration cap？ | **是**：C0–C6 分别至少 `72/108/156/216/252/336/420` iterations | 参考工程每个 stage 都有 `min_iterations`；`enforce` 已把 `soft_budget_iterations` 作为 route gate 的 `min_iterations` 使用。该数值仍待用户确认后冻结 |
-| `D13.6b` | 阈值从哪里标定？ | **分开标定**：边界/final 用冻结 5D BC + ALOS reference；routine 用一次专门的 P0 训练 rollout | 遵守“不得用 treatment 结果回调阈值”；不能拿某一个 MOD4 arm 的结果当别人的门槛 |
-| `D13.6c` | 初始 margin 和 completion floor 是否采用文档建议值？ | **采用**：cross/vertical margin `0.10`、pre-goal 3D margin `0.05`、`completion_min=min(0.90, reference_completion-0.05)` 且不低于 `0.80` | 与 §4.9.2 已确认公式一致，只需确认是否按此冻结 |
-| `D13.6d` | shadow 何时切成 enforce？ | **首波先 shadow**：至少覆盖一个完整 stage 边界和一次最终 formal；阈值表冻结后，从下一个 module-set 开始 enforce | 满足 Goal182 “先 shadow 后 enforce”，同时避免同一批 treatment 结果既当标定又当验证 |
+| `D13.6a` | routine gate 是否必须先跑满 stage 的 soft iteration cap？ | **是**：C0–C6 分别至少 `72/108/156/216/252/336/420` iterations | `enforce` 把 `soft_budget_iterations` 作为 route gate 的 `min_iterations` |
+| `D13.6b` | 阈值从哪里标定？ | **分开标定**：边界/final 用冻结 5D BC + ALOS reference；routine 用专门的 P0 训练 rollout | 不得用 treatment 结果回调阈值 |
+| `D13.6c` | margin 和 completion floor 采用什么值？ | cross/vertical margin `0.10`；**不设 `pre_goal_3d_rmse_m` margin**；`completion_min=min(0.90, reference_completion-0.05)` 且不低于 `0.80` | `pre_goal_3d_rmse_m` 只作 telemetry |
+| `D13.6d` | shadow 何时切成 enforce？ | **首波先 shadow**：至少覆盖一个完整 stage 边界和一次最终 formal；阈值表冻结后，从下一个 module-set 开始 enforce | 避免同一批 treatment 结果既当标定又当验证 |
 
 ## 9. 决策记录
 
@@ -266,3 +269,6 @@ telemetry，不能把 route gate 切到 enforce。
 | 2026-11-17 | canonical 评价产物 | evaluator 默认写 `episodes.jsonl` 与 `trace.npz`；episode/trace 共用 `episode_id`，并增加可复算所需的 path-step 权重 | 正式 run 不再依赖显式 `--trace-output`；artifact auditor 可对单 run 和 eval set 做非零退出检查 |
 | 2026-11-17 | formal evaluation launcher | 新增 `run_goal182_eval.py` 和 `build_goal182_eval_report.py`；报告按 pressure 分节，eval-set auditor 从 run 明细复算 report rows，正式 phase 只接受 FROZEN matrix/tier | 正式评价产物链路闭环；不再需要手工散表或手填主表数字 |
 | 2026-11-17 | ALOS guidance telemetry | evaluator 补记 horizontal gain/lookahead、lookahead error gain、adaptive flag 和 terminal alignment；旧六臂结果因主指标完全相同标 `LEGACY_ONLY` | 新 ALOS screen 才能证明干预实际生效；A0/A3 选择不得引用旧结果 |
+| 2026-11-17 | D13.6 冻结 | 用户确认 D13.6a–d 按推荐冻结；margin 只保留 cross/vertical `0.10`，不设 pre-goal 3D margin；completion floor `0.80–0.90`；首波 shadow | route gate 不再消费 `pre_goal_3d_rmse_m`；该指标只作 telemetry |
+| 2026-11-17 | A0/A3 选择 | A1 rudder、A2 stern、A3 3D 进入 screen；A0_HISTORICAL 只作历史锚点；3D 为正式主线 | screen 不得引用旧 ALOS 六臂结果；正式训练用 3D authority |
+| 2026-11-17 | matrix 冻结 | core PE2E/ALOSB 与 eval matrix 全部 `FROZEN`；SHA-256 写入 `goal182_matrix_freeze.json` | formal launcher/checker 要求 FROZEN；builder 默认拒绝覆盖 |

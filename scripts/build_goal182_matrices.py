@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -13,6 +14,7 @@ GOVERNANCE = REPO_ROOT / "configs" / "governance"
 AXIS_PATH = GOVERNANCE / "goal182_axis_registry.json"
 MATRIX_SCHEMA = "auv_core_composition_matrix.v1"
 INDEX_SCHEMA = "auv_core_composition_index.v1"
+FREEZE_MANIFEST = GOVERNANCE / "goal182_matrix_freeze.json"
 TRAINING_PROFILE = "PPO-FLAT-4096x48-E5-MB4"
 
 ACTOR_BACKENDS = ("MLP", "TA")
@@ -116,7 +118,23 @@ def _matrix(control: str) -> dict[str, Any]:
     }
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--force-unfreeze",
+        action="store_true",
+        help="overwrite matrices even if a freeze manifest exists",
+    )
+    return parser.parse_args()
+
+
 def main() -> None:
+    args = parse_args()
+    if FREEZE_MANIFEST.is_file() and not args.force_unfreeze:
+        raise SystemExit(
+            f"refusing to overwrite frozen matrices; {FREEZE_MANIFEST} exists. "
+            "Use --force-unfreeze only with an explicit protocol decision."
+        )
     pe2e = _matrix("PE2E")
     alosb = _matrix("ALOSB")
     for control, payload in (("PE2E", pe2e), ("ALOSB", alosb)):

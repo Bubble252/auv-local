@@ -166,6 +166,8 @@ def main() -> int:
         "--matrix",
         str(_resolve(args.eval_matrix)),
     ]
+    if "formal" in args.phase.lower():
+        matrix_check.append("--require-frozen")
     returncode = _run(matrix_check)
     if returncode != 0:
         return returncode

@@ -19,7 +19,6 @@ from typing import Any
 METRIC_KEYS = {
     "cross_track_rmse_max_m": "/episode/cross_track_rmse_mean",
     "vertical_rmse_max_m": "/episode/vertical_rmse_mean",
-    "pre_goal_3d_rmse_max_m": "/episode/pre_goal_3d_rmse_mean",
 }
 COMPLETION_KEY = "/episode/path_completion_mean"
 
@@ -93,7 +92,6 @@ def build_thresholds(
     *,
     cross_margin: float,
     vertical_margin: float,
-    three_d_margin: float,
     completion_margin: float = 0.05,
     completion_floor: float = 0.80,
     completion_ceiling: float = 0.90,
@@ -114,7 +112,6 @@ def build_thresholds(
     return {
         "cross_track_rmse_max_m": upper("cross_track_rmse_max_m", cross_margin),
         "vertical_rmse_max_m": upper("vertical_rmse_max_m", vertical_margin),
-        "pre_goal_3d_rmse_max_m": upper("pre_goal_3d_rmse_max_m", three_d_margin),
         "completion_min": float(completion_min),
         "safety_max": float(safety_max),
     }
@@ -128,7 +125,6 @@ def main() -> int:
     parser.add_argument("--window-size", type=int, default=20)
     parser.add_argument("--cross-margin", type=float, default=0.10)
     parser.add_argument("--vertical-margin", type=float, default=0.10)
-    parser.add_argument("--three-d-margin", type=float, default=0.05)
     parser.add_argument("--completion-margin", type=float, default=0.05)
     parser.add_argument("--completion-floor", type=float, default=0.80)
     parser.add_argument("--completion-ceiling", type=float, default=0.90)
@@ -147,7 +143,6 @@ def main() -> int:
         calibration,
         cross_margin=args.cross_margin,
         vertical_margin=args.vertical_margin,
-        three_d_margin=args.three_d_margin,
         completion_margin=args.completion_margin,
         completion_floor=args.completion_floor,
         completion_ceiling=args.completion_ceiling,

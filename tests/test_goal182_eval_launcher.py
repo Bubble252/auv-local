@@ -77,6 +77,16 @@ def test_launcher_dry_run_wires_protocol_and_disables_legacy_analyzer(tmp_path: 
 
 
 def test_formal_phase_rejects_draft_matrix(tmp_path: Path) -> None:
+    matrix = json.loads(
+        (ROOT / "configs" / "governance" / "goal182_eval_matrix.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    matrix["matrix_status"] = "DRAFT"
+    for tier in matrix["tiers"]:
+        tier["status"] = "DRAFT"
+    draft = tmp_path / "draft_eval_matrix.json"
+    draft.write_text(json.dumps(matrix), encoding="utf-8")
     completed = subprocess.run(
         [
             sys.executable,
@@ -87,6 +97,8 @@ def test_formal_phase_rejects_draft_matrix(tmp_path: Path) -> None:
             str(tmp_path / "arms.json"),
             "--output-root",
             str(tmp_path / "eval"),
+            "--eval-matrix",
+            str(draft),
             "--matrix-id",
             "G182-EVAL",
             "--tier",

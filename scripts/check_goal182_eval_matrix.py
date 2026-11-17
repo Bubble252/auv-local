@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -11,12 +12,15 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MATRIX = ROOT / "configs" / "governance" / "goal182_eval_matrix.json"
+DEFAULT_FREEZE_MANIFEST = ROOT / "configs" / "governance" / "goal182_matrix_freeze.json"
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
     parser.add_argument("--schema-only", action="store_true")
+    parser.add_argument("--freeze-manifest", type=Path, default=DEFAULT_FREEZE_MANIFEST)
+    parser.add_argument("--require-frozen", action="store_true")
     return parser.parse_args()
 
 
@@ -25,6 +29,10 @@ def _load(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"{path}: expected a JSON object")
     return payload
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _tier_errors(tier: dict[str, Any], top: dict[str, Any], errors: list[str]) -> None:
@@ -117,11 +125,37 @@ def main() -> int:
         errors.append(f"tier order/ids mismatch: {ids}")
     for tier in tiers:
         _tier_errors(tier, matrix, errors)
+    if args.require_frozen:
+        if matrix.get("matrix_status") != "FROZEN":
+            errors.append("formal evaluation requires matrix_status=FROZEN")
+        frozen_offenders = [
+            str(tier.get("tier_id"))
+            for tier in tiers
+            if tier.get("status") != "FROZEN"
+        ]
+        if frozen_offenders:
+            errors.append(f"formal evaluation requires FROZEN tiers; got {frozen_offenders}")
+        if not args.freeze_manifest.is_file():
+            errors.append(f"freeze manifest not found: {args.freeze_manifest}")
+        else:
+            manifest = _load(args.freeze_manifest)
+            relative = str(args.matrix.resolve().relative_to(ROOT))
+            entries = {
+                str(entry.get("path")): entry
+                for entry in manifest.get("matrices", [])
+                if isinstance(entry, dict)
+            }
+            entry = entries.get(relative)
+            if entry is None:
+                errors.append(f"freeze manifest: missing {relative}")
+            elif entry.get("sha256") != _sha256(args.matrix):
+                errors.append(f"freeze manifest: SHA mismatch for {relative}")
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)
         return 1
-    print("PASS goal182 eval matrix")
+    suffix = " frozen" if args.require_frozen else ""
+    print(f"PASS goal182 eval matrix{suffix}")
     return 0
 
 

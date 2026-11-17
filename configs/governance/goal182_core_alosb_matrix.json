@@ -729,7 +729,7 @@
   "goal_id": "Goal182",
   "matrix_family_id": "G182-CORE-COMP",
   "matrix_id": "G182-CORE-ALOSB",
-  "matrix_status": "DRAFT",
+  "matrix_status": "FROZEN",
   "program_group_id": "G-ALOS-BODY-RL",
   "schema_version": "auv_core_composition_matrix.v1",
   "training_profile": "PPO-FLAT-4096x48-E5-MB4"

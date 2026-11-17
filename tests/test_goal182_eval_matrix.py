@@ -33,3 +33,15 @@ def test_goal182_eval_matrix_checker_passes() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "PASS" in result.stdout
+
+
+def test_goal182_eval_matrix_checker_requires_frozen_matrix() -> None:
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--require-frozen"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "PASS goal182 eval matrix frozen" in result.stdout

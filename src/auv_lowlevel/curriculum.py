@@ -878,16 +878,11 @@ class RouteGateThresholds:
 
     cross_track_rmse_max_m: float
     vertical_rmse_max_m: float
-    pre_goal_3d_rmse_max_m: float
     completion_min: float
     safety_max: float = 0.0
 
     def __post_init__(self) -> None:
-        for name in (
-            "cross_track_rmse_max_m",
-            "vertical_rmse_max_m",
-            "pre_goal_3d_rmse_max_m",
-        ):
+        for name in ("cross_track_rmse_max_m", "vertical_rmse_max_m"):
             value = float(getattr(self, name))
             if not math.isfinite(value) or value < 0.0:
                 raise ValueError(f"RouteGateThresholds.{name} must be finite and non-negative")
@@ -901,7 +896,6 @@ class RouteGateThresholds:
         required = {
             "cross_track_rmse_max_m",
             "vertical_rmse_max_m",
-            "pre_goal_3d_rmse_max_m",
             "completion_min",
         }
         missing = required.difference(value)
@@ -913,7 +907,6 @@ class RouteGateThresholds:
         return cls(
             cross_track_rmse_max_m=float(value["cross_track_rmse_max_m"]),
             vertical_rmse_max_m=float(value["vertical_rmse_max_m"]),
-            pre_goal_3d_rmse_max_m=float(value["pre_goal_3d_rmse_max_m"]),
             completion_min=float(value["completion_min"]),
             safety_max=float(value.get("safety_max", 0.0)),
         )
@@ -922,7 +915,6 @@ class RouteGateThresholds:
         return {
             "cross_track_rmse_max_m": float(self.cross_track_rmse_max_m),
             "vertical_rmse_max_m": float(self.vertical_rmse_max_m),
-            "pre_goal_3d_rmse_max_m": float(self.pre_goal_3d_rmse_max_m),
             "completion_min": float(self.completion_min),
             "safety_max": float(self.safety_max),
         }
@@ -931,7 +923,6 @@ class RouteGateThresholds:
 ROUTE_GATE_METRIC_KEYS = {
     "cross_track_rmse_m": "/episode/cross_track_rmse_mean",
     "vertical_rmse_m": "/episode/vertical_rmse_mean",
-    "pre_goal_3d_rmse_m": "/episode/pre_goal_3d_rmse_mean",
     "completion_ratio": "/episode/path_completion_mean",
     "safety_rate": "/episode/safety_termination_rate",
 }
@@ -1037,7 +1028,6 @@ class RouteGateWindow:
             would_pass = bool(
                 means["cross_track_rmse_m"] <= thresholds.cross_track_rmse_max_m
                 and means["vertical_rmse_m"] <= thresholds.vertical_rmse_max_m
-                and means["pre_goal_3d_rmse_m"] <= thresholds.pre_goal_3d_rmse_max_m
                 and means["completion_ratio"] >= thresholds.completion_min
                 and means["safety_rate"] <= thresholds.safety_max
             )

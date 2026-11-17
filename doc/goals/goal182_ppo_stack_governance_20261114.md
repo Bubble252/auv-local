@@ -772,8 +772,7 @@ ALOS 不再用 `guidance.minimum_speed_ratio * cruise_speed` 抬高下限，终�
 | 硬否决 | `safety_rate` | 超过当前 stage `safety_max` 即不晋级 |
 | 防停滞 | `path_completion_ratio` | 低于 `completion_min[stage]` 即不晋级 |
 | 主 route | `path_horizontal_rmse_m`、`path_vertical_rmse_m` | 分别低于 `cross_rmse_max[stage]`、`vertical_rmse_max[stage]` |
-| 次级 route | `pre_goal_3d_rmse_m` | 低于 `pre_goal_3d_rmse_max[stage]`；无有效 pre-goal 步时该 stage 配置无效 |
-| 仅诊断 | `timeout_rate`、`plane_miss_rate`、`success_rate`、`path_three_d_rmse_m`、overshoot、terminal longitudinal | 写入 summary/decision log，但不参与 pass/fail |
+| 仅诊断 | `timeout_rate`、`plane_miss_rate`、`success_rate`、`path_three_d_rmse_m`、`pre_goal_3d_rmse_m`、overshoot、terminal longitudinal | 写入 summary/decision log，但不参与 pass/fail |
 
 补充规则：
 
@@ -789,7 +788,7 @@ ALOS 不再用 `guidance.minimum_speed_ratio * cruise_speed` 抬高下限，终�
   但被另一项平均掉。
 - 课程 routine 晋级使用训练 rollout 的 20/3 规则；frozen-dev 只在 stage 边界和最终
   formal 评价运行，不承担每 20 iterations 的晋级判断。
-- routine 晋级使用的 `completion_min`、cross/vertical 上限、pre-goal 上限，由 P0
+- routine 晋级使用的 `completion_min`、cross/vertical 上限，由 P0
   baseline 的训练 rollout 20-iteration 分布标定；边界/final 的 frozen-dev 阈值另表
   标定。两张表都写入并冻结后使用，不得混用，也不得用 treatment 结果回调阈值。
 - 首轮先运行 route-gate **shadow mode**：计算 `route_gate_would_pass` 并写日志，但不
@@ -818,7 +817,8 @@ ALOS 不再用 `guidance.minimum_speed_ratio * cruise_speed` 抬高下限，终�
 route_threshold = max(reference_mean * (1 + margin), reference_mean + 2 * reference_std)
 ```
 
-  cross/vertical 的 `margin` 初始建议 `0.10`，pre-goal 3D 初始建议 `0.05`；
+  cross/vertical 的 `margin` 初始建议 `0.10`；pre-goal 3D 不设 margin，只作
+  telemetry；
   `completion_min` 初始建议 `min(0.90, reference_completion - 0.05)`，且不低于
   `0.80`。这些系数在 P0 baseline 后冻结，不得根据 treatment 结果改。
 - 纯端到端和 ALOS 各自生成 routine 训练 rollout 表与边界 frozen-dev 表，分别写入
@@ -3008,7 +3008,7 @@ D13 已选方向（reward 目标已确认，StageGate 待定）：
 - **D13.3 `pc_ppo_scale` 单独处理**：暂保留 `0.01`，不与 reward 形状一起改；后续作为
   独立尺度因子比较 `0.01 / 0.1 / 1.0`，并观察 value loss、explained variance、grad norm。
 - **D13.4 StageGate v1 口径已确认**：硬否决只看 `safety`；防停滞用
-  `path_completion_ratio`；主门控为 cross/vertical RMSE，pre-goal 3D 作次级 guard；
+  `path_completion_ratio`；主门控为 cross/vertical RMSE；pre-goal 3D 仅作 telemetry；
   `timeout`、`plane_miss`、`success`、3D RMSE、overshoot 仅作诊断；routine 晋级用
   训练 rollout 的 20/3，frozen-dev 只在 stage 边界和最终 formal 运行。详见 §4.9.1。
 - **D13.5 阈值标定政策已确认**：纯端到端与 ALOS 分开生成 stage threshold 表，但使用
@@ -3161,7 +3161,8 @@ git diff --cached --check
 | 2026-11-15 | D10 网络容量与 Goal181 顺序 | 旧 `[256,128]` 退役；Goal182 固定 M 档 MLP `[512,256,128]` 选择 PPO profile，随后 Goal181 比较 M 档 Transformer vs M 档 MLP | 旧网络只作 `historical_only`；actor/critic 必须同容量 |
 | 2026-11-15 | D11 历史 baseline | 重跑 `P0_HISTORICAL`；先 1 seed screen，再补 3 seeds formal，作为共用新协议 baseline | 禁止跨协议直接比较历史结果 |
 | 2026-11-15 | D12 训练组织 | 不照搬参考式多 stage runner；保持单 run C0–C6 StageGate，晋级不重置网络/optimizer | 每轮使用当前 stage rollout 的 reward/return 更新，不存在 C0–C6 总奖励 |
-| 2026-11-15 | D13 reward/StageGate | 选择 C；两套 route-centric reward 修改目标表已确认（§4.9）；StageGate v1 口径已确认（§4.9.1）；阈值标定政策已确认（§4.9.2） | StageGate v1：`safety` 硬否决、completion 防停滞、cross/vertical 主门控、pre-goal 3D 次级 guard；`timeout/plane_miss/success/3D/overshoot` 仅诊断。纯端到端/ALOS 分开标定、首轮只做总体 gate、不设 success floor、先 shadow 后 enforce；具体阈值和切换点仍待定 |
+| 2026-11-15 | D13 reward/StageGate | 选择 C；两套 route-centric reward 修改目标表已确认（§4.9）；StageGate v1 口径已确认（§4.9.1）；阈值标定政策已确认（§4.9.2） | StageGate v1：`safety` 硬否决、completion 防停滞、cross/vertical 主门控；`timeout/plane_miss/success/3D/pre-goal 3D/overshoot` 仅诊断。纯端到端/ALOS 分开标定、首轮只做总体 gate、不设 success floor、先 shadow 后 enforce |
+| 2026-11-17 | D13.6 参数冻结 | 用户确认 D13.6a–d 按推荐冻结；cross/vertical margin `0.10`，不设 `pre_goal_3d_rmse_m` margin；completion floor `0.80–0.90`；首波 shadow | `pre_goal_3d_rmse_m` 仍记录但不进入 route gate；soft cap `72/108/156/216/252/336/420`；阈值分开标定 |
 | 2026-11-15 | D14 gamma/lambda | `gamma=0.995`、`lam=0.95` | 保留 AUV 长时程信用跨度，不照搬 `0.99` |
 | 2026-11-15 | D15 entropy | `entropy_coef=0.005` 作为所有新 arm 公共配置 | Phase 4 只改变 `init_std`，不把 entropy 混入探索因子 |
 | 2026-11-15 | D16 warmstart/checkpoint | 同一 BC 底座与残差初始化；fresh optimizer；iteration=0；final/early-stop checkpoint；禁止 dev best 和跨 arm resume | 保证 arm 公平并隔离验证集 |

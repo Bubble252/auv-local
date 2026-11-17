@@ -221,7 +221,6 @@ def _route_thresholds() -> RouteGateThresholds:
     return RouteGateThresholds(
         cross_track_rmse_max_m=0.25,
         vertical_rmse_max_m=0.25,
-        pre_goal_3d_rmse_max_m=0.35,
         completion_min=0.80,
         safety_max=0.0,
     )

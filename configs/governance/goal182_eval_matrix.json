@@ -1,91 +1,159 @@
 {
-  "schema_version": "auv_goal_matrix.v2",
+  "eval_seeds": [
+    90001,
+    90002,
+    90003
+  ],
   "goal_id": "Goal182",
-  "matrix_id": "G182-EVAL",
-  "matrix_status": "DRAFT",
-  "training_profile": "PPO-FLAT-4096x48-E5-MB4",
-  "pressure_levels": ["nominal", "current", "noise", "plant"],
-  "radii_m": [2.0],
-  "train_seeds": [86201, 86202, 86203],
-  "eval_seeds": [90001, 90002, 90003],
   "heldout": {
     "enabled": false,
     "seeds": []
   },
+  "heldout_rule": "held-out seeds 100-149 remain closed",
+  "matrix_id": "G182-EVAL",
+  "matrix_status": "FROZEN",
+  "pressure_levels": [
+    "nominal",
+    "current",
+    "noise",
+    "plant"
+  ],
+  "radii_m": [
+    2.0
+  ],
+  "reporting_rule": "report every pressure separately; never pool pressure levels before ranking",
+  "schema_version": "auv_goal_matrix.v2",
   "tiers": [
     {
+      "eval_seed_count": 3,
+      "expected_cells": 48,
+      "expected_episodes_per_arm": 144,
+      "pressure_levels": [
+        "nominal",
+        "current",
+        "noise",
+        "plant"
+      ],
+      "primary": true,
+      "radii_m": [
+        2.0
+      ],
+      "route_profiles": [
+        "stage_matched"
+      ],
+      "selection": "all formal arms",
+      "stage_levels": [
+        "C2",
+        "C3",
+        "C4",
+        "C6"
+      ],
+      "status": "FROZEN",
       "tier_id": "MAIN_RANKING",
-      "status": "DRAFT",
-      "selection": "all formal arms",
-      "stage_levels": ["C2", "C3", "C4", "C6"],
-      "pressure_levels": ["nominal", "current", "noise", "plant"],
-      "radii_m": [2.0],
-      "route_profiles": ["stage_matched"],
-      "train_seed_count": 3,
+      "train_seed_count": 3
+    },
+    {
       "eval_seed_count": 3,
       "expected_cells": 48,
       "expected_episodes_per_arm": 144,
-      "primary": true
-    },
-    {
+      "fixed_speeds_mps": [
+        1.0,
+        1.5,
+        2.0,
+        2.5
+      ],
+      "pressure_levels": [
+        "nominal"
+      ],
+      "primary": false,
+      "radii_m": [
+        2.0
+      ],
+      "route_profiles": [
+        "stage_matched"
+      ],
+      "selection": "all formal arms",
+      "stage_levels": [
+        "C2",
+        "C3",
+        "C4",
+        "C6"
+      ],
+      "status": "FROZEN",
       "tier_id": "SPEED_ENVELOPE",
-      "status": "DRAFT",
-      "selection": "all formal arms",
-      "stage_levels": ["C2", "C3", "C4", "C6"],
-      "pressure_levels": ["nominal"],
-      "fixed_speeds_mps": [1.0, 1.5, 2.0, 2.5],
-      "radii_m": [2.0],
-      "route_profiles": ["stage_matched"],
-      "train_seed_count": 3,
-      "eval_seed_count": 3,
-      "expected_cells": 48,
-      "expected_episodes_per_arm": 144,
-      "primary": false
+      "train_seed_count": 3
     },
     {
-      "tier_id": "ROUTE_GENERALIZATION",
-      "status": "DRAFT",
-      "selection": "top3_main_ranking",
-      "stage_levels": ["C6"],
-      "pressure_levels": ["nominal", "current", "noise", "plant"],
-      "radii_m": [2.0],
-      "route_profile_count": 22,
-      "route_profiles": {
-        "two_dimensional": 19,
-        "three_dimensional": 3
-      },
-      "train_seed_count": 3,
       "eval_seed_count": 3,
       "expected_cells": 264,
       "expected_episodes_per_arm": 792,
-      "primary": false
+      "pressure_levels": [
+        "nominal",
+        "current",
+        "noise",
+        "plant"
+      ],
+      "primary": false,
+      "radii_m": [
+        2.0
+      ],
+      "route_profile_count": 22,
+      "route_profiles": {
+        "three_dimensional": 3,
+        "two_dimensional": 19
+      },
+      "selection": "top3_main_ranking",
+      "stage_levels": [
+        "C6"
+      ],
+      "status": "FROZEN",
+      "tier_id": "ROUTE_GENERALIZATION",
+      "train_seed_count": 3
     },
     {
-      "tier_id": "DEPTH_GENERALIZATION",
-      "status": "DRAFT",
-      "selection": "top3_main_ranking",
-      "stage_levels": ["C6"],
-      "pressure_levels": ["nominal"],
-      "radii_m": [2.0],
-      "route_profiles": ["R_STRAIGHT", "R_3D_M"],
-      "depths_m": [10, 80, 250, 500],
-      "train_seed_count": 3,
+      "depths_m": [
+        10,
+        80,
+        250,
+        500
+      ],
       "eval_seed_count": 3,
       "expected_cells": 24,
       "expected_episodes_per_arm": 72,
-      "primary": false
+      "pressure_levels": [
+        "nominal"
+      ],
+      "primary": false,
+      "radii_m": [
+        2.0
+      ],
+      "route_profiles": [
+        "R_STRAIGHT",
+        "R_3D_M"
+      ],
+      "selection": "top3_main_ranking",
+      "stage_levels": [
+        "C6"
+      ],
+      "status": "FROZEN",
+      "tier_id": "DEPTH_GENERALIZATION",
+      "train_seed_count": 3
     },
     {
-      "tier_id": "EXTERNAL_GEOMETRY_SUITE",
-      "status": "DRAFT",
-      "selection": "final_winner",
-      "suite": "D",
-      "training_profile": "PPO-FLAT-4096x48-E5-MB4",
-      "may_select_winner": false,
       "may_select_checkpoint": false,
-      "primary": false
+      "may_select_winner": false,
+      "primary": false,
+      "selection": "final_winner",
+      "status": "FROZEN",
+      "suite": "D",
+      "tier_id": "EXTERNAL_GEOMETRY_SUITE",
+      "training_profile": "PPO-FLAT-4096x48-E5-MB4"
     }
   ],
-  "reporting_rule": "report every pressure separately; never pool pressure levels before ranking",
-  "heldout_rule": "held-out seeds 100-149 remain closed"
+  "train_seeds": [
+    86201,
+    86202,
+    86203
+  ],
+  "training_profile": "PPO-FLAT-4096x48-E5-MB4"
 }
