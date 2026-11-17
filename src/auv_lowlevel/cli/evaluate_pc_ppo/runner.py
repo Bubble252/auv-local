@@ -119,6 +119,8 @@ def _run(
     allow_start_progress_training_override: bool = False,
     require_nominal_start: bool = True,
     curriculum_stage: str | None = None,
+    route_profile: str | None = None,
+    depth_m: float | None = None,
     disable_curriculum_direct_command: bool = False,
     curriculum_current_speed_range_mps: tuple[float, float] | None = None,
     curriculum_shear_scale: float | None = None,
@@ -215,12 +217,8 @@ def _run(
         controller_override = load_config(controller_config_path).controller
         _validate_controller_pitch_override(config.controller, controller_override)
         config = replace(config, controller=controller_override)
-    config = _apply_eval_start_contract(
-        config, require_nominal_start=require_nominal_start
-    )
-    _validate_eval_start_contract(
-        config, require_nominal_start=require_nominal_start
-    )
+    config = _apply_eval_start_contract(config, require_nominal_start=require_nominal_start)
+    _validate_eval_start_contract(config, require_nominal_start=require_nominal_start)
     if config.arm != "PC" or config.policy_mode != "pure_controller":
         raise ValueError("environment config is not a PC pure-controller config")
     effective_current_override = curriculum_current_speed_range_mps
@@ -1347,6 +1345,8 @@ def _run(
         endpoint_stop_enabled=endpoint_stop_enabled,
         goal_radius_m=config.plant.goal_radius_m,
         success_frame=success_frame,
+        route_profile=route_profile,
+        depth_m=depth_m,
         plant_scale_factors=(
             None if inner.plant_scales is None else inner.plant_scales.detach().cpu().numpy()
         ),

@@ -17,6 +17,7 @@ MAX_JOBS="${MAX_JOBS:-2}"
 POLL_S="${POLL_S:-60}"
 ITERATIONS="${ITERATIONS:-2600}"
 GPU_WHITELIST="${GPU_WHITELIST:-0 1 6 7}"
+ROUTE_GATE_DIR="${ROUTE_GATE_DIR:-$W/configs/governance/route_gate}"
 
 STATUS="$R/queue_status.tsv"
 SUMMARY="$R/queue_summary.txt"
@@ -73,6 +74,8 @@ write_summary() {
     printf -- '- max concurrent jobs: `%s`\n' "$MAX_JOBS"
     printf -- '- minimum free GPU memory: `%s MiB`\n' "$MIN_FREE_MIB"
     printf -- '- GPU whitelist: `%s`\n' "$GPU_WHITELIST"
+    printf -- '- route gate dir: `%s`\n' "$ROUTE_GATE_DIR"
+    printf -- '- curriculum promotion: `TRAINING_ROLLOUT_20_3 enforce`\n'
     printf -- '- updated: `%s`\n\n' "$(date -Iseconds)"
     printf '## Status counts\n\n'
     awk -F '\t' 'NF {count[$1]++} END {for (key in count) printf "- %s: %d\n", key, count[key]}' "$STATUS" | sort
@@ -81,6 +84,68 @@ write_summary() {
     printf '```\n'
   } >"$tmp"
   mv "$tmp" "$SUMMARY"
+}
+
+route_thresholds_for() {
+  local control=$1
+  printf '%s/goal182_route_gate_%s_20_3.thresholds.json\n' \
+    "$ROUTE_GATE_DIR" "$(printf '%s' "$control" | tr '[:upper:]' '[:lower:]')"
+}
+
+validate_thresholds() {
+  local control=$1 path=$2
+  "$PY" - "$path" "$control" <<'PY'
+import json
+import math
+import sys
+
+path, control = sys.argv[1], sys.argv[2]
+try:
+    payload = json.load(open(path, encoding="utf-8"))
+except Exception as error:
+    raise SystemExit(f"{control}: cannot read thresholds {path}: {error}")
+thresholds = payload.get("thresholds", payload)
+if not isinstance(thresholds, dict):
+    raise SystemExit(f"{control}: thresholds payload must be an object")
+coverage = payload.get("stage_coverage")
+if not isinstance(coverage, dict):
+    raise SystemExit(f"{control}: thresholds missing stage_coverage")
+required_stages = {"C0", "C1", "C2", "C3", "C4", "C5", "C6"}
+covered = set(coverage.get("required", ()))
+if not required_stages.issubset(covered):
+    raise SystemExit(
+        f"{control}: thresholds must require C0-C6; got {sorted(covered)}"
+    )
+if coverage.get("missing"):
+    raise SystemExit(f"{control}: thresholds have missing stages {coverage['missing']}")
+if coverage.get("insufficient"):
+    raise SystemExit(
+        f"{control}: thresholds have insufficient stage records {coverage['insufficient']}"
+    )
+counts = coverage.get("counts", {})
+for stage in sorted(required_stages):
+    if int(counts.get(stage, 0)) < 20:
+        raise SystemExit(
+            f"{control}: stage {stage} has only {counts.get(stage, 0)} complete records"
+        )
+required = {
+    "cross_track_rmse_max_m",
+    "vertical_rmse_max_m",
+    "completion_min",
+}
+missing = required.difference(thresholds)
+if missing:
+    raise SystemExit(f"{control}: thresholds missing {sorted(missing)}")
+for key in ("cross_track_rmse_max_m", "vertical_rmse_max_m"):
+    value = float(thresholds[key])
+    if not math.isfinite(value) or value < 0.0:
+        raise SystemExit(f"{control}: invalid {key}={value}")
+for key in ("completion_min", "safety_max"):
+    value = float(thresholds.get(key, 0.0))
+    if not math.isfinite(value) or not 0.0 <= value <= 1.0:
+        raise SystemExit(f"{control}: invalid {key}={value}")
+print(f"{control}: {path}")
+PY
 }
 
 trap write_summary EXIT
@@ -97,7 +162,12 @@ try:
         payload = json.load(handle)
 except Exception:
     raise SystemExit(1)
-raise SystemExit(0 if payload.get("status") == "completed" else 1)
+completed = (
+    payload.get("status") == "completed"
+    and payload.get("curriculum_final_stage") == "C6"
+    and payload.get("curriculum_current_gate") == "TRAINING_ROLLOUT_20_3"
+)
+raise SystemExit(0 if completed else 1)
 PY
 }
 
@@ -133,13 +203,23 @@ free_gpu() {
 }
 
 launch_job() {
-  local job_index=$1 gpu=$2 spec name cfg out log pid seed
+  local job_index=$1 gpu=$2 spec name cfg out log pid seed control thresholds
   spec=${JOBS[$job_index]}
   name=${spec%%|*}
   cfg=${spec#*|}
   out="$R/formal/$name"
   log="$R/logs/$name.log"
   seed=${name##*seed}
+  case "$name" in
+    pe2e_*) control=PE2E ;;
+    alosb_*) control=ALOSB ;;
+    *)
+      printf 'UNKNOWN_CONTROL\t%s\n' "$name" | tee -a "$STATUS"
+      FAILED=1
+      return 1
+      ;;
+  esac
+  thresholds=$(route_thresholds_for "$control")
 
   if [ ! -f "$W/$cfg" ]; then
     printf 'MISSING_CONFIG\t%s\t%s\t%s\n' "$name" "$cfg" "$(date -Iseconds)" | tee -a "$STATUS"
@@ -158,7 +238,8 @@ launch_job() {
       --training-config "$W/$cfg" \
       --iterations "$ITERATIONS" \
       --curriculum-eval-stage-boundaries \
-      --curriculum-route-gate-mode shadow \
+      --curriculum-route-gate-mode enforce \
+      --curriculum-route-thresholds "$thresholds" \
       --output "$out" \
       --seed "$seed"
   ) >>"$log" 2>&1 &
@@ -199,7 +280,16 @@ for spec in "${JOBS[@]}"; do
   fi
 done
 
-printf 'QUEUE_START\t%s\tjobs=%s\tmax_jobs=%s\tmin_free_mib=%s\tgpu_whitelist=%s\n' \
+validate_thresholds PE2E "$(route_thresholds_for PE2E)" || exit 2
+validate_thresholds ALOSB "$(route_thresholds_for ALOSB)" || exit 2
+
+if [ "${DRY_RUN:-0}" = "1" ]; then
+  printf 'QUEUE_DRY_RUN_OK\t%s\tjobs=%s\troute_gate=enforce\n' \
+    "$(date -Iseconds)" "${#JOBS[@]}" | tee -a "$STATUS"
+  exit 0
+fi
+
+printf 'QUEUE_START\t%s\tjobs=%s\tmax_jobs=%s\tmin_free_mib=%s\tgpu_whitelist=%s\troute_gate=enforce\n' \
   "$(date -Iseconds)" "${#JOBS[@]}" "$MAX_JOBS" "$MIN_FREE_MIB" "$GPU_WHITELIST" | tee -a "$STATUS"
 write_summary
 

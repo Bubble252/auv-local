@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from auv_lowlevel._paths import resolve_from_root
+from auv_lowlevel.eval_pairing import audit_paired_zero, is_zero_arm
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ARMS_SCHEMA = "auv_pc_standing_eval_arms.v1"
@@ -85,9 +86,7 @@ def load_arms(
         seen.add(tag)
         evaluator = arm.get("evaluator")
         if evaluator not in SUPPORTED_EVALUATORS:
-            raise ValueError(
-                f"arm {tag!r} evaluator must be one of {sorted(SUPPORTED_EVALUATORS)}"
-            )
+            raise ValueError(f"arm {tag!r} evaluator must be one of {sorted(SUPPORTED_EVALUATORS)}")
         training_config = arm.get("training_config")
         if not isinstance(training_config, str) or not training_config:
             raise ValueError(f"arm {tag!r} training_config must be a non-empty string")
@@ -228,6 +227,12 @@ def build_command(
         )
         if arm.get("curriculum_stage") is not None:
             command.extend(["--curriculum-stage", str(arm["curriculum_stage"])])
+        scenario_axes = scenario.get("axes")
+        if isinstance(scenario_axes, dict):
+            if scenario_axes.get("route_profile") is not None:
+                command.extend(["--route-profile", str(scenario_axes["route_profile"])])
+            if scenario_axes.get("depth_m") is not None:
+                command.extend(["--depth-m", str(float(scenario_axes["depth_m"]))])
     elif evaluator == "bc_residual":
         command.extend(
             [
@@ -311,6 +316,10 @@ def build_jobs(
                     "arm_tag": tag,
                     "run_tag": run_tag,
                     "paradigm": arm.get("paradigm"),
+                    "learning_composition": arm.get("learning_composition"),
+                    "control_contract": arm.get("control_contract"),
+                    "paired_zero_tag": arm.get("paired_zero_tag"),
+                    "is_zero_baseline": is_zero_arm(arm),
                     "evaluator": arm["evaluator"],
                     "scenario": sid,
                     "output": _relative(output),
@@ -460,7 +469,9 @@ def main() -> int:
     output_root = _resolve(args.output_root)
     manifest = _load_json(manifest_path)
     arms = load_arms(arms_path, tags=args.tags)
-    seed_start = int(manifest.get("eval_seeds_start", 20) if args.seed_start is None else args.seed_start)
+    seed_start = int(
+        manifest.get("eval_seeds_start", 20) if args.seed_start is None else args.seed_start
+    )
     seed_count = int(manifest.get("eval_seeds", 40) if args.seed_count is None else args.seed_count)
     gpus = args.gpus.split()
     pythonpath = _pythonpath(None if args.sb3_root is None else _resolve(args.sb3_root))
@@ -476,6 +487,9 @@ def main() -> int:
         overwrite=args.overwrite,
         scenarios=args.scenarios,
     )
+    pairing_status, pairing_errors = audit_paired_zero(arms, selected_tags=args.tags)
+    for job in jobs:
+        job["zero_baseline_status"] = pairing_status.get(str(job["arm_tag"]), "UNKNOWN")
     plan = {
         "schema_version": "auv_pc_standing_eval_run_plan.v1",
         "manifest": _relative(manifest_path),
@@ -487,6 +501,7 @@ def main() -> int:
         "dtype": args.dtype,
         "gpus": gpus,
         "job_count": len(jobs),
+        "pairing": {"statuses": pairing_status, "errors": pairing_errors},
         "jobs": jobs,
     }
     if args.dry_run:
@@ -512,8 +527,10 @@ def main() -> int:
     paired_arms = has_paired_arms(jobs, zero_tag=args.zero_tag)
     if args.analyze and not paired_arms:
         print("zero-only selection: paired analyzer skipped; baseline summaries are complete")
-    if args.analyze and paired_arms and any(
-        (_resolve(item["output"]) / "summary.json").is_file() for item in results
+    if (
+        args.analyze
+        and paired_arms
+        and any((_resolve(item["output"]) / "summary.json").is_file() for item in results)
     ):
         command = [
             args.python,

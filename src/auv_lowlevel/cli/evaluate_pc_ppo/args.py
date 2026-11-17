@@ -89,6 +89,17 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="evaluate a fixed curriculum stage by sampling its episode parameters",
     )
     parser.add_argument(
+        "--route-profile",
+        default=None,
+        help="explicit route_profile label copied into every episode record",
+    )
+    parser.add_argument(
+        "--depth-m",
+        type=float,
+        default=None,
+        help="explicit absolute route depth copied into every episode record",
+    )
+    parser.add_argument(
         "--disable-curriculum-direct-command",
         action="store_true",
         help=(

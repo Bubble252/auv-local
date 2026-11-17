@@ -68,8 +68,12 @@ REQUIRED_REPORT_FIELDS = {
     "checkpoint_sha256",
     "stage",
     "route_profile",
+    "depth_m",
     "pressure_profile",
     "radius_m",
+    "learning_composition",
+    "is_zero_baseline",
+    "zero_baseline_status",
     "eval_seeds",
     "n_eval_episodes",
     "valid",
@@ -312,11 +316,24 @@ def _audit_manifest(root: Path) -> tuple[dict[str, Any], list[str]]:
     runs = manifest.get("runs")
     if not isinstance(runs, list) or not runs:
         errors.append(f"{manifest_path}: runs must be a non-empty list")
-    if manifest.get("expected_cells") != len(runs):
-        errors.append(f"{manifest_path}: expected_cells differs from runs length")
-    observed = sum(isinstance(run, dict) and bool(run.get("summary_sha256")) for run in runs)
+    policy_runs = [
+        run
+        for run in runs
+        if isinstance(run, dict) and not bool(run.get("is_zero_baseline", False))
+    ]
+    zero_runs = [
+        run for run in runs if isinstance(run, dict) and bool(run.get("is_zero_baseline", False))
+    ]
+    if manifest.get("expected_cells") != len(policy_runs):
+        errors.append(f"{manifest_path}: expected_cells differs from policy runs length")
+    observed = sum(bool(run.get("summary_sha256")) for run in policy_runs)
     if manifest.get("observed_cells") != observed:
         errors.append(f"{manifest_path}: observed_cells differs from run summaries")
+    if int(manifest.get("zero_cells", 0)) != len(zero_runs):
+        errors.append(f"{manifest_path}: zero_cells differs from zero runs length")
+    observed_zero = sum(bool(run.get("summary_sha256")) for run in zero_runs)
+    if int(manifest.get("observed_zero_cells", 0)) != observed_zero:
+        errors.append(f"{manifest_path}: observed_zero_cells differs from zero summaries")
     return manifest, errors
 
 
@@ -377,15 +394,22 @@ def _audit_report_counts(
     rows: list[dict[str, Any]],
     *,
     valid_cells: int,
+    valid_zero_cells: int,
+    zero_cells: int,
 ) -> list[str]:
     errors: list[str] = []
     manifest_runs = manifest.get("runs") if isinstance(manifest.get("runs"), list) else []
     if len(rows) != len(manifest_runs):
         errors.append(f"{report_path}: row count differs from matrix_manifest runs")
     if manifest.get("valid_cells") != valid_cells:
-        errors.append(f"{report_path}: valid_cells differs from report rows")
-    if manifest.get("invalid_cells") != len(rows) - valid_cells:
+        errors.append(f"{report_path}: valid_cells differs from policy report rows")
+    policy_cells = len(rows) - zero_cells
+    if manifest.get("invalid_cells") != policy_cells - valid_cells:
         errors.append(f"{report_path}: invalid_cells differs from report rows")
+    if int(manifest.get("zero_cells", 0)) != zero_cells:
+        errors.append(f"{report_path}: zero_cells differs from report rows")
+    if int(manifest.get("valid_zero_cells", 0)) != valid_zero_cells:
+        errors.append(f"{report_path}: valid_zero_cells differs from report rows")
     return errors
 
 
@@ -402,6 +426,8 @@ def _audit_report(root: Path, manifest: dict[str, Any]) -> list[str]:
     if not rows:
         return errors
     valid_cells = 0
+    valid_zero_cells = 0
+    zero_cells = 0
     run_dirs: list[Path] = []
     pressures: set[str] = set()
     for index, row in enumerate(rows):
@@ -409,11 +435,24 @@ def _audit_report(root: Path, manifest: dict[str, Any]) -> list[str]:
         errors.extend(row_errors)
         if run_dir is not None:
             run_dirs.append(run_dir)
-        if isinstance(row, dict) and row.get("valid") is True:
+        if isinstance(row, dict) and row.get("is_zero_baseline") is True:
+            zero_cells += 1
+            if row.get("valid") is True:
+                valid_zero_cells += 1
+        elif isinstance(row, dict) and row.get("valid") is True:
             valid_cells += 1
         if isinstance(row, dict) and row.get("pressure_profile"):
             pressures.add(str(row["pressure_profile"]))
-    errors.extend(_audit_report_counts(report_path, manifest, rows, valid_cells=valid_cells))
+    errors.extend(
+        _audit_report_counts(
+            report_path,
+            manifest,
+            rows,
+            valid_cells=valid_cells,
+            valid_zero_cells=valid_zero_cells,
+            zero_cells=zero_cells,
+        )
+    )
     errors.extend(_audit_pressure_sections(markdown_path, pressures))
     for run_dir in sorted(set(run_dirs)):
         errors.extend(audit_run(run_dir))

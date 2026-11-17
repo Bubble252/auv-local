@@ -1,0 +1,157 @@
+{
+  "actor": {
+    "actor_input_contract": "fused",
+    "actor_kind": "mlp",
+    "pooling": "none",
+    "token_contract": "none"
+  },
+  "algorithm": {
+    "clip_param": 0.2,
+    "desired_kl": 0.01,
+    "entropy_coef": 0.005,
+    "gamma": 0.995,
+    "lam": 0.95,
+    "learning_rate": 1e-12,
+    "max_grad_norm": 1.0,
+    "normalize_advantage_per_mini_batch": true,
+    "num_learning_epochs": 5,
+    "num_mini_batches": 4,
+    "schedule": "adaptive",
+    "use_clipped_value_loss": true,
+    "value_loss_coef": 1.0
+  },
+  "base_policy": {
+    "checkpoint": "/data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-bc-current-prep/pe2e_bc_current/pc_bc_actor.pt",
+    "checkpoint_sha256": "d85718a432a287f2ae255528f645bc20f4445aba875c9fb9c44f008c578094b2",
+    "mode": "frozen_pc_bc_residual",
+    "residual_action_mask": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "residual_scale": 1e-06
+  },
+  "encoder": {
+    "dropout": 0,
+    "feature_dim": 64,
+    "feedforward_dim": 128,
+    "fusion_hidden": [
+      128,
+      64
+    ],
+    "kind": "dual_horizon_transformer",
+    "num_heads": 4,
+    "num_layers": 2,
+    "output_dim": 64
+  },
+  "environment": {
+    "config": "configs/lowlevel/goal182/calibration/env_C5.json",
+    "max_episode_steps": null,
+    "num_envs": 4096,
+    "observation_schema": "pc_v1"
+  },
+  "experiment": {
+    "arm": "PC",
+    "device": "cuda",
+    "learning_composition": "BCRES",
+    "name": "goal182_route_gate_calibration_reference_pe2e_C5",
+    "output": "artifacts/lowlevel/goal182_ppo_stack_governance_20261114/calibration/reference_pe2e_C5",
+    "seed": 86201,
+    "trainable_scope": "actor_critic"
+  },
+  "history": {
+    "current_frame_dropout_prob": 0.0,
+    "long_stride": 1,
+    "long_window": 50,
+    "short_stride": 1,
+    "short_window": 10
+  },
+  "instrumentation": {
+    "policy_metrics_sample_size": 8192,
+    "record_step_timings": true,
+    "write_iteration_records": true
+  },
+  "pc": {
+    "action_interface": "environment",
+    "actor_command_dim": 0,
+    "actor_current_encoder_alpha": 1.0,
+    "actor_current_encoder_enabled": true,
+    "actor_current_encoder_hidden_dims": [
+      64
+    ],
+    "actor_state_mode": "full",
+    "actuator_residual_channel_gains": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "actuator_residual_scale": 1.0,
+    "aux_current_coef": 0.0,
+    "aux_current_steps": 0,
+    "bc_path_dim": 5,
+    "critic_command_dim": 1,
+    "critic_path_dim": 30,
+    "critic_path_encoder_alpha": 1.0,
+    "critic_path_encoder_hidden_dims": [
+      64
+    ],
+    "critic_path_encoder_zero_init": false,
+    "d_z_total": 64,
+    "dade_action_head_enabled": false,
+    "dade_action_head_isolated": false,
+    "dade_enabled": true,
+    "dade_history_mode": "encoded",
+    "dade_state_mode": "full",
+    "dade_warmstart_input_scale": 0.03,
+    "n_in_reserved": 8,
+    "n_z_reserved": 4,
+    "path_curriculum": [],
+    "path_dim": 5,
+    "path_encoder_alpha": 1.0,
+    "path_encoder_hidden_dims": [
+      64
+    ],
+    "path_encoder_zero_init": false,
+    "state_encoder_hidden_dims": [
+      128,
+      128
+    ]
+  },
+  "policy": {
+    "activation": "elu",
+    "actor_hidden_dims": [
+      512,
+      256,
+      128
+    ],
+    "critic_hidden_dims": [
+      512,
+      256,
+      128
+    ],
+    "init_noise_std": 0.3,
+    "noise_std_type": "scalar"
+  },
+  "runner": {
+    "empirical_normalization": true,
+    "logger": "tensorboard",
+    "num_steps_per_env": 48,
+    "save_interval": 40
+  },
+  "schema_version": "auv_odarrl_control_ppo.v1",
+  "training": {
+    "initial_residual_output_std": 0.0,
+    "initial_residual_zero": false,
+    "iterations": 40,
+    "privileged_current_critic": false
+  },
+  "training_profile": "PPO-FLAT-4096x48-E5-MB4",
+  "vector_env": {
+    "backend": "batch_torch",
+    "compile_mode": "default",
+    "compile_step": false,
+    "physics_dtype": "float32",
+    "projection_search_radius": 8,
+    "validate_finite": false
+  }
+}

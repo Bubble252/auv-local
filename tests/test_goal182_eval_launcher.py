@@ -78,9 +78,7 @@ def test_launcher_dry_run_wires_protocol_and_disables_legacy_analyzer(tmp_path: 
 
 def test_formal_phase_rejects_draft_matrix(tmp_path: Path) -> None:
     matrix = json.loads(
-        (ROOT / "configs" / "governance" / "goal182_eval_matrix.json").read_text(
-            encoding="utf-8"
-        )
+        (ROOT / "configs" / "governance" / "goal182_eval_matrix.json").read_text(encoding="utf-8")
     )
     matrix["matrix_status"] = "DRAFT"
     for tier in matrix["tiers"]:
@@ -117,6 +115,130 @@ def test_formal_phase_rejects_draft_matrix(tmp_path: Path) -> None:
     assert "FROZEN matrix" in completed.stderr
 
 
+def test_launcher_rejects_retired_strict125_manifest(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "axes": {"goal_radii": ["default", "strict125"]},
+                "scenarios": [
+                    {
+                        "id": "p-nominal__r-P0__l35__v1p2__g-strict125",
+                        "config": str(tmp_path / "env.json"),
+                        "axes": {"goal_radius": "strict125", "goal_radius_m": 1.25},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    arms = tmp_path / "arms.json"
+    arms.write_text(
+        json.dumps(
+            {
+                "schema_version": "auv_pc_standing_eval_arms.v1",
+                "arms": [
+                    {
+                        "tag": "zero",
+                        "evaluator": "sac",
+                        "training_config": str(tmp_path / "env.json"),
+                        "action_mode": "zero-residual",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--manifest",
+            str(manifest),
+            "--arms",
+            str(arms),
+            "--output-root",
+            str(tmp_path / "eval"),
+            "--matrix-id",
+            "G182-EVAL",
+            "--tier",
+            "MAIN_RANKING",
+            "--phase",
+            "smoke",
+            "--dry-run",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 2
+    assert "retired" in completed.stderr
+    assert "strict125" in completed.stderr
+
+
+def test_launcher_rejects_manifest_without_goal_radius(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {
+                        "id": "p-nominal__r-P0__l35__v1p2",
+                        "config": str(tmp_path / "env.json"),
+                        "axes": {"path_family": "P0"},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    arms = tmp_path / "arms.json"
+    arms.write_text(
+        json.dumps(
+            {
+                "schema_version": "auv_pc_standing_eval_arms.v1",
+                "arms": [
+                    {
+                        "tag": "zero",
+                        "evaluator": "sac",
+                        "training_config": str(tmp_path / "env.json"),
+                        "action_mode": "zero-residual",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--manifest",
+            str(manifest),
+            "--arms",
+            str(arms),
+            "--output-root",
+            str(tmp_path / "eval"),
+            "--matrix-id",
+            "G182-EVAL",
+            "--tier",
+            "MAIN_RANKING",
+            "--phase",
+            "smoke",
+            "--dry-run",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 2
+    assert "missing goal radius" in completed.stderr
+
+
 def test_runner_command_contains_canonical_inputs(tmp_path: Path) -> None:
     module = _module()
     args = module._parse_args.__globals__["argparse"].Namespace(
@@ -148,3 +270,126 @@ def test_runner_command_contains_canonical_inputs(tmp_path: Path) -> None:
     assert "--no-analyze" in command
     assert "--dry-run" in command
     assert command[command.index("--seed-start") + 1] == "90001"
+
+
+def test_depth_tier_rejects_manifest_without_absolute_depth(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {
+                        "id": "p-nominal__r-R_3D_M__l70__v1p2__g-default",
+                        "config": str(tmp_path / "env.json"),
+                        "axes": {"route_profile": "R_3D_M", "goal_radius": "default"},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    arms = tmp_path / "arms.json"
+    arms.write_text(
+        json.dumps(
+            {
+                "schema_version": "auv_pc_standing_eval_arms.v1",
+                "arms": [
+                    {
+                        "tag": "zero",
+                        "evaluator": "sac",
+                        "training_config": str(tmp_path / "env.json"),
+                        "action_mode": "zero-residual",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--manifest",
+            str(manifest),
+            "--arms",
+            str(arms),
+            "--output-root",
+            str(tmp_path / "eval"),
+            "--matrix-id",
+            "G182-EVAL",
+            "--tier",
+            "DEPTH_GENERALIZATION",
+            "--phase",
+            "smoke",
+            "--dry-run",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 2
+    assert "missing depth_m" in completed.stderr
+
+
+def test_launcher_rejects_bcres_without_paired_zero(tmp_path: Path) -> None:
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "scenarios": [
+                    {
+                        "id": "p-nominal__r-P0__l35__v1p2__g-default",
+                        "config": str(tmp_path / "env.json"),
+                        "axes": {"goal_radius": "default"},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    arms = tmp_path / "arms.json"
+    arms.write_text(
+        json.dumps(
+            {
+                "schema_version": "auv_pc_standing_eval_arms.v1",
+                "arms": [
+                    {
+                        "tag": "bcres",
+                        "evaluator": "ppo",
+                        "training_config": str(tmp_path / "train.json"),
+                        "checkpoint": str(tmp_path / "policy.pt"),
+                        "learning_composition": "BCRES",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT),
+            "--manifest",
+            str(manifest),
+            "--arms",
+            str(arms),
+            "--output-root",
+            str(tmp_path / "eval"),
+            "--matrix-id",
+            "G182-EVAL",
+            "--tier",
+            "MAIN_RANKING",
+            "--phase",
+            "smoke",
+            "--dry-run",
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 2
+    assert "missing paired_zero_tag" in completed.stderr

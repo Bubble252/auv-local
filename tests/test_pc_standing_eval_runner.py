@@ -174,3 +174,32 @@ def test_zero_only_selection_skips_paired_analyzer() -> None:
     assert runner.has_paired_arms(jobs, zero_tag="zero") is False
     jobs.append({"arm_tag": "mid_only_86201"})
     assert runner.has_paired_arms(jobs, zero_tag="zero") is True
+
+
+def test_ppo_jobs_carry_explicit_route_and_depth_metadata(tmp_path: Path) -> None:
+    scenario = tmp_path / "depth.json"
+    scenario.write_text("{}\n", encoding="utf-8")
+    manifest = {
+        "scenarios": [
+            {
+                "id": "p-nominal__r-R_3D_M__d500__l70__v1p2__g-default",
+                "config": str(scenario),
+                "axes": {"route_profile": "R_3D_M", "depth_m": 500.0},
+            }
+        ]
+    }
+    ppo_arm = next(arm for arm in _arms() if arm["tag"] == "ppo")
+    jobs = runner.build_jobs(
+        manifest=manifest,
+        arms=[ppo_arm],
+        output_root=tmp_path / "eval",
+        python="/python",
+        seed_start=90001,
+        seed_count=3,
+        device="cpu",
+        dtype="float64",
+        overwrite=True,
+    )
+    command = jobs[0]["command"]
+    assert command[command.index("--route-profile") + 1] == "R_3D_M"
+    assert command[command.index("--depth-m") + 1] == "500.0"

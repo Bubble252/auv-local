@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
+
+from auv_lowlevel.eval_pairing import audit_paired_zero
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RUNNER = REPO_ROOT / "scripts" / "run_pc_standing_eval_suite.py"
@@ -19,6 +22,8 @@ BUILDER = REPO_ROOT / "scripts" / "build_goal182_eval_report.py"
 AUDITOR = REPO_ROOT / "scripts" / "audit_goal182_artifacts.py"
 MATRIX_CHECKER = REPO_ROOT / "scripts" / "check_goal182_eval_matrix.py"
 DEFAULT_MATRIX = REPO_ROOT / "configs" / "governance" / "goal182_eval_matrix.json"
+DEFAULT_RADIUS_LABELS = {"default", "2p0", "2.0"}
+DEFAULT_RADIUS_M = 2.0  # magic-number-ok: Goal182 active evaluation fixes plant.goal_radius_m
 
 
 def _parse_args() -> argparse.Namespace:
@@ -152,12 +157,179 @@ def _matrix_errors(args: argparse.Namespace) -> list[str]:
     return errors
 
 
+def _manifest_radius_errors(path: Path) -> list[str]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    errors: list[str] = []
+    axes = payload.get("axes")
+    if isinstance(axes, dict):
+        radii = axes.get("goal_radii")
+        if isinstance(radii, list):
+            for radius in radii:
+                if str(radius) not in DEFAULT_RADIUS_LABELS:
+                    errors.append(f"retired or unknown goal radius label in manifest: {radius!r}")
+    scenarios = payload.get("scenarios")
+    if isinstance(scenarios, list):
+        for scenario in scenarios:
+            if not isinstance(scenario, dict):
+                continue
+            scenario_axes = scenario.get("axes")
+            axes = scenario_axes if isinstance(scenario_axes, dict) else {}
+            label = axes.get("goal_radius", scenario.get("goal_radius"))
+            radius_m = axes.get("goal_radius_m", scenario.get("goal_radius_m"))
+            if label is None and radius_m is None:
+                matched = re.search(r"(?:^|__)g-([^_]+)(?:__|$)", str(scenario.get("id", "")))
+                if matched:
+                    label = matched.group(1)
+            if label is None and radius_m is None:
+                errors.append(
+                    f"scenario {scenario.get('id')} is missing goal radius; "
+                    "Goal182 active evaluation requires 2.0 m"
+                )
+                continue
+            if label is not None and str(label) not in DEFAULT_RADIUS_LABELS:
+                errors.append(f"retired goal radius in scenario {scenario.get('id')}: {label!r}")
+            if radius_m is not None:
+                try:
+                    radius_value = float(radius_m)
+                except (TypeError, ValueError):
+                    errors.append(
+                        f"goal_radius_m is not numeric in {scenario.get('id')}: {radius_m!r}"
+                    )
+                else:
+                    if abs(radius_value - DEFAULT_RADIUS_M) > 1e-9:
+                        errors.append(
+                            f"goal_radius_m must be 2.0 in {scenario.get('id')}; got {radius_m!r}"
+                        )
+    return errors
+
+
+def _tier_axes(path: Path, tier_id: str) -> tuple[list[float], list[str]] | None:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    tiers = payload.get("tiers")
+    if not isinstance(tiers, list):
+        return None
+    tier = next((item for item in tiers if item.get("tier_id") == tier_id), None)
+    if not isinstance(tier, dict):
+        return None
+    depths = [float(value) for value in tier.get("depths_m", [])]
+    routes = [str(value) for value in tier.get("route_profiles", [])]
+    return depths, routes
+
+
+def _manifest_depth_errors(
+    path: Path, *, eval_matrix: Path, tier_id: str, formal: bool
+) -> list[str]:
+    if tier_id != "DEPTH_GENERALIZATION":
+        return []
+    expected = _tier_axes(eval_matrix, tier_id)
+    if expected is None:
+        return ["DEPTH_GENERALIZATION axes are missing from the eval matrix"]
+    expected_depths, expected_routes = expected
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    errors: list[str] = []
+    axes = payload.get("axes")
+    if isinstance(axes, dict):
+        manifest_depths = axes.get("depth_profiles_m")
+        if manifest_depths is not None:
+            actual = [float(value) for value in manifest_depths]
+            if len(actual) != len(expected_depths) or any(
+                abs(a - b) > 1e-9 for a, b in zip(actual, expected_depths, strict=True)
+            ):
+                errors.append(f"manifest depth_profiles_m mismatch: {actual} != {expected_depths}")
+    scenarios = payload.get("scenarios")
+    if not isinstance(scenarios, list) or not scenarios:
+        return errors + ["manifest scenarios must be a non-empty list"]
+    found_depths: set[float] = set()
+    found_routes: set[str] = set()
+    for scenario in scenarios:
+        if not isinstance(scenario, dict):
+            continue
+        sid = str(scenario.get("id", ""))
+        scenario_axes = scenario.get("axes")
+        axes = scenario_axes if isinstance(scenario_axes, dict) else {}
+        depth = axes.get("depth_m", scenario.get("depth_m"))
+        route = axes.get("route_profile", scenario.get("route_profile"))
+        if depth is None:
+            matched = re.search(r"(?:^|__)d([0-9p.]+)(?:__|$)", sid)
+            if matched:
+                depth = matched.group(1).replace("p", ".")
+        if route is None:
+            matched = re.search(r"(?:^|__)r-(.+?)(?=__|$)", sid)
+            if matched:
+                route = matched.group(1)
+        if depth is None:
+            errors.append(f"scenario {sid} is missing depth_m")
+            continue
+        try:
+            depth_value = float(depth)
+        except (TypeError, ValueError):
+            errors.append(f"scenario {sid} depth_m is not numeric: {depth!r}")
+            continue
+        if not any(abs(depth_value - value) <= 1e-9 for value in expected_depths):
+            errors.append(f"scenario {sid} depth_m {depth_value} is not registered")
+        found_depths.add(depth_value)
+        if route is None:
+            errors.append(f"scenario {sid} is missing route_profile")
+        else:
+            found_routes.add(str(route))
+    if formal:
+        missing_depths = [
+            value
+            for value in expected_depths
+            if not any(abs(value - actual) <= 1e-9 for actual in found_depths)
+        ]
+        missing_routes = [value for value in expected_routes if value not in found_routes]
+        if missing_depths:
+            errors.append(f"manifest is missing depths {missing_depths}")
+        if missing_routes:
+            errors.append(f"manifest is missing routes {missing_routes}")
+    return errors
+
+
+def _arm_pairing_errors(path: Path, *, selected_tags: list[str] | None, strict: bool) -> list[str]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    arms = payload.get("arms")
+    if not isinstance(arms, list) or not arms:
+        return ["arms manifest must contain a non-empty arms list"]
+    _statuses, errors = audit_paired_zero(
+        arms,
+        selected_tags=selected_tags,
+        strict=strict,
+    )
+    return errors
+
+
 def main() -> int:
     args = _parse_args()
     output_root = _resolve(args.output_root)
     errors = _matrix_errors(args)
     if errors:
         for error in errors:
+            print(f"Goal182 eval launcher: {error}", file=sys.stderr)
+        return 2
+    radius_errors = _manifest_radius_errors(_resolve(args.manifest))
+    if radius_errors:
+        for error in radius_errors:
+            print(f"Goal182 eval launcher: {error}", file=sys.stderr)
+        return 2
+    formal = "formal" in args.phase.lower()
+    depth_errors = _manifest_depth_errors(
+        _resolve(args.manifest),
+        eval_matrix=_resolve(args.eval_matrix),
+        tier_id=args.tier,
+        formal=formal,
+    )
+    if depth_errors:
+        for error in depth_errors:
+            print(f"Goal182 eval launcher: {error}", file=sys.stderr)
+        return 2
+    pairing_errors = _arm_pairing_errors(
+        _resolve(args.arms),
+        selected_tags=args.tags,
+        strict=formal,
+    )
+    if pairing_errors:
+        for error in pairing_errors:
             print(f"Goal182 eval launcher: {error}", file=sys.stderr)
         return 2
     matrix_check = [

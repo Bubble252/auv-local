@@ -10,6 +10,7 @@ the first formal run and then passed to training as
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import statistics
@@ -21,6 +22,7 @@ METRIC_KEYS = {
     "vertical_rmse_max_m": "/episode/vertical_rmse_mean",
 }
 COMPLETION_KEY = "/episode/path_completion_mean"
+CURRICULUM_STAGES = ("C0", "C1", "C2", "C3", "C4", "C5", "C6")
 
 
 def _read_records(path: Path) -> list[dict[str, Any]]:
@@ -46,8 +48,45 @@ def _metric(record: dict[str, Any], key: str) -> float | None:
     return number if math.isfinite(number) else None
 
 
-def calibrate(records: list[dict[str, Any]], *, window_size: int) -> dict[str, Any]:
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _stage_coverage(
+    stages: list[str | None],
+    required_stages: tuple[str, ...],
+    min_records_per_stage: int,
+) -> dict[str, Any]:
+    counts = {stage: 0 for stage in required_stages}
+    for stage in stages:
+        if isinstance(stage, str) and stage in counts:
+            counts[stage] += 1
+    return {
+        "required": list(required_stages),
+        "counts": counts,
+        "missing": [stage for stage in required_stages if counts[stage] == 0],
+        "insufficient": [
+            stage for stage in required_stages if 0 < counts[stage] < min_records_per_stage
+        ],
+        "min_records_per_stage": min_records_per_stage,
+        "records_without_stage": sum(stage is None for stage in stages),
+    }
+
+
+def calibrate(
+    records: list[dict[str, Any]],
+    *,
+    window_size: int,
+    calibration_source: str = "REFERENCE_BC",
+    required_stages: tuple[str, ...] = (),
+    min_stage_records: int = 0,
+) -> dict[str, Any]:
     rows: list[dict[str, float]] = []
+    stages: list[str | None] = []
     for record in records:
         row: dict[str, float] = {}
         for name, key in METRIC_KEYS.items():
@@ -61,14 +100,25 @@ def calibrate(records: list[dict[str, Any]], *, window_size: int) -> dict[str, A
                 continue
             row["completion_ratio"] = completion
             rows.append(row)
+            stages.append(record.get("curriculum_stage"))
     if len(rows) < window_size:
         raise ValueError(
             f"need at least {window_size} complete rollout iterations; got {len(rows)}"
         )
-    windows = [
-        rows[start : start + window_size]
-        for start in range(0, len(rows) - window_size + 1)
-    ]
+    coverage = _stage_coverage(stages, required_stages, min_stage_records)
+    if coverage["missing"]:
+        raise ValueError(
+            "calibration records do not cover required stages: "
+            + ", ".join(coverage["missing"])
+            + f"; coverage={coverage['counts']}"
+        )
+    if coverage["insufficient"]:
+        raise ValueError(
+            "calibration records have too few iterations for required stages: "
+            + ", ".join(coverage["insufficient"])
+            + f"; minimum={min_stage_records}, coverage={coverage['counts']}"
+        )
+    windows = [rows[start : start + window_size] for start in range(0, len(rows) - window_size + 1)]
     statistics_by_metric: dict[str, dict[str, float]] = {}
     for name in (*METRIC_KEYS, "completion_ratio"):
         means = [sum(window_row[name] for window_row in window) / window_size for window in windows]
@@ -81,9 +131,11 @@ def calibrate(records: list[dict[str, Any]], *, window_size: int) -> dict[str, A
     return {
         "schema_version": "auv_goal182_route_gate_thresholds.v1",
         "status": "CALIBRATED_PENDING_FREEZE",
-        "calibration_source": "training_rollout_20_iteration_windows",
+        "calibration_source": calibration_source,
+        "window_scheme": "TRAINING_ROLLOUT_20_ITERATION_WINDOWS",
         "window_size": window_size,
         "statistics": statistics_by_metric,
+        "stage_coverage": coverage,
     }
 
 
@@ -122,7 +174,25 @@ def main() -> int:
     parser.add_argument("--records", type=Path, action="append", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--control-contract", choices=("PE2E", "ALOSB"), required=True)
+    parser.add_argument(
+        "--calibration-source",
+        choices=("REFERENCE_BC", "P0_HISTORICAL"),
+        default="REFERENCE_BC",
+    )
+    parser.add_argument("--reference-id", default=None)
+    parser.add_argument("--reference-sha256", default=None)
     parser.add_argument("--window-size", type=int, default=20)
+    parser.add_argument(
+        "--require-stages",
+        default="",
+        help="comma-separated curriculum stages that must appear in the calibration records",
+    )
+    parser.add_argument(
+        "--min-stage-records",
+        type=int,
+        default=0,
+        help="minimum complete iteration records required for every required stage",
+    )
     parser.add_argument("--cross-margin", type=float, default=0.10)
     parser.add_argument("--vertical-margin", type=float, default=0.10)
     parser.add_argument("--completion-margin", type=float, default=0.05)
@@ -131,14 +201,22 @@ def main() -> int:
     parser.add_argument("--safety-max", type=float, default=0.0)
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
+    required_stages = tuple(part.strip() for part in args.require_stages.split(",") if part.strip())
+    unknown_stages = sorted(set(required_stages).difference(CURRICULUM_STAGES))
+    if unknown_stages:
+        parser.error("unknown --require-stages values: " + ", ".join(unknown_stages))
+    if args.min_stage_records < 0:
+        parser.error("--min-stage-records must be non-negative")
     if args.output.exists() and not args.force:
         raise SystemExit(f"refusing to overwrite frozen thresholds: {args.output}")
-    records = [
-        record
-        for path in args.records
-        for record in _read_records(path)
-    ]
-    calibration = calibrate(records, window_size=args.window_size)
+    records = [record for path in args.records for record in _read_records(path)]
+    calibration = calibrate(
+        records,
+        window_size=args.window_size,
+        calibration_source=args.calibration_source,
+        required_stages=required_stages,
+        min_stage_records=args.min_stage_records,
+    )
     calibrated = build_thresholds(
         calibration,
         cross_margin=args.cross_margin,
@@ -152,12 +230,46 @@ def main() -> int:
         **calibration,
         "control_contract": args.control_contract,
         "thresholds": calibrated,
+        "reference": {
+            "id": args.reference_id,
+            "sha256": args.reference_sha256,
+        },
+        "formula": {
+            "cross_track_rmse_max_m": "max(mean*(1+cross_margin), mean+2*std)",
+            "vertical_rmse_max_m": "max(mean*(1+vertical_margin), mean+2*std)",
+            "completion_min": "max(floor, min(ceiling, mean-completion_margin))",
+            "safety_max": "configured",
+        },
+        "margins": {
+            "cross": args.cross_margin,
+            "vertical": args.vertical_margin,
+            "completion": args.completion_margin,
+            "completion_floor": args.completion_floor,
+            "completion_ceiling": args.completion_ceiling,
+            "safety_max": args.safety_max,
+        },
         "records": [str(path) for path in args.records],
+        "record_files": [{"path": str(path), "sha256": _sha256(path)} for path in args.records],
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    frozen_table = {
+        "schema_version": "auv_goal182_route_gate_frozen_thresholds.v1",
+        "status": "FROZEN",
+        "control_contract": args.control_contract,
+        "calibration_source": payload["calibration_source"],
+        "window_scheme": payload["window_scheme"],
+        "window_size": payload["window_size"],
+        "statistics": payload["statistics"],
+        "stage_coverage": payload["stage_coverage"],
+        "formula": payload["formula"],
+        "margins": payload["margins"],
+        "reference": payload["reference"],
+        "record_files": payload["record_files"],
+        "thresholds": calibrated,
+    }
     args.output.with_suffix(".thresholds.json").write_text(
-        json.dumps(calibrated, indent=2, sort_keys=True) + "\n"
+        json.dumps(frozen_table, indent=2, sort_keys=True) + "\n"
     )
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0

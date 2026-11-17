@@ -24,6 +24,8 @@ def _episode_records(
     endpoint_stop_enabled: bool = False,
     goal_radius_m: float = 2.0,
     success_frame: str = DEFAULT_SUCCESS_FRAME,
+    route_profile: str | None = None,
+    depth_m: float | None = None,
     plant_scale_factors: np.ndarray | None = None,
 ) -> list[dict[str, Any]]:
     """Return per-seed closed-loop metrics for paired ABC analysis."""
@@ -52,6 +54,8 @@ def _episode_records(
         steps = int(active_steps[index])
         row: dict[str, Any] = {
             "seed": int(seed),
+            "route_profile": route_profile,
+            "depth_m": depth_m,
             "plant_scale_factors": (
                 None
                 if plant_scale_factors is None

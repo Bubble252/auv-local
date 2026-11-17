@@ -1,0 +1,251 @@
+{
+  "actuator": {
+    "envelope": "pc20",
+    "material_tolerance_fraction": 0.01,
+    "max_fin_rate_deg_s": 150,
+    "max_propeller_rpm": 1525,
+    "max_rudder_angle_deg": 20,
+    "max_stern_plane_angle_deg": 20,
+    "plant_max_fin_rate_deg_s": 150,
+    "plant_max_propeller_rpm": 1525,
+    "plant_max_rudder_angle_deg": 20,
+    "plant_max_stern_plane_angle_deg": 20
+  },
+  "base_controller": {
+    "heading_gain": 2,
+    "heading_rate_gain": 0.6,
+    "max_speed_integral_rpm": 400,
+    "nominal_step_s": 0.02,
+    "pitch_gain": 2,
+    "pitch_rate_gain": 1,
+    "speed_feedforward_rpm_per_mps": 600,
+    "speed_gain_rpm_per_mps": 80,
+    "speed_integral_gain_rpm_per_mps_s": 10,
+    "type": "remus100_tracking_pd_pi",
+    "use_current_field": false
+  },
+  "current": {
+    "constant_within_episode": false,
+    "direction_rad": [
+      -3.1415926536,
+      3.1415926536
+    ],
+    "enabled": true,
+    "shear": {
+      "origin_ned_m": [
+        0,
+        0,
+        10
+      ],
+      "velocity_gradient_per_s": [
+        [
+          0.004,
+          0,
+          0
+        ],
+        [
+          0,
+          -0.003,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    },
+    "speed_mps": [
+      0.25,
+      0.45
+    ],
+    "time_variation": {
+      "direction_amplitude_rad": 0.3,
+      "period_s": 8,
+      "speed_amplitude_mps": 0.1
+    },
+    "type": "sheared_horizontal"
+  },
+  "curriculum": {
+    "enabled": true,
+    "initial_stage": "C3",
+    "manifest_filename": "curriculum_episodes.jsonl",
+    "promotion_enabled": false,
+    "speed_protocol": "SPEED_V3_CENTER_OUT_5S",
+    "stage_mix": [
+      {
+        "stage": "C3",
+        "weight": 1.0
+      }
+    ]
+  },
+  "evaluation": {
+    "seed_count": 50,
+    "seed_start": 0,
+    "training_seed_start": 90000
+  },
+  "experiment": {
+    "arm": "PC",
+    "name": "goal182_route_gate_calibration_env_C3",
+    "output": "artifacts/lowlevel/goal182_ppo_stack_governance_20261114/calibration/env_C3",
+    "pc_control_mode": "path_fixed_speed",
+    "pc_stage": "C3",
+    "policy_mode": "pure_controller",
+    "seed": 81300,
+    "sensor_source": "synthetic"
+  },
+  "guidance": {
+    "compensate_current": false,
+    "horizontal_gain": 2.5,
+    "horizontal_lookahead_m": 3,
+    "initial_angular_rate_range": [
+      -0.05,
+      0.05
+    ],
+    "initial_propeller_rpm_ratio": 0.0,
+    "initial_propeller_rpm_ratio_range": [
+      0.0,
+      1.0
+    ],
+    "initial_speed_ratio": 1.0,
+    "initial_speed_ratio_range": [
+      0.8,
+      1.2
+    ],
+    "lookahead_error_gain": 1,
+    "max_lookahead_m": 20,
+    "min_lookahead_m": 0.5,
+    "terminal_capture_distance_m": 20,
+    "terminal_speed_mps": 0,
+    "validity_period_s": 0.5,
+    "vertical_gain": 1,
+    "vertical_lookahead_m": 2
+  },
+  "normalization": {
+    "angular_rate_scale_rad_s": 1,
+    "attitude_scale_rad": 3.141592653589793,
+    "current_scale_mps": 0.5,
+    "position_scale_m": 100,
+    "surge_speed_scale_mps": 2.5,
+    "sway_heave_speed_scale_mps": 1
+  },
+  "observation": {
+    "current_contract": "hidden",
+    "dim": 26,
+    "expose_current": false,
+    "speed_feedback": "ground"
+  },
+  "plant": {
+    "backend": "batch_torch_remus100",
+    "bounds_m": [
+      [
+        -200,
+        200
+      ],
+      [
+        -200,
+        200
+      ],
+      [
+        0,
+        520.0
+      ]
+    ],
+    "control_hz": 50,
+    "dt_s": 0.02,
+    "goal_radius_m": 2,
+    "max_episode_steps": 3000,
+    "pvs_source_dir": null,
+    "vehicle": "REMUS100"
+  },
+  "reference": {
+    "depth_amplitude_m": 0.4,
+    "depth_cycles": 2,
+    "depth_slope_m": 2,
+    "depth_start_m": 10,
+    "generator": "sinusoidal_3d_arclength",
+    "lateral_amplitude_m": 1.5,
+    "lateral_cycles": 1,
+    "length_m": 35,
+    "path_bank_seed": 41,
+    "path_bank_size": 32,
+    "sample_spacing_m": 0.1,
+    "speed_mps": 1.2,
+    "start_jitter_pitch_rad": 0.1745329252,
+    "start_jitter_xy_m": 0.5,
+    "start_jitter_yaw_rad": 0.1745329252,
+    "start_jitter_z_m": 0.5,
+    "x_span_m": 30
+  },
+  "residual": {
+    "max_action": 1,
+    "scale_rpm": 0,
+    "scale_rudder": 0,
+    "scale_stern": 0
+  },
+  "reward": {
+    "cmd_heading_std_rad": 0.5,
+    "cmd_speed_std_mps": 0.25,
+    "goal_bonus": 0.0,
+    "hold_bonus": false,
+    "mode": "pc_path_track",
+    "out_of_bounds_penalty": 0.0,
+    "path_cross_huber_delta_m": 0.5,
+    "path_heading_std_rad": 0.5,
+    "path_vertical_huber_delta_m": 0.5,
+    "pc_ppo_scale": 0.01,
+    "route_ground_speed_stall_gate_high_mps": 0.4,
+    "route_ground_speed_stall_gate_low_mps": 0.2,
+    "route_ground_speed_stall_threshold_mps": 0.25,
+    "route_middle_gate": 0.0,
+    "terminal_progress_weight": 0.0,
+    "timeout_penalty": 0.0,
+    "w_3d": 0.0,
+    "w_action": 0.0,
+    "w_action_clip_attempt_pc": 0.0,
+    "w_action_pc": 0.1,
+    "w_action_smooth_pc": 0.005,
+    "w_actuator_material_sat_pc": 0.02,
+    "w_approach_pitch": 0.0,
+    "w_approach_vertical": 0.0,
+    "w_cmd_pitch": 0.0,
+    "w_cmd_speed": 2.5,
+    "w_cmd_yaw": 0.0,
+    "w_heave_potential": 0.0,
+    "w_p": 0.02,
+    "w_path_3d": 0.0,
+    "w_path_cross": 3.5,
+    "w_path_energy": 0.01,
+    "w_path_pitch": 1.0,
+    "w_path_progress": 0.0,
+    "w_path_speed_smooth": 0.025,
+    "w_path_vertical": 1.5,
+    "w_phi": 3.0,
+    "w_prog": 0.0,
+    "w_route_ground_speed_stall": 0.0,
+    "w_route_speed_pc": 0.0,
+    "w_sat": 0.0,
+    "w_sat_pc": 0.0,
+    "w_u": 0.0,
+    "w_vertical_potential": 0.0,
+    "w_yaw": 1.0
+  },
+  "schema_version": "auv_odarrl_control.v1",
+  "sensors": {
+    "profile": "unbiased_small_noise_v2",
+    "seed": 81300
+  },
+  "termination": {
+    "goal_plane_miss_distance_weight": 0.0,
+    "goal_plane_miss_penalty": 0.0,
+    "max_depth_m": 510.0,
+    "min_depth_m": 0.0,
+    "p_term_deg_s": 90,
+    "pc_goal_plane_miss_termination_enabled": true,
+    "phi_term_deg": 45,
+    "position_source": "eta",
+    "safety_terminal_penalty": -50,
+    "t_p_term_s": 0.5,
+    "t_phi_term_s": 1
+  }
+}

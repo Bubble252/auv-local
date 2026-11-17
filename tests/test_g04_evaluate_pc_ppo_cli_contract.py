@@ -28,7 +28,7 @@ from auv_lowlevel.config import load_config
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "evaluate_pc_ppo.py"
-HELP_SHA256 = "895873e097531e9bbef5fdc847b9887dae63a3be82f21d8c5b1309201afd9b87"
+HELP_SHA256 = "a50144dff74b4cf0b4bde781f2745556190e3f39662f06fc245d858c476920a3"
 
 
 def test_help_text_is_byte_stable() -> None:
@@ -77,6 +77,7 @@ def test_default_namespace_is_stable() -> None:
         "curriculum_current_speed_range_mps": None,
         "curriculum_shear_scale": None,
         "curriculum_stage": None,
+        "depth_m": None,
         "device": "cpu",
         "disable_curriculum_direct_command": False,
         "dtype": "float64",
@@ -88,6 +89,7 @@ def test_default_namespace_is_stable() -> None:
         "path_ablation": "none",
         "ppo_residual_attenuation_enter_m": 3.0,
         "ppo_residual_attenuation_full_m": 1.25,
+        "route_profile": None,
         "seed_count": 64,
         "seed_start": 0,
         "success_frame": "both",
@@ -115,9 +117,7 @@ def test_default_namespace_is_stable() -> None:
 
 
 def test_formal_eval_requires_nominal_start() -> None:
-    config = load_config(
-        ROOT / "configs" / "lowlevel" / "goal182" / "env_path_fixed_speed_c3.json"
-    )
+    config = load_config(ROOT / "configs" / "lowlevel" / "goal182" / "env_path_fixed_speed_c3.json")
 
     with pytest.raises(ValueError, match="INVALID_EVAL_START_CONTRACT"):
         _validate_eval_start_contract(config)

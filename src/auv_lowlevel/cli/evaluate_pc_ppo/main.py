@@ -35,15 +35,9 @@ def _guidance_telemetry_fields(guidance: object) -> dict[str, float | bool]:
         "guidance_speed_adaptive_lookahead_enabled": bool(
             guidance.speed_adaptive_lookahead_enabled
         ),
-        "guidance_terminal_alignment_min_m": float(
-            guidance.terminal_alignment_min_m
-        ),
-        "guidance_terminal_alignment_max_m": float(
-            guidance.terminal_alignment_max_m
-        ),
-        "guidance_terminal_alignment_horizon_s": float(
-            guidance.terminal_alignment_horizon_s
-        ),
+        "guidance_terminal_alignment_min_m": float(guidance.terminal_alignment_min_m),
+        "guidance_terminal_alignment_max_m": float(guidance.terminal_alignment_max_m),
+        "guidance_terminal_alignment_horizon_s": float(guidance.terminal_alignment_horizon_s),
     }
 
 
@@ -68,9 +62,7 @@ def main() -> int:
     )
     output_dir = _resolve(args.output)
     trace_output = (
-        _resolve(args.trace_output)
-        if args.trace_output is not None
-        else output_dir / "trace.npz"
+        _resolve(args.trace_output) if args.trace_output is not None else output_dir / "trace.npz"
     )
     _validate_trace_sensor_ages(trace_output, args.trace_sensor_ages)
     _validate_trace_estimator_state(trace_output, args.trace_estimator_state)
@@ -110,6 +102,8 @@ def main() -> int:
         allow_start_progress_training_override=(args.allow_start_progress_training_override),
         require_nominal_start=not args.allow_non_nominal_start,
         curriculum_stage=args.curriculum_stage,
+        route_profile=args.route_profile,
+        depth_m=args.depth_m,
         disable_curriculum_direct_command=args.disable_curriculum_direct_command,
         curriculum_current_speed_range_mps=(
             None
@@ -141,10 +135,7 @@ def main() -> int:
         ppo_residual_attenuation_full_m=args.ppo_residual_attenuation_full_m,
         ppo_residual_attenuation_enter_m=args.ppo_residual_attenuation_enter_m,
     )
-    episodes = [
-        {"episode_id": int(episode["seed"]), **episode}
-        for episode in episodes
-    ]
+    episodes = [{"episode_id": int(episode["seed"]), **episode} for episode in episodes]
     selected_config = load_config(selected_environment_config)
     selected_stage = str(selected_config.pc_stage)
     effective_guidance = selected_config.guidance
@@ -156,9 +147,7 @@ def main() -> int:
     report = {
         "schema_version": "auv_pc_ppo_evaluation.v1",
         "training_config": str(training_config_path),
-        "actor": (
-            None if training_config.actor is None else training_config.actor.as_dict()
-        ),
+        "actor": (None if training_config.actor is None else training_config.actor.as_dict()),
         "learning_composition": training_config.learning_composition,
         "trainable_scope": training_config.trainable_scope,
         "environment_config": str(selected_environment_config),

@@ -30,7 +30,7 @@ from auv_lowlevel.curriculum import (
 )
 from auv_lowlevel.curriculum_trainer import (
     CurriculumTrainerHook,
-    combine_eval_summaries,
+    parse_eval_summary,
     run_eval_command,
 )
 from auv_lowlevel.experiment_contract import require_training_curriculum
@@ -133,7 +133,6 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--curriculum-eval-default-config", type=Path, default=None)
-    parser.add_argument("--curriculum-eval-strict-config", type=Path, default=None)
     parser.add_argument("--curriculum-eval-interval", type=int, default=100_000)
     parser.add_argument("--curriculum-eval-seed-start", type=int, default=20)
     parser.add_argument("--curriculum-eval-seed-count", type=int, default=40)
@@ -188,9 +187,7 @@ def _parse_actuator_channel_gains(
     if len(values) != 3:
         raise ValueError("--actuator-residual-channel-gains requires three values")
     if any(not np.isfinite(item) or item < 0.0 for item in values):
-        raise ValueError(
-            "--actuator-residual-channel-gains values must be finite and non-negative"
-        )
+        raise ValueError("--actuator-residual-channel-gains values must be finite and non-negative")
     return (values[0], values[1], values[2])
 
 
@@ -247,9 +244,7 @@ def _current_encoder_alpha_schedule(
             "policy.current_encoder_alpha_start and "
             "policy.current_encoder_alpha_end must be set together"
         )
-    transitions_value = policy_config.get(
-        "current_encoder_alpha_ramp_transitions", 0
-    )
+    transitions_value = policy_config.get("current_encoder_alpha_ramp_transitions", 0)
     if isinstance(transitions_value, bool):
         raise ValueError(
             "policy.current_encoder_alpha_ramp_transitions must be a non-negative integer"
@@ -261,14 +256,10 @@ def _current_encoder_alpha_schedule(
         )
     if start_value is None:
         if transitions != 0:
-            raise ValueError(
-                "policy.current_encoder_alpha_ramp_transitions requires start and end"
-            )
+            raise ValueError("policy.current_encoder_alpha_ramp_transitions requires start and end")
         return base_alpha, None
     if current_dim == 0:
-        raise ValueError(
-            "actor current-encoder alpha ramp requires observation.current_dim=3"
-        )
+        raise ValueError("actor current-encoder alpha ramp requires observation.current_dim=3")
     schedule = LinearAlphaSchedule(
         start=float(start_value),
         end=float(end_value),
@@ -283,18 +274,17 @@ def main() -> int:
     sb3_root = _resolve(args.sb3_root) if args.sb3_root is not None else _discover_sb3_root()
     if str(sb3_root) not in sys.path:
         sys.path.insert(0, str(sb3_root))
-    from stable_baselines3 import SAC
     from stable_baselines3.common.callbacks import BaseCallback
 
+    from auv_rl.sac.authority_sac import (
+        AuthorityRegularizedSAC,
+        parse_authority_regularization,
+    )
     from auv_rl.sac.pc_features import (
         PC_DADE_FEATURE_DIM,
         PCStatePathFeatureExtractor,
         initialize_sac_head_from_bc,
         zero_initialize_sac_residual,
-    )
-    from auv_rl.sac.authority_sac import (
-        AuthorityRegularizedSAC,
-        parse_authority_regularization,
     )
     from auv_rl.sac.pc_vec_env import PCHistoryVecEnv
 
@@ -310,12 +300,11 @@ def main() -> int:
         )
     actuator_residual_scale = float(payload.get("actuator_residual_scale", 0.25))
     actuator_max_action = float(payload.get("actuator_max_action", 1.0))
-    actuator_channel_gains = _parse_actuator_channel_gains(
-        args.actuator_residual_channel_gains
-    )
-    if actuator_channel_gains is None and payload.get(
-        "actuator_residual_channel_gains"
-    ) is not None:
+    actuator_channel_gains = _parse_actuator_channel_gains(args.actuator_residual_channel_gains)
+    if (
+        actuator_channel_gains is None
+        and payload.get("actuator_residual_channel_gains") is not None
+    ):
         payload_gains = payload["actuator_residual_channel_gains"]
         actuator_channel_gains = _parse_actuator_channel_gains(
             ",".join(str(item) for item in payload_gains)
@@ -327,28 +316,17 @@ def main() -> int:
         else None
     )
     base_residual_action_mask = tuple(
-        float(value)
-        for value in payload.get("base_residual_action_mask", (1.0, 1.0, 1.0))
+        float(value) for value in payload.get("base_residual_action_mask", (1.0, 1.0, 1.0))
     )
     base_residual_bias = tuple(
         float(value) for value in payload.get("base_residual_bias", (0.0, 0.0, 0.0))
     )
-    if len(base_residual_bias) != 3 or not all(
-        np.isfinite(value) for value in base_residual_bias
-    ):
+    if len(base_residual_bias) != 3 or not all(np.isfinite(value) for value in base_residual_bias):
         raise ValueError("base_residual_bias must contain three finite numbers")
-    residual_terminal_gate_enabled = bool(
-        payload.get("residual_terminal_gate_enabled", False)
-    )
-    residual_terminal_gate_enter_m = float(
-        payload.get("residual_terminal_gate_enter_m", 10.0)
-    )
-    residual_terminal_gate_full_m = float(
-        payload.get("residual_terminal_gate_full_m", 3.0)
-    )
-    learner_terminal_gate_mode = str(
-        payload.get("learner_terminal_gate_mode", "none")
-    )
+    residual_terminal_gate_enabled = bool(payload.get("residual_terminal_gate_enabled", False))
+    residual_terminal_gate_enter_m = float(payload.get("residual_terminal_gate_enter_m", 10.0))
+    residual_terminal_gate_full_m = float(payload.get("residual_terminal_gate_full_m", 3.0))
+    learner_terminal_gate_mode = str(payload.get("learner_terminal_gate_mode", "none"))
     if learner_terminal_gate_mode not in {"none", "shell"}:
         raise ValueError("learner_terminal_gate_mode must be 'none' or 'shell'")
     if learner_terminal_gate_mode == "shell" and not residual_terminal_gate_enabled:
@@ -501,8 +479,8 @@ def main() -> int:
     if activation_name not in activation_fns:
         raise ValueError(f"unsupported policy activation: {activation_name}")
 
-    current_encoder_alpha_initial, current_encoder_alpha_schedule = (
-        _current_encoder_alpha_schedule(policy_config, current_dim=current_dim)
+    current_encoder_alpha_initial, current_encoder_alpha_schedule = _current_encoder_alpha_schedule(
+        policy_config, current_dim=current_dim
     )
     net_arch = [int(value) for value in training.get("net_arch", (256, 128))]
     features_extractor_kwargs = {
@@ -585,9 +563,9 @@ def main() -> int:
         "base_residual_checkpoint": (
             None if base_residual_checkpoint is None else str(base_residual_checkpoint)
         ),
-                "base_residual_checkpoint_sha256": (
-                    None if base_residual_checkpoint is None else _sha256(base_residual_checkpoint)
-                ),
+        "base_residual_checkpoint_sha256": (
+            None if base_residual_checkpoint is None else _sha256(base_residual_checkpoint)
+        ),
         "base_residual_action_mask": list(base_residual_action_mask),
         "base_residual_bias": list(base_residual_bias),
         "residual_terminal_gate_enabled": residual_terminal_gate_enabled,
@@ -633,14 +611,10 @@ def main() -> int:
                 "actuator_residual_scale": actuator_residual_scale,
                 "actuator_max_action": actuator_max_action,
                 "actuator_residual_channel_gains": (
-                    None
-                    if actuator_channel_gains is None
-                    else list(actuator_channel_gains)
+                    None if actuator_channel_gains is None else list(actuator_channel_gains)
                 ),
                 "base_residual_checkpoint": (
-                    None
-                    if base_residual_checkpoint is None
-                    else str(base_residual_checkpoint)
+                    None if base_residual_checkpoint is None else str(base_residual_checkpoint)
                 ),
                 "base_residual_action_mask": list(base_residual_action_mask),
                 "base_residual_bias": list(base_residual_bias),
@@ -675,11 +649,6 @@ def main() -> int:
             environment_path
             if args.curriculum_eval_default_config is None
             else _resolve(args.curriculum_eval_default_config)
-        )
-        strict_eval_config = (
-            environment_path
-            if args.curriculum_eval_strict_config is None
-            else _resolve(args.curriculum_eval_strict_config)
         )
 
         def _evaluate_curriculum(stage: str, completed_transitions: int):
@@ -723,16 +692,10 @@ def main() -> int:
                 episodes_path = eval_output / "episodes.json"
                 if episodes_path.is_file():
                     summary = dict(summary)
-                    summary["episodes"] = json.loads(
-                        episodes_path.read_text(encoding="utf-8")
-                    )
+                    summary["episodes"] = json.loads(episodes_path.read_text(encoding="utf-8"))
                 return summary
 
-            return combine_eval_summaries(
-                _run(default_eval_config, "default"),
-                _run(strict_eval_config, "strict125"),
-                gate=curriculum_sampler.stages[stage].gate,
-            )
+            return parse_eval_summary(_run(default_eval_config, "default"))
 
         curriculum_hook = CurriculumTrainerHook(
             controller=CurriculumPromotionController(
@@ -819,22 +782,14 @@ def main() -> int:
         "environment_config": str(environment_path),
         "environment_config_sha256": _sha256(environment_path),
         "curriculum": environment_config.curriculum.as_dict(),
-        "curriculum_promotion_enabled": bool(
-            environment_config.curriculum.promotion_enabled
-        ),
-        "curriculum_force_current_alpha_zero": bool(
-            args.curriculum_force_current_alpha_zero
-        ),
-        "curriculum_direct_commands_enabled": not bool(
-            args.curriculum_disable_direct_command
-        ),
+        "curriculum_promotion_enabled": bool(environment_config.curriculum.promotion_enabled),
+        "curriculum_force_current_alpha_zero": bool(args.curriculum_force_current_alpha_zero),
+        "curriculum_direct_commands_enabled": not bool(args.curriculum_disable_direct_command),
         "direct_commands_active": bool(env.env.direct_commands),
         "speed_contract": speed_contract,
         "reference_speed_mps": speed_contract["reference_speed_mps"],
         "command_residual": (
-            asdict(environment_config.command_residual)
-            if action_interface == "command"
-            else None
+            asdict(environment_config.command_residual) if action_interface == "command" else None
         ),
         "controller_gain_residual": (
             asdict(environment_config.controller_gain_residual)
