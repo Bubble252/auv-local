@@ -404,6 +404,14 @@ guarded 的 fixed normalization。此次同时把 std 从 `0.05` 改为 `0.1`，
 单独归因给 normalization 或 std；按反过度实验规则，不追加矩阵外消融去拆分归因。
 BCFT 继续使用 fixed normalization + std `0.05`；C0 路线、速度、`completion_min` 不变。
 
+**2026-11-17 C0 fixed-std1.5 ablation（REJECTED，非 canonical）**：保持 fixed normalization、actor LR `1e-5`、critic LR `3e-4`、`schedule=fixed`，只把 `init_noise_std` 提到 `1.5`；C0-only、`promotion=false`、72 iterations、1536 envs，GPU 4：
+
+- 1-iteration：`approx_kl=0.00246`、`clip_fraction=0.00903`、`ratio_max=1.40`，首个 update 数值稳定；
+- 最后 20 条 training-rollout：cross `15.1088 m`、vertical `3.5953 m`，作为对照的 fixed+std0.05 是 cross `0.7124 m`、vertical `0.2552 m`；
+- 退化同样逐步累积：cross 从 iterations 13–24 的 `1.225 m` 增至 61–72 的 `17.525 m`，vertical 从 `0.420 m` 增至 `3.670 m`；
+- KL max `0.00492`、clip max `0.0452`、ratio max `1.57`、peak reserved `8442 MiB`；completion、timeout、success 仅作 telemetry；
+- 结论：仅把 action noise std 提到 `1.5` 就会导致路径跟踪逐步漂移，低 KL/clip 不能证明行为质量。std `1.5` 拒绝，BCFT 固定使用 std `0.05`；不追加矩阵外 std 扫参。
+
 **最小 stage sweep 已落地（待服务器执行）**：`build_goal182_route_gate_calibration_configs.py`
 现在生成 7 个 stage env（C0–C6，单 stage mix、`promotion_enabled=false`）和 14 个
 training config（PE2E/ALOSB × 7 stage）。每个 stage 固定 40 iterations；
