@@ -35,3 +35,34 @@ def test_goal182_formal_alos_configs_use_a3_vertical_gain() -> None:
             assert environment_path.name == "env_alos_formal_a3_3d.json"
             environment = load_config(ROOT / environment_path)
             assert environment.guidance.vertical_gain == 2.5
+
+
+def test_goal182_formal_envs_use_frozen_60s_episode_protocol() -> None:
+    for name in ("env_path_fixed_speed_formal.json", "env_alos_formal_a3_3d.json"):
+        environment = load_config(GOAL / name)
+        assert environment.plant.max_episode_steps == 3000
+        assert environment.plant.dt_s == 0.02
+
+
+def test_goal182_formal_curriculum_sampler_covers_all_promotion_stages() -> None:
+    from auv_lowlevel.curriculum import (
+        CURRICULUM_STAGE_ORDER,
+        CurriculumStageSampler,
+        curriculum_stage_mix_target,
+        curriculum_stages_with_overrides,
+    )
+
+    for name in ("env_path_fixed_speed_formal.json", "env_alos_formal_a3_3d.json"):
+        environment = load_config(GOAL / name)
+        stages = curriculum_stages_with_overrides(
+            [stage for stage, _weight in environment.curriculum.stage_mix]
+        )
+        assert set(stages) == set(CURRICULUM_STAGE_ORDER)
+        sampler = CurriculumStageSampler(
+            stages=stages, stage_mix=environment.curriculum.stage_mix
+        )
+        for stage in CURRICULUM_STAGE_ORDER:
+            sampler.set_stage_mix(
+                curriculum_stage_mix_target(stage, preview_enabled=True)
+            )
+            assert sampler.sample(12345, stage=stage).stage == stage

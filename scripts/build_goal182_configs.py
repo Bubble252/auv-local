@@ -36,6 +36,9 @@ PPO_ITERATIONS = 5
 TRAIN_SEED = 86201
 FORMAL_SEEDS = (86201, 86202, 86203)
 FORMAL_ITERATIONS = 2600
+# Goal182 CU2 (2026-11-16): formal protocol is 3000 steps x 0.02 s = 60 s.
+# The pre-formal C3 screen env keeps the legacy 2500-step cap.
+FORMAL_MAX_EPISODE_STEPS = 3000
 
 START_JITTER_YAW_RAD = 0.1745329252
 START_JITTER_PITCH_RAD = 0.1745329252
@@ -173,6 +176,8 @@ def _environment(*, formal: bool = False) -> dict[str, Any]:
         }
     )
     payload["plant"]["bounds_m"][2][1] = 520.0
+    if formal:
+        payload["plant"]["max_episode_steps"] = FORMAL_MAX_EPISODE_STEPS
     payload["sensors"] = {"profile": "unbiased_small_noise_v2", "seed": 81300}
     payload["experiment"].update(
         {
