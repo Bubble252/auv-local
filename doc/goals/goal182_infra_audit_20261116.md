@@ -356,5 +356,31 @@ python scripts/check_goal182_eval_matrix.py --require-frozen
 # PASS goal182 eval matrix frozen
 ```
 
-正式训练现在只剩用户对 ALOSB BCFT/BCRES 的 A/B/C/D 决策，以及从包含本修复的新
-commit 建干净服务器 worktree。
+### 11.1 修复后的 formal-env contract smoke
+
+服务器已从分支 commit `8f3e264` 建干净 worktree：
+
+```text
+/data/yhx/underwater-robotics/worktrees/auv-local/goal182/20261117-goal182-formal-8f3e264
+```
+
+`TRRES_CMD` 在 formal ALOS env 上跑 2 iterations（C0 起点、GPU7）：
+
+- 2/2 iteration `losses_finite=true`；
+- 写出 `final.pt`（10,704,243 bytes）、`training_manifest.json` 和
+  `curriculum_state.json`；
+- curriculum state 为 `stage=C0`、`stage_mix=C0:0.9/C1:0.1`、`promotion_enabled=true`；
+- route gate 在 iteration 2 仍记 `TELEMETRY_MISSING`，原因是窗口内没有 episode 自然
+  结束，符合预期；
+- 触发两次 frozen-dev curriculum eval（`196608` / `393216` transitions），
+  default 与 strict125 各 40 seeds 均完成并写出 canonical summary；
+- 这两次 eval 的 C0 success `0.05`、3D `5.3451/5.2661 m` 只是 1–2 iteration
+  检查点，不是 formal 结果。
+
+运行根目录：
+
+```text
+/data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-formal-8f3e264
+```
+
+正式训练现在只剩用户对 ALOSB BCFT/BCRES 的 A/B/C/D 决策。

@@ -14,6 +14,7 @@ goal182_branch: goal182/infra-20261117
 goal182_server: ssh -p 43127 yhx@152.136.183.51；节点 underwater-8x4090；数据根 /data/yhx/underwater-robotics；smoke worktree 20261117-goal182-smoke-3a96fa7；run 根 /data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-smoke-3a96fa7；GPU6 评价、GPU7 训练。
 goal182_screen_result: 4 个已就绪 MOD4 × MLP arm（BCFT/BCRES/TRRES_CMD/TRRES_ACT）各 5 iterations、C3、seed 86201，全部 rc=0、5/5 finite；单 seed 评价均写出 summary/episodes/trace，success 0/1；只证明链路可执行，不是 formal 排名。
 goal182_formal_env_fix: CU2 的 max_episode_steps=3000（60 s）此前未写入 formal env；已在 build_goal182_configs.py 增加 FORMAL_MAX_EPISODE_STEPS，重生成两份 formal env，并加 60 s 与 C0–C6 sampler 覆盖测试。screen 的非 formal C3 env 保留 2500 以保持可追溯。
+goal182_formal_smoke: 从 commit 8f3e264 建干净 formal worktree；TRRES_CMD 在 formal ALOS env 跑 2 iterations（C0），2/2 finite，写出 final.pt/manifest/curriculum state；两次 frozen-dev curriculum eval 各 40 seeds 完成。run 根 /data/yhx/underwater-robotics/runs/auv-local/goal182/20261117-goal182-formal-8f3e264。只作 contract smoke，不是 formal 结果。
 goal182_blockers: ALOSB × BCFT/BCRES 需要兼容 ALOS 输入的 5D BC；现有 PE2E BC SHA f7103f04… 不能直接作 ALOSB warmstart。可选 A 先训 ALOS BC、B 用户豁免、C 首波 4 臂后置、D 重定义契约。正式训练前必须清空此 USER_DECISION。
 goal175_status: A2_COMPLETE / GATE175_FAIL / VERTICAL_GUARD_FAIL / H175C_NOT_SUPPORTED / HELDOUT_CLOSED
 goal175_result: doc/goals/goal175_result_20261114.md
