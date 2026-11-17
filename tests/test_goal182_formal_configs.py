@@ -218,6 +218,22 @@ def test_goal182_envs_only_use_default_two_metre_radius() -> None:
         assert float(plant["goal_radius_m"]) == 2.0
 
 
+def test_goal182_route_gate_calibration_configs_are_frozen_reference_rollouts() -> None:
+    paths = sorted((GOAL / "calibration").glob("reference_*_C*.json"))
+
+    assert len(paths) == 14
+    for path in paths:
+        payload = _module_payload(path)
+        algorithm = payload["algorithm"]
+        assert algorithm["learning_rate"] == 1e-12
+        assert algorithm["schedule"] == "fixed"
+        assert "learning_rate_actor" not in algorithm
+        assert "learning_rate_critic" not in algorithm
+        assert "learning_rate_dade_head" not in algorithm
+        assert payload["base_policy"]["residual_scale"] == 1e-6
+        assert payload["training"]["iterations"] == 100
+
+
 def test_goal182_ppo_trainer_has_no_strict125_eval_path() -> None:
     source = (ROOT / "scripts" / "train_batch_lowlevel_ppo.py").read_text(encoding="utf-8")
     assert "curriculum-eval-strict-config" not in source

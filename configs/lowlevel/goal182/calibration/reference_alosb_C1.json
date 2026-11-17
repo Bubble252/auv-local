@@ -16,7 +16,7 @@
     "normalize_advantage_per_mini_batch": true,
     "num_learning_epochs": 5,
     "num_mini_batches": 4,
-    "schedule": "adaptive",
+    "schedule": "fixed",
     "use_clipped_value_loss": true,
     "value_loss_coef": 1.0
   },
@@ -136,13 +136,13 @@
     "empirical_normalization": true,
     "logger": "tensorboard",
     "num_steps_per_env": 48,
-    "save_interval": 40
+    "save_interval": 100
   },
   "schema_version": "auv_odarrl_control_ppo.v1",
   "training": {
     "initial_residual_output_std": 0.0,
     "initial_residual_zero": false,
-    "iterations": 40,
+    "iterations": 100,
     "privileged_current_critic": false
   },
   "training_profile": "PPO-FLAT-4096x48-E5-MB4",

@@ -37,8 +37,8 @@ REFERENCE_RESIDUAL_SCALE = (
 REFERENCE_LEARNING_RATE = (
     1e-12  # magic-number-ok: effectively no PPO update during reference rollouts
 )
-CALIBRATION_ITERATIONS = 60
-STAGE_CALIBRATION_ITERATIONS = 40
+CALIBRATION_ITERATIONS = 100
+STAGE_CALIBRATION_ITERATIONS = 100
 
 
 def _write(path: Path, payload: dict) -> None:
@@ -53,6 +53,7 @@ def build_config(control: str, source: Path, destination: Path) -> dict:
     payload = copy.deepcopy(payload)
     payload["base_policy"]["residual_scale"] = REFERENCE_RESIDUAL_SCALE
     payload["algorithm"]["learning_rate"] = REFERENCE_LEARNING_RATE
+    payload["algorithm"]["schedule"] = "fixed"
     for key in ("learning_rate_actor", "learning_rate_critic", "learning_rate_dade_head"):
         payload["algorithm"].pop(key, None)
     payload["training"]["iterations"] = CALIBRATION_ITERATIONS
