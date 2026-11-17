@@ -11,7 +11,6 @@ from auv_lowlevel.batch.pc_env import BatchedPCLowLevelEnv
 from auv_lowlevel.config import load_config, parse_config
 from auv_lowlevel.curriculum import CurriculumStageSampler
 
-
 ROOT = Path(__file__).resolve().parents[1]
 BASE_CONFIG = ROOT / "configs/lowlevel/odarrl_control_pc_c3_random_realistic_v0_fixed_speed.json"
 
@@ -49,9 +48,12 @@ def test_curriculum_reset_applies_every_episode_axis(tmp_path: Path) -> None:
     assert env.curriculum_specs is not None
     specs = env.curriculum_specs
     assert [spec.stage for spec in specs] == ["C3"] * len(seeds)
-    lengths = env.path.total_length_m_for(len(seeds))
     expected_lengths = torch.tensor([spec.length_m for spec in specs], dtype=torch.float64)
-    torch.testing.assert_close(lengths, expected_lengths, rtol=0.0, atol=1e-5)
+    points = env.path.points_ned_m
+    horizontal_lengths = torch.linalg.norm(torch.diff(points[:, :, :2], dim=1), dim=-1).sum(dim=1)
+    torch.testing.assert_close(horizontal_lengths, expected_lengths, rtol=0.0, atol=0.05)
+    total_lengths = env.path.total_length_m_for(len(seeds))
+    assert torch.all(total_lengths >= expected_lengths - 1e-6)
     expected_depths = torch.tensor([spec.depth_m for spec in specs], dtype=torch.float64)
     torch.testing.assert_close(env.eta[:, 2], expected_depths, rtol=0.0, atol=1e-8)
     torch.testing.assert_close(
@@ -92,7 +94,9 @@ def test_curriculum_reset_applies_every_episode_axis(tmp_path: Path) -> None:
 
     rows = [
         json.loads(line)
-        for line in (tmp_path / "curriculum_episodes.jsonl").read_text(encoding="utf-8").splitlines()
+        for line in (tmp_path / "curriculum_episodes.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
     assert len(rows) == len(seeds)
     assert {row["stage"] for row in rows} == {"C3"}
@@ -127,7 +131,9 @@ def test_curriculum_reset_indices_merges_only_selected_rows(tmp_path: Path) -> N
 
     rows = [
         json.loads(line)
-        for line in (tmp_path / "curriculum_episodes.jsonl").read_text(encoding="utf-8").splitlines()
+        for line in (tmp_path / "curriculum_episodes.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
     ]
     assert len(rows) == 4
     assert rows[-1]["train_seed"] == 31
@@ -165,9 +171,7 @@ def test_curriculum_config_parser_accepts_c5_c6_and_frozen_mix() -> None:
     assert config.pc_stage == "C6"
     assert config.curriculum.enabled is True
     assert config.curriculum.initial_stage == "C6"
-    assert dict(config.curriculum.stage_mix) == pytest.approx(
-        {"C6": 0.80, "C5": 0.15, "C0": 0.05}
-    )
+    assert dict(config.curriculum.stage_mix) == pytest.approx({"C6": 0.80, "C5": 0.15, "C0": 0.05})
 
 
 def test_curriculum_config_parser_rejects_missing_mix_when_enabled() -> None:

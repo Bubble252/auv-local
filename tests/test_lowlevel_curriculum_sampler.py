@@ -23,9 +23,10 @@ from auv_lowlevel.curriculum import (
     RouteGateThresholds,
     RouteGateWindow,
     StageEvaluation,
+    StageGate,
     curriculum_stage_mix_target,
-    curriculum_stratum,
     curriculum_stages_with_overrides,
+    curriculum_stratum,
     default_curriculum_stages,
     high_speed_curriculum_stages,
 )
@@ -50,13 +51,16 @@ def _route_metrics(
 
 def _passing_evaluation(default: float = 0.92) -> StageEvaluation:
     return StageEvaluation(
+        safety_rate=0.0,
+        path_completion_ratio=0.95,
+        cross_track_rmse_m=0.20,
+        vertical_rmse_m=0.20,
         default_success=default,
-        strict_success=0.75,
+        eta_tight_success_rate=0.75,
         timeout_rate=0.02,
         plane_miss_rate=0.02,
-        safety_rate=0.0,
-        anchor_default_success=0.90,
-        stratified_default_success={"depth_low": 0.90, "depth_high": 0.84},
+        path_three_d_rmse_m=0.30,
+        pre_goal_3d_rmse_m=0.30,
     )
 
 
@@ -69,11 +73,27 @@ def test_default_stage_protocol_covers_c0_to_c6_in_order() -> None:
     assert stages["C6"].current_period_range_s == (4.0, 8.0)
 
 
+def test_curriculum_depth_ranges_cover_goal182_depth_axis() -> None:
+    stages = default_curriculum_stages()
+    assert stages["C0"].depth_range_m[0] <= 10.0
+    assert stages["C6"].depth_range_m[1] >= 500.0
+    frozen_depths = (10.0, 80.0, 250.0, 500.0)
+    assert all(
+        any(
+            low <= depth <= high for low, high in (stage.depth_range_m for stage in stages.values())
+        )
+        for depth in frozen_depths
+    )
+    for name, stage in stages.items():
+        sampler = CurriculumStageSampler(stage_mix=((name, 1.0),))
+        for seed in range(50):
+            sampled = sampler.sample(seed)
+            assert stage.depth_range_m[0] <= sampled.depth_m <= stage.depth_range_m[1]
+
+
 def test_curriculum_speed_ranges_stay_inside_remus_envelope() -> None:
     stages = default_curriculum_stages()
-    assert max(stage.speed_range_mps[1] for stage in stages.values()) <= (
-        REMUS100_MAX_SPEED_MPS
-    )
+    assert max(stage.speed_range_mps[1] for stage in stages.values()) <= (REMUS100_MAX_SPEED_MPS)
     with pytest.raises(ValueError, match="REMUS100 speed envelope"):
         replace(stages["C6"], speed_range_mps=(1.2, REMUS100_MAX_SPEED_MPS + 0.01))
 
@@ -158,8 +178,7 @@ def test_high_speed_curriculum_v2_sampler_respects_joint_ground_speed_cap() -> N
     specs = sampler.sample_batch(range(2048), stage="C6")
     assert all(spec.speed_mps <= REMUS100_MAX_SPEED_MPS for spec in specs)
     assert all(
-        spec.speed_mps + spec.current_speed_mps + 0.10
-        <= REMUS100_MAX_SPEED_MPS + 1e-12
+        spec.speed_mps + spec.current_speed_mps + 0.10 <= REMUS100_MAX_SPEED_MPS + 1e-12
         for spec in specs
     )
     assert max(spec.speed_mps for spec in specs) >= 2.30
@@ -178,12 +197,9 @@ def test_high_speed_curriculum_v2_all_stages_respect_joint_ground_speed_cap() ->
         specs = sampler.sample_batch(range(4096), stage=stage)
         upper = SPEED_CURRICULUM_V2_RANGES_MPS[stage][1]
         assert max(spec.speed_mps for spec in specs) <= upper + 1e-12
-        assert max(spec.speed_mps for spec in specs) <= (
-            REMUS100_MAX_SPEED_MPS - variation + 1e-12
-        )
+        assert max(spec.speed_mps for spec in specs) <= (REMUS100_MAX_SPEED_MPS - variation + 1e-12)
         assert all(
-            spec.speed_mps + spec.current_speed_mps + variation
-            <= REMUS100_MAX_SPEED_MPS + 1e-12
+            spec.speed_mps + spec.current_speed_mps + variation <= REMUS100_MAX_SPEED_MPS + 1e-12
             for spec in specs
         )
 
@@ -204,8 +220,7 @@ def test_sampler_couples_speed_and_current_inside_remus_envelope() -> None:
     assert all(spec.speed_mps <= REMUS100_MAX_SPEED_MPS for spec in specs)
     assert all(spec.speed_mps >= 2.40 for spec in specs)
     assert all(
-        spec.speed_mps + spec.current_speed_mps + 0.1
-        <= REMUS100_MAX_SPEED_MPS + 1e-12
+        spec.speed_mps + spec.current_speed_mps + 0.1 <= REMUS100_MAX_SPEED_MPS + 1e-12
         for spec in specs
     )
 
@@ -236,9 +251,7 @@ def test_max_speed_endpoint_requires_zero_current_and_variation() -> None:
 
 def test_sampler_variation_bound_must_stay_inside_remus_envelope() -> None:
     with pytest.raises(ValueError, match="variation"):
-        CurriculumStageSampler(
-            current_variation_speed_amplitude_mps=REMUS100_MAX_SPEED_MPS + 0.01
-        )
+        CurriculumStageSampler(current_variation_speed_amplitude_mps=REMUS100_MAX_SPEED_MPS + 0.01)
 
 
 def test_stage_sampler_is_deterministic_and_within_frozen_ranges() -> None:
@@ -298,33 +311,55 @@ def test_promotion_requires_two_consecutive_gate_passes() -> None:
     assert len(controller.history) == 2
 
 
-def test_severe_failure_twice_rolls_back_one_stage() -> None:
-    controller = CurriculumPromotionController(start_stage="C1")
-    evaluation = StageEvaluation(
-        default_success=0.75,
-        strict_success=0.50,
-        timeout_rate=0.30,
-        plane_miss_rate=0.30,
-        safety_rate=0.0,
-        anchor_default_success=0.90,
-        stratified_default_success={"depth_low": 0.72, "depth_high": 0.70},
+def test_terminal_outcomes_do_not_fail_the_stage_gate() -> None:
+    gate = StageGate(
+        safety_max=0.0,
+        completion_min=0.80,
+        cross_track_rmse_max_m=0.30,
+        vertical_rmse_max_m=0.30,
     )
-    assert controller.observe(evaluation) is CurriculumDecision.CONTINUE
-    assert controller.observe(evaluation) is CurriculumDecision.ROLLBACK
-    assert controller.stage == "C0"
-    assert controller.rollbacks_used == 1
+    evaluation = StageEvaluation(
+        safety_rate=0.0,
+        path_completion_ratio=0.95,
+        cross_track_rmse_m=0.20,
+        vertical_rmse_m=0.20,
+        default_success=0.0,
+        eta_tight_success_rate=0.0,
+        timeout_rate=1.0,
+        plane_miss_rate=1.0,
+        path_three_d_rmse_m=100.0,
+        pre_goal_3d_rmse_m=100.0,
+    )
+    assert evaluation.gate_failures(gate) == ()
+    assert evaluation.gate_passes(gate) is True
+
+
+def test_route_rmse_thresholds_fail_closed_when_telemetry_is_missing() -> None:
+    gate = StageGate(
+        safety_max=0.0,
+        completion_min=0.80,
+        cross_track_rmse_max_m=0.30,
+        vertical_rmse_max_m=0.30,
+    )
+    missing = StageEvaluation(
+        safety_rate=0.0,
+        path_completion_ratio=0.95,
+        cross_track_rmse_m=None,
+        vertical_rmse_m=None,
+    )
+    assert missing.gate_passes(gate) is False
+    assert "telemetry missing" in " ".join(missing.gate_failures(gate))
 
 
 def test_safety_guard_failure_twice_rolls_back() -> None:
     controller = CurriculumPromotionController(start_stage="C2")
     evaluation = StageEvaluation(
+        safety_rate=0.02,
+        path_completion_ratio=0.95,
         default_success=0.82,
-        strict_success=0.58,
+        eta_tight_success_rate=0.58,
         timeout_rate=0.20,
         plane_miss_rate=0.10,
-        safety_rate=0.02,
-        anchor_default_success=0.90,
-        stratified_default_success={"depth_low": 0.82, "depth_high": 0.80},
     )
     assert controller.observe(evaluation) is CurriculumDecision.CONTINUE
     assert controller.observe(evaluation) is CurriculumDecision.ROLLBACK
@@ -334,23 +369,35 @@ def test_safety_guard_failure_twice_rolls_back() -> None:
 def test_stalled_metric_triggers_stalled_decision() -> None:
     controller = CurriculumPromotionController(start_stage="C1")
     evaluation = StageEvaluation(
+        safety_rate=0.0,
+        path_completion_ratio=0.55,
         default_success=0.80,
-        strict_success=0.60,
+        eta_tight_success_rate=0.60,
         timeout_rate=0.10,
         plane_miss_rate=0.10,
-        safety_rate=0.0,
-        anchor_default_success=0.90,
-        stratified_default_success={"depth_low": 0.80, "depth_high": 0.78},
     )
     assert controller.observe(evaluation) is CurriculumDecision.CONTINUE
     assert controller.observe(evaluation) is CurriculumDecision.CONTINUE
     assert controller.observe(evaluation) is CurriculumDecision.CURRICULUM_STALLED
 
 
-def test_budget_and_current_encoder_guards() -> None:
+def test_iteration_budget_guard() -> None:
     controller = CurriculumPromotionController()
-    budget = controller.observe(_passing_evaluation(), completed_transitions=400_000)
+    budget = controller.observe(_passing_evaluation(), completed_iterations=120)
     assert budget is CurriculumDecision.STAGE_BUDGET_EXHAUSTED
+
+
+def test_per_iteration_stage_budget_check_is_idempotent() -> None:
+    controller = CurriculumPromotionController(start_stage="C0")
+
+    assert controller.check_stage_budget(119).exhausted is False
+    status = controller.check_stage_budget(120)
+    assert status.exhausted is True
+    assert status.stage == "C0"
+    assert status.consumed_iterations == 120
+    assert status.hard_cap_iterations == 120
+    # Re-observing the same completed iteration must not double-count.
+    assert controller.check_stage_budget(120).consumed_iterations == 120
 
 
 def test_goal182_iteration_caps_replace_transition_budget_unit() -> None:
@@ -383,17 +430,27 @@ def test_goal182_iteration_caps_replace_transition_budget_unit() -> None:
     assert controller.stage_consumed_iterations == 120
 
 
-def test_rollback_reentry_uses_per_stage_budget_not_global_transitions() -> None:
+def test_goal182_iteration_budget_ignores_global_transition_clock() -> None:
+    controller = CurriculumPromotionController(start_stage="C0")
+    decision = controller.observe(
+        _passing_evaluation(),
+        completed_transitions=14_155_776,
+        completed_iterations=60,
+    )
+    assert decision is CurriculumDecision.CONTINUE
+    assert controller.stage == "C0"
+
+
+def test_rollback_reentry_ignores_global_transition_clock() -> None:
     controller = CurriculumPromotionController(start_stage="C0")
     passing = _passing_evaluation()
     failing = StageEvaluation(
+        safety_rate=0.02,
+        path_completion_ratio=0.55,
         default_success=0.65,
-        strict_success=0.55,
+        eta_tight_success_rate=0.55,
         timeout_rate=0.0,
         plane_miss_rate=0.35,
-        safety_rate=0.0,
-        anchor_default_success=0.90,
-        stratified_default_success={"path:P0": 0.63, "path:P1": 0.70},
     )
 
     assert controller.observe(passing, completed_transitions=100_000) is CurriculumDecision.CONTINUE
@@ -404,22 +461,18 @@ def test_rollback_reentry_uses_per_stage_budget_not_global_transitions() -> None
     assert controller.stage == "C0"
 
     assert controller.observe(passing, completed_transitions=500_000) is CurriculumDecision.CONTINUE
-    assert controller.stage_consumed_transitions == 300_000
-    assert (
-        controller.observe(passing, completed_transitions=600_000)
-        is CurriculumDecision.STAGE_BUDGET_EXHAUSTED
-    )
+    assert controller.observe(passing, completed_transitions=600_000) is CurriculumDecision.PROMOTE
+    assert controller.stage == "C1"
 
     controller = CurriculumPromotionController(start_stage="C4")
     rejected = controller.observe(
         StageEvaluation(
+            safety_rate=0.0,
+            path_completion_ratio=0.95,
             default_success=0.82,
-            strict_success=0.60,
+            eta_tight_success_rate=0.60,
             timeout_rate=0.10,
             plane_miss_rate=0.10,
-            safety_rate=0.0,
-            anchor_default_success=0.90,
-            stratified_default_success={"depth_low": 0.82, "depth_high": 0.80},
             current_encoder_constant_degradation=0.08,
             current_encoder_fast_layer_compensation=0.0,
         )
@@ -485,7 +538,6 @@ def test_stage_mix_ramp_is_linear_and_sets_sampler_mix() -> None:
     counts = {key: sum(spec.stage == key for spec in sampled) / len(sampled) for key, _ in target}
     for key, weight in target:
         assert counts[key] == pytest.approx(weight, abs=0.035)
-
 
 
 def test_route_gate_window_is_shadow_until_thresholds_are_frozen() -> None:
