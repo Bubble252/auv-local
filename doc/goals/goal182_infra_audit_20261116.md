@@ -384,3 +384,34 @@ python scripts/check_goal182_eval_matrix.py --require-frozen
 ```
 
 正式训练现在只剩用户对 ALOSB BCFT/BCRES 的 A/B/C/D 决策。
+
+### 11.2 本轮提交与推送
+
+```bash
+cd settled_局部规划器_反应式/.worktrees/goal182-infra-detached-20261116
+git add scripts/build_goal182_configs.py tests/test_goal182_formal_configs.py \
+  configs/lowlevel/goal182/env_alos_formal_a3_3d.json \
+  configs/lowlevel/goal182/env_path_fixed_speed_formal.json
+git diff --cached --check
+git commit -m "fix(goal182): enforce 60s formal episode protocol"
+
+git add doc/goals/goal182_screen_20261117.md \
+  doc/goals/goal182_infra_audit_20261116.md research/STATE.md research/LEDGER.jsonl
+git diff --cached --check
+git commit -m "docs(goal182): record quick screen and 60s formal fix"
+
+git push server goal182/infra-20261117
+git push origin goal182/infra-20261117
+```
+
+服务器验证：
+
+```bash
+ssh -p 43127 yhx@152.136.183.51
+W=/data/yhx/underwater-robotics/worktrees/auv-local/goal182/20261117-goal182-formal-8f3e264
+cd "$W"
+git rev-parse --short HEAD   # dc1d146
+PYTHONPATH=$W/src:/data/yhx/underwater-robotics/worktrees/auv-core/g04-sync/20261114-g04-sync-0e0bfb1/src \
+  /data/yhx/underwater-robotics/envs/venvs/isaaclab/bin/python \
+  -m pytest tests/test_goal182_formal_configs.py -q   # 4 passed
+```
