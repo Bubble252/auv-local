@@ -345,6 +345,15 @@ PE2E BCFT seed86201（单 seed 完整课程）
 - **标定隔离**：COMP 与 NOCOMP 各生成一套 7-stage 100-it 标定包，分别冻结两张 `status=FROZEN` 表；每张表仍需用户单独确认后才能用于正式 routine gate。
 - **启动节奏**：两线各先跑首条 BCFT 的 75-it C0 晋级 smoke；通过后各跑 BCFT seed86201 2600-it。BCRES 复用同线 BC 与表；TRRES_CMD/TRRES_ACT 不用 BC，fresh init，但必须复用同线 env 与同线冻结表。不得一次排满所有 module/seed。
 
+**2026-11-18 双线执行记录**
+
+- COMP demo：`demos_goal184_alos_comp_v4_teacher_alos_truth`，`688128` samples / `551` episodes，dataset SHA `23ece77846283a8b88959e6acd057d1198f73507f0478f3a46d792b27960bc13`，curriculum SHA `2b99f15eb5362bf7d765280b2216c4a7df320a0c59bf394b6a94aec7c57d736f`；manifest `compensate_current=true`、teacher source `truth`。
+- COMP BC：`alos_comp_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`，SHA `7433802d2a6c43205941da179fcb08e501f556a4a1a8c5ebd638d2b849e6f236`，best epoch `28`，val loss `0.0214032`。
+- COMP BC_ONLY C3（seeds `20–23`，COMP env，teacher truth）：student 3D `2.7571 m` / horizontal `2.2651 m` / vertical `1.5719 m`，success `1.0`；同次 teacher 3D `2.7867 m`、success `1.0`。teacher-relative screen PASS。
+- NOCOMP BC 仍为 `f4ccb463...`；BC_ONLY C3 student 3D `3.2266 m`、success `0.5`，teacher `2.7898 m`、success `0.75`，标 `WEAK_BC_INIT`；按双线计划可继续，但首条 BCFT 必须过 75-it C0 smoke。
+- 配置包：`configs/lowlevel/goal184/train_formal_mod4_alosb_{bcft,bcres}_{comp,nocomp}_env_empirical_5d_m_seed86201.json`；标定包 `calibration/stage_matched_alosb_{comp,nocomp}_v4_100it_fixedlr/`（各 7 个 env + 7 个 train + manifest）。四条 formal config 和 14 条 calibration config 的 canonical profile checker 均 PASS。
+- 当前执行：COMP 7-stage 100-it 标定运行中；完成后运行 NOCOMP 7-stage 标定。两表冻结后分别跑首条 BCFT 的 75-it C0 smoke；未冻结/未确认前不得启动正式 2600-it arm。
+
 ### 5.4 可执行命令模板
 
 以下命令从干净 server worktree 运行；`W`、`R`、`PY`、`CORE` 必须替换为本次 run 的实际路径。
