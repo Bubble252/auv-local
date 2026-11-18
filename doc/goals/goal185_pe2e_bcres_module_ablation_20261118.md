@@ -69,7 +69,7 @@ autoresearch:
 | demo SHA256 | `cee7e4906cf526ccad6a58c6a9e203c387fb9e4d09a8fdee2d85731f879813fc` |
 | demo 规模 | 593 episodes / 688,128 samples / C0–C6 |
 | MOD3 BC | `pe2e_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`，SHA `86cab3fef9ee5784c0d3ef9441b1a409636df45204902713bb2fc950ebb1c086` |
-| MOD2/1/0 BC | 同一 demo 重训的无 current encoder BC（新目录，SHA 待冻结） |
+| MOD2/1/0 BC | `pe2e_bc_stage_matched_v4_teacher_alos_truth_nocurrent/pc_bc_actor.pt`，SHA `f593cd9957cd245a932611b188c9fac2c08b6978910e3b22e9d580ef4b266c80`（same demo，`actor_current_encoder=none`，best epoch 16 / val 0.05238） |
 | eval seeds | `20/21/22`；dev `20–23` |
 | held-out | `100–149` 关闭 |
 | 半径 | 只用 `2.0 m` |
@@ -121,17 +121,22 @@ MOD0 与 MOD2/MOD1 共用同一无 current BC；DADE warm start 是零输出，
 
 ### 5.2 Steps
 
-- [ ] **Step 0：配置生成**
+- [x] **Step 0：配置生成**
   - 新增 `scripts/build_goal185_mod_ablation_configs.py`，以 MOD4 empirical BCRES config 为模板，
     只改 §4.1 的字段与 `experiment.name/output`；
   - 每份运行 `python3 /home/bubble/水下机器人/总协调/scripts/check_training_profile.py --training-config <config>`；
   - `git add` 脚本与 4 份 config，`git diff --cached --check` 后 commit。
-- [ ] **Step 1：无 current encoder BC**
-  - 用同一 `demos.npz` 重训，输出
-    `bc/pe2e_bc_stage_matched_v4_teacher_alos_truth_nocurrent/pc_bc_actor.pt`；
-  - 配方不变，只去掉 `--actor-current-encoder-enabled`；
-  - 计算 SHA256，跑一次 BC_ONLY C3 seeds `20–23` 只读诊断（不作 Gate）；
-  - 把 SHA 写回 §3 与 config，commit。
+- [x] **Step 1：无 current encoder BC**
+  - 已重训：`actor_current_encoder=none`，same demo，best epoch 16 / val `0.05238`，
+    SHA `f593cd99...`；
+  - BC_ONLY C3 seeds 20–23（只读诊断，不作 Gate）：
+    3D `1.8718 m`、horizontal `1.4608 m`、vertical `1.1703 m`、
+    success `0.25`（1/4）、timeout `0`；
+    对照 v4 current BC：3D `1.9933 m`、horizontal `1.4405 m`、
+    vertical `1.3778 m`、success `0.75`；
+  - 判读：路径误差不差于 v4，但速度跟踪 `speed_rmse 0.81 vs 0.46`、success
+    telemetry 更弱。MOD2/1/0 的结果带 BC 质量混杂，只能作描述性消融，
+    不能单独把退化归因给模块。
 - [ ] **Step 2：合同 smoke**
   - 4 个 MOD 各跑一次 1-it 1536-env contract smoke；
   - 检查 frozen BC 加载、MOD0 的 `dade_enabled=false`、`critic_path_dim`、
