@@ -1,6 +1,6 @@
 # Goal184 PPO 启动就绪审计
 
-> **2026-11-18 后续复核**：传感器 v3、C5/C6 outage、stage-matched 7-stage demo、BC 重训、BC_ONLY、逐阶段 route-gate 阈值生产/消费以及训练产物审计接线均已完成；formal env/training config 的 warmstart 已更新到 `2292c195...`，`check_training_profile=PASS`，warmstart empirical schema 已匹配。审计器现在检查 C0–C6 provenance、20/3 gate、迭代数值和 empirical checkpoint metadata，失败非零退出。eval seeds 已按用户批准从 `90001–90003` 重冻结为 `20/21/22`，matrix/freeze checker 返回 PASS。仍未完成：实际 PE2E 标定/冻结、服务器 1-iteration smoke、用户选 B 的 75-it gate smoke。
+> **2026-11-18 后续复核**：传感器 v3、C5/C6 outage、stage-matched 7-stage demo、BC 重训、BC_ONLY、逐阶段 route-gate 阈值生产/消费以及训练产物审计接线均已完成；formal env/training config 的 warmstart 已更新到 `2292c195...`，`check_training_profile=PASS`，warmstart empirical schema 已匹配。审计器现在检查 C0–C6 provenance、20/3 gate、迭代数值和 empirical checkpoint metadata，失败非零退出。eval seeds 已按用户批准从 `90001–90003` 重冻结为 `20/21/22`，matrix/freeze checker 返回 PASS。STAGE_MATCHED_BC 1-iteration 1536-env smoke 已在服务器 commit `2cbd13c` 上 PASS。仍未完成：实际 PE2E 标定/冻结、用户选 B 的 75-it gate smoke。
 
 日期：2026-11-18。范围：只读审计与本文记录；没有修改实验参数、启动训练或连接服务器核验实时状态。
 

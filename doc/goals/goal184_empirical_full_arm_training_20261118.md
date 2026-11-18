@@ -1,7 +1,7 @@
 # Goal184：empirical 归一化下的完整课程 arm 训练与测评
 
 **日期**：2026-11-18<br>
-**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_READY / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_READY / SERVER_1IT_SMOKE_PENDING / REFERENCE_BC_INVALID_FOR_ROUTINE / EVAL_SEEDS_REFROZEN / HELDOUT_CLOSED`<br>
+**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_READY / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_READY / SERVER_1IT_SMOKE_PASSED / REFERENCE_BC_INVALID_FOR_ROUTINE / EVAL_SEEDS_REFROZEN / HELDOUT_CLOSED`<br>
 **父 Goal**：Goal182、Goal183<br>
 **仓库**：`settled_局部规划器_反应式`<br>
 **执行提示词**：`/home/bubble/水下机器人/总协调/doc/ops/GOAL184_EMPIRICAL_FULL_ARMS_PROMPT_20261118.md`<br>
@@ -45,7 +45,8 @@ autoresearch:
 - **outage 覆盖（采集侧）**：C0–C4 `current_estimate_valid_rate=1.0`、0 次 outage；C5 `8/76` episodes、duty `0.0387%`；C6 `29/90` episodes、duty `0.165%`；均落在 §4.1 预期带内；
 - **BC_ONLY 对照（seeds `20–23`，`endpoint_stop`，path_dim=5）**：旧 C3 固定环境 3D `1.9775 m`、horizontal `1.9578 m`、vertical `0.2786 m`、success `0.25`，同环境 teacher 3D `2.4071 m`；stage-matched C3 3D `5.0211 m`，teacher `4.6141 m`，说明差异来自 stage-matched C3（v3 速度/流场）本身更难，不是 BC 退化；
 - **BC_ONLY outage 诊断（C5/C6，seeds `20–51`）**：C5 `current_estimate_valid_rate=0.999384`、3D `3.2795 m`、success `0.09375`；C6 `current_estimate_valid_rate=0.998690`、3D `2.6483 m`、success `0.40625`；C5/C6 均真实触发 outage；
-- 旧 `ce4290` checkpoint 的 1-iteration 1536-env contract smoke 已通过：KL `0.003287`、clip `0.022705`、ratio max `1.528058`、peak reserved `8438 MiB`，checkpoint empirical metadata 正常；该 smoke 只证明旧 checkpoint 接线，**不能作为 STAGE_MATCHED_BC 的验收**，新 checkpoint 的 1-it smoke 仍待 Phase A 服务器执行；
+- 旧 `ce4290` checkpoint 的 1-iteration 1536-env contract smoke 已通过：KL `0.003287`、clip `0.022705`、ratio max `1.528058`、peak reserved `8438 MiB`；该 smoke 只作为历史接线证据；
+- **STAGE_MATCHED_BC 1-iteration 1536-env smoke PASS（2026-11-18）**：服务器 worktree `20261118-goal184-2cbd13c`、commit `2cbd13c`、GPU 3；`73728` steps、`12.60 s`；`approx_kl=0.00312599`、`clip_fraction=0.0250244`、`ratio_max=1.552786`、`losses_finite=true`、mean std `0.04996`、peak reserved `8438 MiB`；warmstart SHA `2292c195...` 与 config 一致，manifest `normalization_mode=empirical`、actor schema hash `0ae8f361...`、`status=completed`；
 - 初版 `REFERENCE_BC` 40-it/stage 标定已停止：iteration record 的 `episode_metrics` 只有在有 episode 完成时才非空，C0/C1/C2 的 PE2E 非空数仅 `21/21/26`，C3 在 11 it 时仅 `1`，达不到 `min-stage-records=20`；
 - 首次 100-it 并行标定又暴露 `schedule=adaptive` 会把 reference LR 从 `1e-12` 自动放大到 `1e-2`，C3 第 18 it 因 std 变负崩溃；已把 calibration 配置改为 `schedule=fixed`，并以回归测试锁住 `1e-12` 与 100 it；
 - 修复后 2-it calibration smoke 通过：两 it 实际 LR 均为 `1e-12`，std 保持 `0.30`，`losses_finite=true`；
@@ -123,7 +124,7 @@ autoresearch:
 4. [x] provenance：manifest 记录 stage、start hazard、duration；`current_est_delay_s=(0, 0)` 与 tau `0.05–0.5 s` 由 profile/config 哈希固定；评价侧已有 `current_estimate_valid_rate` 作为 realized valid 比例。未单独增加 realized outage 次数 telemetry（按 `EXPERIMENT_EFFICIENCY` 可选项处理）。
 5. [x] 测试：`tests/test_goal184_current_outage.py` 覆盖 v3 tau、C0–C4 outage 恒为 0、C5/C6 参数范围、duration ≤ `0.3 s`、delay 恒为 0、outage 期间冻结且不读 true current、恢复后从 post-outage current 热启动、同 seed 可复现、env reset 接线；`tests/test_lowlevel_curriculum_sampler.py`、`test_lowlevel_curriculum_noise.py`、`test_lowlevel_curriculum_trainer.py`、`test_pc_goal85_unbiased_contract.py`、`test_lowlevel_pc_sensors.py`、`test_lowlevel_pc_env.py` 回归通过。
 6. [x] BC 采集：`scripts/collect_pc_bc_demos.py` 新增 `--curriculum-stages`，逐 stage 固定 `stage_mix` 并复用训练侧 sampler；`curriculum_stage` 写入 npz，stage 参数与 outage 契约写入 `demos.manifest.json` 和 `curriculum_episodes.jsonl`。重采 7 stage × 24 envs × 4096 steps，seeds `91000–91023`，teacher 仍使用 clean/privileged 标签。
-7. [x] 重采并重训 BC：新 checkpoint SHA `2292c19567ddf685c8ad13bf8ce7db99bfb575628198402c2fe0acf91229ad29`；BC_ONLY 已跑，C3 固定环境 3D `1.9775 m`（优于旧 `ce4290` 的 `2.4459 m`），stage-matched C3/C5/C6 均完成，C5/C6 真实触发 outage。STAGE_MATCHED_BC 的服务器 1-iteration 1536-env smoke 仍未跑（本地缺少 `rsl_rl`）。
+7. [x] 重采并重训 BC：新 checkpoint SHA `2292c19567ddf685c8ad13bf8ce7db99bfb575628198402c2fe0acf91229ad29`；BC_ONLY 已跑，C3 固定环境 3D `1.9775 m`（优于旧 `ce4290` 的 `2.4459 m`），stage-matched C3/C5/C6 均完成，C5/C6 真实触发 outage；服务器 1-iteration 1536-env smoke 已 PASS。
 8. [ ] 本决策之前的结果统一标 `PRE_TAU_005_050`；C5/C6 旧结果另标 `PRE_C5C6_OUTAGE_CONTRACT`，不与新协议混表。
 
 硬约束：
@@ -154,7 +155,7 @@ autoresearch:
 - [x] Step 0：用户明确授权 commit/push 和服务器执行；建立新 clean worktree，记录 base commit。
 - [x] Step 1（historical：`ce4290`）：新增 Goal184 的 PE2E empirical formal env 和 training config；运行 profile/config/schema 检查。
 - [x] Step 2（historical：`ce4290`）：上传 C checkpoint；跑 1-iteration 1536-env contract smoke，记录 KL/clip/ratio/memory/checkpoint normalization metadata。
-- [ ] Step 2b：STAGE_MATCHED_BC 的 formal env/training config 已更新（env=`unbiased_small_noise_v3`，warmstart SHA=`2292c195...`，`check_training_profile=PASS`）；warmstart 契约（dims/current encoder/empirical schema hash `0ae8f361...`）已本地校验通过。剩余：服务器 1-iteration 1536-env contract smoke；旧 `ce4290` smoke 不能作为新 checkpoint 的验收。
+- [x] Step 2b：STAGE_MATCHED_BC 的 formal env/training config 已更新（env=`unbiased_small_noise_v3`，warmstart SHA=`2292c195...`，`check_training_profile=PASS`）；warmstart 契约（dims/current encoder/empirical schema hash `0ae8f361...`）已本地校验通过；服务器 commit `2cbd13c` 上的 1-iteration 1536-env contract smoke PASS（KL `0.003126`、clip `0.025024`、ratio max `1.552786`、losses finite、peak reserved `8438 MiB`）。
 - [ ] Step 3：§4.1 的 C5/C6 outage、STAGE_MATCHED_BC 重采/重训和新 checkpoint SHA 已完成；旧 `ce4290` 标定包过期。逐 stage 阈值生产/消费已实现并通过测试：标定窗口不跨 stage，产物包含 `statistics_by_stage` 和 `thresholds_by_stage`；训练入口拒绝非 `FROZEN` 表、以及多阶段课程使用旧单表。新标定包已生成，见 §5.2.2；剩余：在服务器跑 PE2E 7-stage 标定并冻结实际数值。ALOSB 阈值在启动首个 ALOSB arm 前单独标定；每个 stage 必须有至少 20 条非空 episode metrics。
 - [ ] Step 4：route-gate 验证。用户 2026-11-18 已选 **B**：独立跑至少 75 it 的 gate smoke，确认 C0 在 soft cap=72 后能实际晋级，再启动 full arm。`--iterations 20` 只能当 contract smoke（阈值加载/enforce 接线/无崩溃），不能写成“20/3 通过”；这次 75-it smoke 是必要预实验，不扩成多 seed/超参扫参。
 - [ ] Step 5：从 STAGE_MATCHED_BC checkpoint 先跑 `PE2E × BCFT × MOD4 × MLP × seed86201` 单 seed 完整 arm，标 `FULL_CURRICULUM_SINGLE_SEED_PILOT`；训练结束必须运行 Goal184 训练产物审计，失败则不得进入正式评价。
@@ -163,20 +164,20 @@ autoresearch:
 - [ ] Step 8：扩展 `PE2E × BCRES`，复用同一 STAGE_MATCHED_BC checkpoint；然后做 ALOS demo/BC 审计和 ALOSB 扩展。
 - [ ] Step 9：写 result、`research/STATE.md`、`research/LEDGER.jsonl`，运行 ledger checker。
 
-### 5.2.1 Phase A 启动清单（等待用户授权 commit/push 与服务器执行）
+### 5.2.1 Phase A 启动清单（2026-11-18 已完成）
 
-- 本地执行位置：`/home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/goal182-infra-detached-20261116`；HEAD `3a78ffd`，工作区 dirty（Phase 0 改动未提交）；
+- 本地执行位置：`/home/bubble/水下机器人/settled_局部规划器_反应式/.worktrees/goal182-infra-detached-20261116`；Phase A 执行提交 `2cbd13c`；本地文档在 smoke 后继续更新；
 - formal env：`configs/lowlevel/goal184/env_path_fixed_speed_formal_empirical.json`，文件 SHA-256 `db4de5ff1ed1d5cb9b4b37da6d04df95c82855d61d609cc6e0e5d61512cc9729`；
 - formal training config：`configs/lowlevel/goal184/train_formal_mod4_pe2e_bcft_env_empirical_5d_m_seed86201.json`，文件 SHA-256 `56721dcc5e4b1bd7905c19c6f7f06baab596a8fc7b47543ae879b518ad4f9e33`；`check_training_profile=PASS`；
 - 本地实际加载复验通过：env `normalization.mode=empirical`、runner empirical=false、curriculum enabled/promotion=true、初始 mix `C0 0.9 / C1 0.1`（后续按 promotion 展开到 C6）、2600 it、4096×48×4、warmstart SHA `2292c195...` 与 checkpoint 匹配；`check_goal182_matrices.py --require-frozen --require-first-wave-configs` PASS；
 - formal config contract 复验 PASS（2026-11-18）：`validate_arm_base_consistency`、`validate_arm_current_contract`、`require_training_curriculum` 均通过；2600 it、4096 envs × 48 steps、5 epochs × 4 mini-batches、profile `PPO-FLAT-4096x48-E5-MB4`、radius `2.0 m`、env empirical + runner empirical=false、local BC SHA `2292c195...` 与 config 一致；
-- warmstart 实加载预检 PASS（2026-11-18）：用正式 env 的 actor/critic layout 实例化 `PCActorCritic` 后，`load_pc_bc_actor_prior` 实际加载 `2292c195...` 成功；normalization payload 与 `PCNormalization` 完全一致，empirical mode/schema hash 匹配，command projection、path encoder load 和 DADE zero-init 均完成。该预检覆盖了 SHA 之外的布局/归一化契约；服务器 1-it smoke 仍不可省略；
+- warmstart 实加载预检 PASS（2026-11-18）：用正式 env 的 actor/critic layout 实例化 `PCActorCritic` 后，`load_pc_bc_actor_prior` 实际加载 `2292c195...` 成功；normalization payload 与 `PCNormalization` 完全一致，empirical mode/schema hash 匹配，command projection、path encoder load 和 DADE zero-init 均完成；服务器 1-it smoke 已在 commit `2cbd13c` 上通过；
 - 训练产物审计器已接线：`audit_goal182_artifacts.py --train-run ...`，失败非零退出；目标回归 19 项、相关回归 60 项与 `ruff` 通过；
 - demo：`_goal184_artifacts/data/demos_goal184_stage_matched_v3/demos.npz`，SHA `9a3d465a...`；curriculum manifest SHA `a983b8db...`；
 - BC：`_goal184_artifacts/pe2e_bc_stage_matched_v3/pc_bc_actor.pt`，SHA `2292c195...`；服务器目标路径 `$R/bc/pe2e_bc_stage_matched_v3/pc_bc_actor.pt`；
-- 服务器 worktree：`/data/yhx/underwater-robotics/worktrees/auv-local/goal184/20261118-goal184-3f1b382`；run root：`/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-3f1b382`；
-- 本地 PPO smoke 无法执行：当前 `.venv` 缺 `rsl_rl`；已改为本地校验 warmstart 契约（dims、current encoder、empirical schema hash 全部匹配），完整 1-iteration 1536-env smoke 必须在服务器跑；
-- 需要用户明确授权后才能执行：commit/push、服务器 clean worktree 更新、BC/demo artifact 搬运、1-iteration 1536-env smoke；
+- 服务器 worktree：`/data/yhx/underwater-robotics/worktrees/auv-local/goal184/20261118-goal184-2cbd13c`（HEAD `2cbd13c`，clean）；run root：`/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-3f1b382`（保持配置冻结路径）；
+- 本地 PPO smoke 无法执行：当前 `.venv` 缺 `rsl_rl`；已改为本地校验 warmstart 契约（dims、current encoder、empirical schema hash 全部匹配），完整 1-iteration 1536-env smoke 已在服务器跑通；
+- 用户已于 2026-11-18 授权并完成：commit/push 到 server bare repo、服务器 clean worktree、BC/curriculum artifact 搬运、1-iteration 1536-env smoke；
 - `configs/lowlevel/goal184/calibration/recollected_matched_bc/` 是未跟踪的过期旧 BC 标定包，不得加入 commit，也不得启动；
 - `configs/lowlevel/goal184/calibration/stage_matched_v3_100it_fixedlr/` 是新的 stage-matched 标定包，必须显式加入 commit（只 add 该子目录），但标定本身仍需服务器执行。
 
@@ -190,7 +191,7 @@ autoresearch:
 - outage 抽样预检 PASS：C0–C4 hazard/duration 均为 0；C5 hazard `0.00208–0.00795 /s`、duration `0.053–0.298 s`；C6 hazard `0.00816–0.01989 /s`、duration `0.053–0.298 s`；transport delay 仍为 0；
 - 标定命令 dry-run PASS：用 7×25 条合成 `iteration_records.jsonl` 按 §5.2.2 的 7 个 `--records` 调用 `calibrate_goal182_route_gate.py`，输出覆盖 C0–C6 各 25 条，`statistics_by_stage`/`thresholds_by_stage` 均含 7 个 stage，冻结表 `status=FROZEN`；该 dry-run 只验证命令和格式，不代表真实 reference 数值；
 - 路径绑定：当前 7 个 `train_C*.json` 的 `experiment.warmstart_actor` 固定为 `/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-3f1b382/bc/pe2e_bc_stage_matched_v3/pc_bc_actor.pt`；若换 run root，必须重新生成配置并更新 SHA，不能只改命令行 `--output`；
-- 运行前提：先完成 STAGE_MATCHED_BC 的服务器 1-it 1536-env smoke；旧 `ce4290` 的 smoke 不算；7 个 stage 都必须 `completed`，每个 stage 至少 20 条三指标非空的 iteration，否则不得冻结；
+- 运行前提已满足：STAGE_MATCHED_BC 的服务器 1-it 1536-env smoke 已 PASS；7 个 stage 都必须 `completed`，每个 stage 至少 20 条三指标非空的 iteration，否则不得冻结；
 - 判读：标定器必须输出 `FROZEN`、`statistics_by_stage` 和 `thresholds_by_stage`；如果 reference 自己不过阈值，判 `REFERENCE_BC_INVALID_FOR_ROUTINE`，只保留证据，不得安装为 routine gate；
 - 启动模板（从干净 server worktree 运行，`W/R/PY/CORE` 替换为实际路径）：
 
