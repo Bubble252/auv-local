@@ -1,7 +1,7 @@
 # Goal184：empirical 归一化下的完整课程 arm 训练与测评
 
 **日期**：2026-11-18<br>
-**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_SUPERSEDED / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_V4_READY / SERVER_1IT_SMOKE_PASSED / REFERENCE_BC_INVALID_FOR_ROUTINE / EVAL_SEEDS_REFROZEN / TEACHER_ALOS_TRUTH_COMP_PD_PI / HELDOUT_CLOSED`<br>
+**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_SUPERSEDED / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_V4_READY / PHASE_B_V4_PASS / C0_PROMOTION_SMOKE_PASS / REFERENCE_BC_AWAITING_OVERRIDE / EVAL_SEEDS_REFROZEN / TEACHER_ALOS_TRUTH_COMP_PD_PI / HELDOUT_CLOSED`<br>
 **父 Goal**：Goal182、Goal183<br>
 **仓库**：`settled_局部规划器_反应式`<br>
 **执行提示词**：`/home/bubble/水下机器人/总协调/doc/ops/GOAL184_EMPIRICAL_FULL_ARMS_PROMPT_20261118.md`<br>
@@ -169,8 +169,8 @@ autoresearch:
 - [x] Step 1（historical：`ce4290`）：新增 Goal184 的 PE2E empirical formal env 和 training config；运行 profile/config/schema 检查。
 - [x] Step 2（historical：`ce4290`）：上传 C checkpoint；跑 1-iteration 1536-env contract smoke，记录 KL/clip/ratio/memory/checkpoint normalization metadata。
 - [x] Step 2b：STAGE_MATCHED_BC 的 formal env/training config 已更新（env=`unbiased_small_noise_v3`，warmstart SHA=`2292c195...`，`check_training_profile=PASS`）；warmstart 契约（dims/current encoder/empirical schema hash `0ae8f361...`）已本地校验通过；服务器 commit `2cbd13c` 上的 1-iteration 1536-env contract smoke PASS（KL `0.003126`、clip `0.025024`、ratio max `1.552786`、losses finite、peak reserved `8438 MiB`）。
-- [ ] Step 3：§4.1 的 C5/C6 outage、STAGE_MATCHED_BC 重采/重训和新 checkpoint SHA 已完成；旧 `ce4290` 标定包过期。逐 stage 阈值生产/消费已实现并通过测试：标定窗口不跨 stage，产物包含 `statistics_by_stage` 和 `thresholds_by_stage`；训练入口拒绝非 `FROZEN` 表、以及多阶段课程使用旧单表。新标定包已生成，见 §5.2.2；剩余：在服务器跑 PE2E 7-stage 标定并冻结实际数值。ALOSB 阈值在启动首个 ALOSB arm 前单独标定；每个 stage 必须有至少 20 条非空 episode metrics。
-- [ ] Step 4：route-gate 验证。用户 2026-11-18 已选 **B**：独立跑至少 75 it 的 gate smoke，确认 C0 在 soft cap=72 后能实际晋级，再启动 full arm。`--iterations 20` 只能当 contract smoke（阈值加载/enforce 接线/无崩溃），不能写成“20/3 通过”；这次 75-it smoke 是必要预实验，不扩成多 seed/超参扫参。
+- [x] Step 3：§4.1 的 C5/C6 outage、STAGE_MATCHED_BC 重采/重训和新 checkpoint SHA 已完成；旧 `ce4290` 标定包过期。逐 stage 阈值生产/消费已实现并通过测试：标定窗口不跨 stage，产物包含 `statistics_by_stage` 和 `thresholds_by_stage`；训练入口拒绝非 `FROZEN` 表、以及多阶段课程使用旧单表。v4 标定包已在服务器跑完 PE2E 7-stage 100-it 并冻结逐 stage 数值，见 §5.2.4。ALOSB 阈值在启动首个 ALOSB arm 前单独标定。
+- [x] Step 4：route-gate 验证。用户 2026-11-18 已选 **B**：独立跑至少 75 it 的 gate smoke，确认 C0 在 soft cap=72 后能实际晋级。75-it smoke 已在 iteration `75` 从 C0 晋级 C1，见 §5.2.4；不扩成多 seed/超参扫参。
 - [ ] Step 5：从 STAGE_MATCHED_BC checkpoint 先跑 `PE2E × BCFT × MOD4 × MLP × seed86201` 单 seed 完整 arm，标 `FULL_CURRICULUM_SINGLE_SEED_PILOT`；训练结束必须运行 Goal184 训练产物审计，失败则不得进入正式评价。
 - [ ] Step 6：跑该 checkpoint 的正式评价；只报告完整 cell，success 等 telemetry 不参与 Gate。
 - [ ] Step 7：资源允许时补 seeds `86202/86203`，再判定 3-seed formal 结果。
@@ -246,6 +246,17 @@ done
 ```
 
 标定完成后先检查 `thresholds_by_stage` 是否覆盖 C0–C6、reference 在各 stage 的 completion/cross/vertical 是否通过自己的阈值，再决定是否安装；不得用池化单一阈值跨 stage。
+
+### 5.2.4 Phase B v4 标定与 75-it 晋级结果（2026-11-18）
+
+- Phase B run root：`/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-64d8225/route_gate_calibration_pe2e_stage_matched_v4_100it_fixedlr`；
+- 七个 stage 均 `status=completed`、各 `100` 条 iteration record；进入标定的 valid 记录数为 C0 `84`、C1 `83`、C2 `76`、C3 `78`、C4 `78`、C5 `79`、C6 `81`，均高于每 stage `20` 条门槛；
+- 冻结表：`thresholds/goal182_route_gate_pe2e_20_3.thresholds.json`，SHA-256 `20ab53f6b54e321be3d22ac49ef30b4595ed3d5e2aa350aaef91c81285e87cf6`；状态 `FROZEN`，覆盖 C0–C6；
+- 逐 stage 阈值：C0 `cross 0.6214 / vertical 0.7299 / completion 0.9`、C1 `0.7858 / 0.6442 / 0.9`、C2 `3.3791 / 0.9432 / 0.9`、C3 `1.8167 / 1.6437 / 0.9`、C4 `1.8119 / 1.6432 / 0.9`、C5 `1.6446 / 2.4426 / 0.9`、C6 `1.5930 / 5.6267 / 0.9`；
+- reference 自检 PASS：七个 stage 的 reference 均值都在自己的阈值内。最低 completion 为 C0 `0.9587`，最大 cross 为 C2 `2.6968 m`，最大 vertical 为 C6 `5.1152 m`；
+- 75-it C0 晋级 smoke：run `smoke/route_gate_75it_c0_promotion`，`status=completed`、`75` 条 record、wall `2529 s`、losses finite、无 nonfinite observation；C0 在 iteration `72–74` 连续三次通过 gate，iteration `75` 决策 `PROMOTE`，stage 切到 `C1`，mix 为 `C1 0.7 / C0 0.2 / C2 0.1`；
+- C0 gate 证据：最近 20-it window `cross 0.5257 m`（阈值 `0.6214`）、`vertical 0.5783 m`（阈值 `0.7299`）、`completion 0.9566`（阈值 `0.9`）、safety `0`；
+- 下一步门槛：这张表来源是 `REFERENCE_BC`。在用户明确确认 `REFERENCE_BC_OVERRIDE` 之前，只能用于 smoke/证据，不得用于正式 BCFT routine gate，也不得据此启动 2600-it 完整 arm。
 
 ### 5.2.3 教师口径变更后的重推进路径（2026-11-18）
 
