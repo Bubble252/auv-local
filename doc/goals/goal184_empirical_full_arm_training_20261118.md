@@ -1,7 +1,7 @@
 # Goal184：empirical 归一化下的完整课程 arm 训练与测评
 
 **日期**：2026-11-18<br>
-**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_READY / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_READY / SERVER_1IT_SMOKE_PASSED / REFERENCE_BC_INVALID_FOR_ROUTINE / EVAL_SEEDS_REFROZEN / HELDOUT_CLOSED`<br>
+**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_SUPERSEDED / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_READY / SERVER_1IT_SMOKE_PASSED / REFERENCE_BC_INVALID_FOR_ROUTINE / EVAL_SEEDS_REFROZEN / TEACHER_ALOS_TRUTH_COMP_PD_PI / HELDOUT_CLOSED`<br>
 **父 Goal**：Goal182、Goal183<br>
 **仓库**：`settled_局部规划器_反应式`<br>
 **执行提示词**：`/home/bubble/水下机器人/总协调/doc/ops/GOAL184_EMPIRICAL_FULL_ARMS_PROMPT_20261118.md`<br>
@@ -47,6 +47,7 @@ autoresearch:
 - **BC_ONLY outage 诊断（C5/C6，seeds `20–51`）**：C5 `current_estimate_valid_rate=0.999384`、3D `3.2795 m`、success `0.09375`；C6 `current_estimate_valid_rate=0.998690`、3D `2.6483 m`、success `0.40625`；C5/C6 均真实触发 outage；
 - 旧 `ce4290` checkpoint 的 1-iteration 1536-env contract smoke 已通过：KL `0.003287`、clip `0.022705`、ratio max `1.528058`、peak reserved `8438 MiB`；该 smoke 只作为历史接线证据；
 - **STAGE_MATCHED_BC 1-iteration 1536-env smoke PASS（2026-11-18）**：服务器 worktree `20261118-goal184-2cbd13c`、commit `2cbd13c`、GPU 3；`73728` steps、`12.60 s`；`approx_kl=0.00312599`、`clip_fraction=0.0250244`、`ratio_max=1.552786`、`losses_finite=true`、mean std `0.04996`、peak reserved `8438 MiB`；warmstart SHA `2292c195...` 与 config 一致，manifest `normalization_mode=empirical`、actor schema hash `0ae8f361...`、`status=completed`；
+- **Teacher 口径变更（2026-11-18 用户定夺）**：上述 `STAGE_MATCHED_BC` demo/checkpoint 是按旧 tangent-command teacher 采的，现作废为 `historical_only`。正式 BC 必须按 §4.2 用 `ALOS + 真值海流前馈 + PD/PI` 重采 demo、重训 BC、重跑 BC_ONLY 和 Phase B；旧 Phase B 七阶段 100-it 结果只对应旧 teacher，重跑前不得用于 Phase C；
 - 初版 `REFERENCE_BC` 40-it/stage 标定已停止：iteration record 的 `episode_metrics` 只有在有 episode 完成时才非空，C0/C1/C2 的 PE2E 非空数仅 `21/21/26`，C3 在 11 it 时仅 `1`，达不到 `min-stage-records=20`；
 - 首次 100-it 并行标定又暴露 `schedule=adaptive` 会把 reference LR 从 `1e-12` 自动放大到 `1e-2`，C3 第 18 it 因 std 变负崩溃；已把 calibration 配置改为 `schedule=fixed`，并以回归测试锁住 `1e-12` 与 100 it；
 - 修复后 2-it calibration smoke 通过：两 it 实际 LR 均为 `1e-12`，std 保持 `0.30`，`losses_finite=true`；
@@ -100,6 +101,7 @@ autoresearch:
 - 正式重冻结已完成：`configs/governance/goal182_eval_matrix.json` 的 `eval_seeds=[20,21,22]`，`configs/governance/goal182_matrix_freeze.json` 的 SHA 已同步为 `ac0dddb00cea1c5c22cee22be3f60c813eb8e649f4d31d6e0ee924b72a03fe1d`；`check_goal182_eval_matrix.py --require-frozen --env-config configs/lowlevel/goal184/env_path_fixed_speed_formal_empirical.json` 返回 `PASS goal182 eval matrix frozen`；
 - ALOSB 扩展前先只读审计旧 ALOS demo 的 sensor profile；若为 `realistic_calibrated` 或无法证明匹配，则重采一套 ALOS demo，再训练 ALOS empirical BC；
 - TRRES_CMD/TRRES_ACT 是 fresh init，不使用 BC demo；
+- BC teacher 采集口径（2026-11-18 用户定夺）：所有用到 BC 的 arm 一律使用 `ALOS guidance + 真值海流前馈补偿 + REMUS PD/PI` 生成 demo；只改 teacher demo 与 teacher 对照，不改 arm 的 control contract、actor 观测、动作接口、reward、termination、success、radius 或训练 profile；细则见 §4.2；
 - held-out `100–149` 不读取、不评价、不写 cache。
 
 ### 4.1 C5/C6 current-estimator outage 契约（IMPLEMENTED / TESTS_PASS / STAGE_MATCHED_BC_READY）
@@ -134,6 +136,17 @@ autoresearch:
 - C0–C4 不加 outage；
 - 不把 outage 与 current/noise/plant 压力池化；C5/C6 的 outage 覆盖和 duty 必须单独报告；
 - realized duty 超出上表预期带时标 `OUTAGE_COVERAGE_ANOMALY`，先诊断，不得通过改 seed 或放宽参数掩盖。
+
+### 4.2 BC teacher 采集口径（ALOS + 真值洋流补偿 + PD/PI）
+
+用户 2026-11-18 定夺：所有用到 BC 的 arm，其 teacher demo 一律使用 **ALOS guidance + 真值海流前馈补偿 + REMUS PD/PI**。这是一条 teacher 采集协议，不是控制契约变更。
+
+- 实现：`BatchedPCTeacher` 默认 `reference_mode="alos_compensated"`、`current_compensation_source="truth"`。参考姿态/水速来自 `BatchedThreeDAlosGuidance`，补偿使用仿真真值 `env.current_ned_mps`；反馈仍使用真值 `eta/nu` 的 PD/PI。旧 `reference_mode="command"` 只保留作诊断对照，不再用于正式 BC 采集。
+- 边界：不改变任一 arm 的 control contract、actor 观测、动作接口、reward、termination、success、radius、seed split 或 training profile；只改变 teacher demo 与 teacher 对照的数据来源。
+- 通用性：PE2E 与 ALOSB 各自的 BC 都遵守此口径；TRRES 不用 BC demo，不受影响。不同 seed/module 仍复用同一套同族 BC，不重复采集。
+- 作废范围：现有 `STAGE_MATCHED_BC`（checkpoint SHA `2292c195...`）及其 demo（SHA `9a3d465a...`）是按旧 tangent-command teacher 采的，作废为 `historical_only`。必须重采 demo、重训 BC、重跑 BC_ONLY 和 Phase B 标定后，才能进入 Phase C。
+- provenance：`collect_pc_bc_demos.py` 的 manifest 必须写出 `teacher_reference_mode`、`teacher_current_compensation_source` 和 `teacher_parameters.compensate_current`；BC_ONLY/teacher 诊断也必须记录同一口径。
+- 过期包隔离：旧 `configs/lowlevel/goal184/calibration/recollected_matched_bc/` 已移到 `_goal184_artifacts/expired_configs/recollected_matched_bc_20261118/`，不删除、不提交、不启动。
 
 ## 5. 执行计划
 
@@ -232,6 +245,21 @@ done
 ```
 
 标定完成后先检查 `thresholds_by_stage` 是否覆盖 C0–C6、reference 在各 stage 的 completion/cross/vertical 是否通过自己的阈值，再决定是否安装；不得用池化单一阈值跨 stage。
+
+### 5.2.3 教师口径变更后的重推进路径（2026-11-18）
+
+旧 `STAGE_MATCHED_BC` demo/checkpoint 和 2026-11-18 已完成的七阶段 Phase B 都按旧 tangent-command teacher 产生，统一标 `PRE_TEACHER_CHANGE`，只作历史证据。按 §4.2 的新 teacher 口径，重新推进到 Phase B 的路径如下。
+
+1. **提交与服务器准备（10–15 min）**：只提交 teacher 实现、采集/评估脚本、测试、本文档、ops 提示词和 `research/STATE.md`；推送 server；建新 worktree 和新 run root；设置 `PYTHONPATH`/`AUV_GOVERNANCE_ROOT`；跑 `check_training_profile.py` 和 1-iteration 1536-env smoke。不复用旧 worktree 或旧 run root。
+2. **重采 demo（约 3 min）**：`collect_pc_bc_demos.py`，7 stage × 24 envs × 4096 steps，seeds 保持 `91000–91023`，便于与旧 demo 配对比较；默认 teacher 为 `alos_compensated + truth`；输出 `demos_goal184_stage_matched_v4_teacher_alos_truth/`。验收：`688128` samples、`594` episodes、每 stage `98304`；manifest 的 `teacher_reference_mode=alos_compensated`、`teacher_current_compensation_source=truth`、`compensate_current=true`；C5/C6 outage duty 在 §4.1 预期带；无 NaN/Inf；记录新 dataset/curriculum SHA。
+3. **重训 BC（约 2 min）**：其余配方不变，输出 `pe2e_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`。验收：losses finite、best epoch 合理、validation RMSE 不明显劣于旧 normalized `[0.0711, 0.0620, 0.1445]`；记录新 checkpoint SHA 和 normalization schema hash。
+4. **BC_ONLY 快检（约 3–5 min）**：只跑 C3 / seeds `20–23` / `endpoint_stop`。这是 screen 软门槛，不写正式 PASS/FAIL：新 C3 3D 误差低于旧 `5.0211 m` 即继续；否则停止，先诊断 teacher/ALOS 补偿是否作用到参考方向，不启动 Phase B。不扫 seed、不加诊断矩阵。
+5. **生成 v4 标定包（约 5–10 min）**：复制旧 `stage_matched_v3_100it_fixedlr` 为 `stage_matched_v4_teacher_alos_truth_100it_fixedlr`，重新生成 7 个 `env_C*.json` + 7 个 `train_C*.json`，更新 `experiment.warmstart_actor` 和新 checkpoint SHA；正式 training config 的 warmstart 同步更新；重跑 profile/config/schema checker。环境 config 未变，eval matrix freeze 不变，不需要重新冻结评价矩阵。
+6. **跑新 Phase B（约 54 min）**：C0–C6 各 `100 it`、`promotion_enabled=false`、`learning_rate=1e-12`、`schedule=fixed`、`seed=86201`。先 `nvidia-smi`，C1–C6 用 GPU1–6，C0 用 GPU7，避开 GPU0。验收：七个 `status=completed`、各 `100` 条 iteration record、每 stage 至少 `20` 条三指标非空、无 NaN/OOM。
+7. **标定与自检（约 5 min）**：用 `calibrate_goal182_route_gate.py`，`--reference-sha256` 用 v4 checkpoint，`--calibration-source REFERENCE_BC`；输出 per-stage thresholds。检查 `status=FROZEN`、`stage_coverage` 覆盖 C0–C6、reference BC 在每个 stage 满足自己的 cross/vertical/completion。reference 自己不过则标 `REFERENCE_BC_INVALID_FOR_ROUTINE`，只保留证据，不安装。
+8. **Phase B 后的门槛**：先跑 75-it C0 晋级 smoke，确认 soft cap 72 后实际晋级；`REFERENCE_BC_OVERRIDE` 需用户明确确认后，才能把参考表用于正式 BCFT routine gate。
+
+时间线约 `1 h 20 min–1 h 40 min`。失败处理：采集/BC 出现 NaN/Inf 立即停；BC_ONLY 新 C3 不低于旧 `5.0211 m` 立即停并诊断；Phase B reference 自检不过不安装；75-it 不晋级不启动 2600-iteration full arm。不换 seed、不放宽阈值、不扫参、不覆盖旧证据。
 
 ### 5.3 arm 扩展顺序
 

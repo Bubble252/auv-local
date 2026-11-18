@@ -52,6 +52,16 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--teacher-label", default=None)
     parser.add_argument("--teacher-selection", type=Path, default=None)
     parser.add_argument(
+        "--teacher-reference-mode",
+        choices=("alos_compensated", "command"),
+        default="alos_compensated",
+    )
+    parser.add_argument(
+        "--teacher-current-compensation-source",
+        choices=("truth", "estimated", "none"),
+        default="truth",
+    )
+    parser.add_argument(
         "--curriculum-stages",
         default=None,
         help=(
@@ -135,6 +145,8 @@ def _collect_config(
     path_dim: int,
     actor_command_dim: int,
     seed_role: str,
+    teacher_reference_mode: str,
+    teacher_current_compensation_source: str,
     curriculum_stage: str | None,
     curriculum_manifest_path: Path | None,
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
@@ -148,8 +160,7 @@ def _collect_config(
     if curriculum_stage is not None:
         if not config.curriculum.enabled:
             raise ValueError(
-                f"{config_path} requires curriculum.enabled=true for "
-                "--curriculum-stages"
+                f"{config_path} requires curriculum.enabled=true for --curriculum-stages"
             )
         stages = curriculum_stages_with_overrides(
             [curriculum_stage],
@@ -181,7 +192,11 @@ def _collect_config(
     )
     seeds = seed_list or tuple(seed_start + index for index in range(num_envs))
     env.reset(seeds)
-    teacher = BatchedPCTeacher(env)
+    teacher = BatchedPCTeacher(
+        env,
+        reference_mode=teacher_reference_mode,
+        current_compensation_source=teacher_current_compensation_source,
+    )
     teacher.reset(num_envs)
 
     arrays: dict[str, list[np.ndarray]] = {
@@ -226,9 +241,7 @@ def _collect_config(
         arrays["actor_state"].append(observation.actor_state.detach().cpu().numpy())
         if path_dim:
             assert observation.actor_path is not None
-            arrays["actor_path"].append(
-                observation.actor_path.detach().cpu().numpy()
-            )
+            arrays["actor_path"].append(observation.actor_path.detach().cpu().numpy())
         command_full = torch.stack(
             [
                 observation.command.heading_rad,
@@ -243,9 +256,7 @@ def _collect_config(
         arrays["episode_id"].append(episode_ids.copy())
         arrays["seed"].append(episode_seeds.detach().cpu().numpy())
         arrays["step"].append(episode_steps.detach().cpu().numpy())
-        arrays["actual_actuator"].append(
-            result.info["actual_actuator"].detach().cpu().numpy()
-        )
+        arrays["actual_actuator"].append(result.info["actual_actuator"].detach().cpu().numpy())
         arrays["reward"].append(result.reward.total.detach().cpu().numpy())
         sensor = env.sensor_output
         assert sensor is not None
@@ -255,24 +266,16 @@ def _collect_config(
         arrays["p_nav"].append(sensor.p_nav.detach().cpu().numpy())
         assert env.eta is not None
         arrays["position_ned_m"].append(env.eta[:, :3].detach().cpu().numpy())
-        arrays["dvl_bottom_valid"].append(
-            sensor.bottom_lock_valid.detach().cpu().numpy()
-        )
-        arrays["dvl_water_valid"].append(
-            sensor.water_track_valid.detach().cpu().numpy()
-        )
+        arrays["dvl_bottom_valid"].append(sensor.bottom_lock_valid.detach().cpu().numpy())
+        arrays["dvl_water_valid"].append(sensor.water_track_valid.detach().cpu().numpy())
         arrays["current_estimate_valid"].append(
             sensor.current_estimate_valid.detach().cpu().numpy()
         )
         arrays["usbl_valid"].append(sensor.usbl_valid.detach().cpu().numpy())
         arrays["usbl_outlier"].append(sensor.usbl_outlier.detach().cpu().numpy())
         arrays["nav_age_s"].append(sensor.nav_age_s.detach().cpu().numpy())
-        arrays["dvl_bottom_age_s"].append(
-            sensor.dvl_bottom_age_s.detach().cpu().numpy()
-        )
-        arrays["dvl_water_age_s"].append(
-            sensor.dvl_water_age_s.detach().cpu().numpy()
-        )
+        arrays["dvl_bottom_age_s"].append(sensor.dvl_bottom_age_s.detach().cpu().numpy())
+        arrays["dvl_water_age_s"].append(sensor.dvl_water_age_s.detach().cpu().numpy())
         arrays["usbl_age_s"].append(sensor.usbl_age_s.detach().cpu().numpy())
         arrays["current_estimate_age_s"].append(
             sensor.current_estimate_age_s.detach().cpu().numpy()
@@ -310,9 +313,7 @@ def _collect_config(
         "config_file_sha256": _sha256(config_path),
         "config_name": config.name,
         "pc_stage": config.pc_stage,
-        "current_crab_enabled": bool(
-            getattr(config.guidance, "current_crab_enabled", False)
-        ),
+        "current_crab_enabled": bool(getattr(config.guidance, "current_crab_enabled", False)),
         "actor_current_encoder": "none",
         "actor_observation_source": (
             "ideal" if config.observation.ideal_actor_observations else "nominal"
@@ -346,9 +347,7 @@ def _collect_config(
                 "current_outage_start_hazard_per_s": list(
                     stage_spec.current_outage_start_hazard_per_s
                 ),
-                "current_outage_duration_s": list(
-                    stage_spec.current_outage_duration_s
-                ),
+                "current_outage_duration_s": list(stage_spec.current_outage_duration_s),
             }
         ),
         "curriculum_speed_protocol": (
@@ -359,12 +358,15 @@ def _collect_config(
             "pitch_integral_limit_rad_s": teacher.pitch_integral_limit_rad_s,
             "speed_feedback": teacher.speed_feedback,
             "speed_integral_limit_rpm": config.controller.max_speed_integral_rpm,
+            "reference_mode": teacher.reference_mode,
+            "current_compensation_source": teacher.current_compensation_source,
+            "compensate_current": bool(
+                teacher.alos_guidance is not None and teacher.alos_guidance.compensate_current
+            ),
         },
         "normalization": config.normalization.as_dict(),
         "path_dim": path_dim,
-        "path_feature_names": (
-            list(pc_path_feature_names_for_dim(path_dim)) if path_dim else []
-        ),
+        "path_feature_names": (list(pc_path_feature_names_for_dim(path_dim)) if path_dim else []),
         "actor_command_dim": actor_command_dim,
         "num_envs": num_envs,
         "steps_per_env": steps_per_env,
@@ -379,9 +381,7 @@ def _collect_config(
                 ).size
             )
             for stage in CURRICULUM_STAGE_ORDER
-            if np.any(
-                combined["curriculum_stage"] == CURRICULUM_STAGE_ORDER.index(stage)
-            )
+            if np.any(combined["curriculum_stage"] == CURRICULUM_STAGE_ORDER.index(stage))
         },
         "safety_events": safety_events,
         "seed_start": seed_start,
@@ -408,22 +408,14 @@ def _collect_config(
                     )
                 )
             ),
-            "dvl_bottom_outage_rate": float(
-                1.0 - np.mean(combined["dvl_bottom_valid"])
-            ),
-            "dvl_water_outage_rate": float(
-                1.0 - np.mean(combined["dvl_water_valid"])
-            ),
-            "current_estimate_valid_rate": float(
-                np.mean(combined["current_estimate_valid"])
-            ),
+            "dvl_bottom_outage_rate": float(1.0 - np.mean(combined["dvl_bottom_valid"])),
+            "dvl_water_outage_rate": float(1.0 - np.mean(combined["dvl_water_valid"])),
+            "current_estimate_valid_rate": float(np.mean(combined["current_estimate_valid"])),
             "usbl_outlier_rate": float(np.mean(combined["usbl_outlier"])),
             "usbl_valid_rate": float(np.mean(combined["usbl_valid"])),
             "nav_age_s_mean": float(np.mean(combined["nav_age_s"])),
             "dvl_bottom_age_s_mean": float(np.mean(combined["dvl_bottom_age_s"])),
-            "current_estimate_age_s_mean": float(
-                np.mean(combined["current_estimate_age_s"])
-            ),
+            "current_estimate_age_s_mean": float(np.mean(combined["current_estimate_age_s"])),
         },
     }
     return combined, metadata
@@ -492,9 +484,7 @@ def main() -> int:
     for config_path in args.config:
         config = load_config(config_path)
         seed_start = (
-            config.evaluation.training_seed_start
-            if args.seed_start is None
-            else args.seed_start
+            config.evaluation.training_seed_start if args.seed_start is None else args.seed_start
         )
         for curriculum_stage in curriculum_stages or (None,):
             arrays, metadata = _collect_config(
@@ -510,11 +500,11 @@ def main() -> int:
                 path_dim=args.path_dim,
                 actor_command_dim=args.actor_command_dim,
                 seed_role=args.seed_role,
+                teacher_reference_mode=args.teacher_reference_mode,
+                teacher_current_compensation_source=(args.teacher_current_compensation_source),
                 curriculum_stage=curriculum_stage,
                 curriculum_manifest_path=(
-                    curriculum_episode_manifest
-                    if curriculum_stage is not None
-                    else None
+                    curriculum_episode_manifest if curriculum_stage is not None else None
                 ),
             )
             for name in names:
@@ -527,10 +517,7 @@ def main() -> int:
                 flush=True,
             )
 
-    payload = {
-        name: np.concatenate(values, axis=0)
-        for name, values in merged.items()
-    }
+    payload = {name: np.concatenate(values, axis=0) for name, values in merged.items()}
     payload["observation_schema"] = np.asarray("pc_v1")
     payload["action_envelope"] = np.asarray(PC_ACTION_ENVELOPE)
     np.savez_compressed(dataset_path, **payload)
@@ -547,12 +534,18 @@ def main() -> int:
             float(np.deg2rad(20.0)),
             1525.0,
         ],
-        "teacher": "BatchedPCTeacher(20deg, ground-speed command, pitch PI)",
+        "teacher": "BatchedPCTeacher(ALOS guidance, current feedforward, REMUS PD/PI)",
+        "teacher_reference_mode": (
+            config_metadata[0]["teacher_parameters"]["reference_mode"] if config_metadata else None
+        ),
+        "teacher_current_compensation_source": (
+            config_metadata[0]["teacher_parameters"]["current_compensation_source"]
+            if config_metadata
+            else None
+        ),
         "path_dim": args.path_dim,
         "path_feature_names": (
-            list(pc_path_feature_names_for_dim(args.path_dim))
-            if args.path_dim
-            else []
+            list(pc_path_feature_names_for_dim(args.path_dim)) if args.path_dim else []
         ),
         "actor_command_dim": args.actor_command_dim,
         "actor_observation_source": (
@@ -574,9 +567,7 @@ def main() -> int:
             else None
         ),
         "curriculum_episode_manifest_sha256": (
-            _sha256(curriculum_episode_manifest)
-            if curriculum_episode_manifest.is_file()
-            else None
+            _sha256(curriculum_episode_manifest) if curriculum_episode_manifest.is_file() else None
         ),
         "command_line": shlex.join(sys.argv),
         "started_at": started_at,

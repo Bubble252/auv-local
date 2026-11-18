@@ -123,9 +123,7 @@ def _collect_config(
     }
     if path_dim:
         arrays["actor_path"] = []
-    episode_ids = np.arange(
-        episode_id_offset, episode_id_offset + num_envs, dtype=np.int64
-    )
+    episode_ids = np.arange(episode_id_offset, episode_id_offset + num_envs, dtype=np.int64)
     next_episode_id = episode_id_offset + num_envs
     episode_steps = np.zeros(num_envs, dtype=np.int64)
     correction_l2: list[np.ndarray] = []
@@ -167,13 +165,9 @@ def _collect_config(
                 executed_action = student_action
 
         arrays["actor_state"].append(observation.actor_state.detach().cpu().numpy())
-        arrays["command"].append(
-            np.zeros((num_envs, 0), dtype=np.float32)
-        )
+        arrays["command"].append(np.zeros((num_envs, 0), dtype=np.float32))
         if path_dim:
-            arrays["actor_path"].append(
-                observation.actor_path.detach().cpu().numpy()
-            )
+            arrays["actor_path"].append(observation.actor_path.detach().cpu().numpy())
         arrays["action"].append(teacher_action.detach().cpu().numpy())
         arrays["episode_id"].append(episode_ids.copy())
         arrays["seed"].append(inner.episode_seed.detach().cpu().numpy())
@@ -182,31 +176,22 @@ def _collect_config(
             observation.actor_current_body.detach().cpu().numpy()
         )
         correction_l2.append(
-            torch.linalg.norm(teacher_action - student_action, dim=1)
-            .detach()
-            .cpu()
-            .numpy()
+            torch.linalg.norm(teacher_action - student_action, dim=1).detach().cpu().numpy()
         )
 
         step = inner.step(executed_action, auto_reset=True)
         infos = step.info
         done = step.done
-        arrays["actual_actuator"].append(
-            infos["actual_actuator"].detach().cpu().numpy()
-        )
+        arrays["actual_actuator"].append(infos["actual_actuator"].detach().cpu().numpy())
         arrays["reward"].append(step.reward.total.detach().cpu().numpy())
         arrays["p_nav"].append(infos["p_nav"].detach().cpu().numpy())
-        arrays["position_ned_m"].append(
-            infos["position_ned_m"].detach().cpu().numpy()
-        )
+        arrays["position_ned_m"].append(infos["position_ned_m"].detach().cpu().numpy())
         arrays["current_estimate_valid"].append(
             infos["current_estimate_valid"].detach().cpu().numpy()
         )
         done_np = done.detach().cpu().numpy() > 0.5
         terminal_kind = infos["terminal_kind"].detach().cpu().numpy()
-        goal_count += int(
-            np.sum((terminal_kind == int(PCTerminalKind.GOAL)) & done_np)
-        )
+        goal_count += int(np.sum((terminal_kind == int(PCTerminalKind.GOAL)) & done_np))
         safety_count += int(
             np.sum(
                 np.isin(
@@ -259,12 +244,15 @@ def _collect_config(
             "pitch_integral_limit_rad_s": teacher.pitch_integral_limit_rad_s,
             "speed_feedback": teacher.speed_feedback,
             "speed_integral_limit_rpm": config.controller.max_speed_integral_rpm,
+            "reference_mode": teacher.reference_mode,
+            "current_compensation_source": teacher.current_compensation_source,
+            "compensate_current": bool(
+                teacher.alos_guidance is not None and teacher.alos_guidance.compensate_current
+            ),
         },
         "normalization": config.normalization.as_dict(),
         "path_dim": path_dim,
-        "path_feature_names": (
-            list(pc_path_feature_names_for_dim(path_dim)) if path_dim else []
-        ),
+        "path_feature_names": (list(pc_path_feature_names_for_dim(path_dim)) if path_dim else []),
         "actor_command_dim": 0,
         "num_envs": num_envs,
         "steps_per_env": steps_per_env,
@@ -282,17 +270,11 @@ def _collect_config(
         "student_correction_l2_p95": float(np.percentile(correction, 95)),
         "sensor_statistics": {
             "nav_position_error_mean_m": float(
-                np.mean(
-                    np.linalg.norm(
-                        combined["p_nav"] - combined["position_ned_m"], axis=1
-                    )
-                )
+                np.mean(np.linalg.norm(combined["p_nav"] - combined["position_ned_m"], axis=1))
             )
             if "p_nav" in combined
             else None,
-            "current_estimate_valid_rate": float(
-                np.mean(combined["current_estimate_valid"])
-            )
+            "current_estimate_valid_rate": float(np.mean(combined["current_estimate_valid"]))
             if "current_estimate_valid" in combined
             else None,
         },
@@ -360,9 +342,7 @@ def main() -> int:
         "action_envelope": "pc20",
         "sample_count": int(combined["actor_state"].shape[0]),
         "episode_count": int(len(np.unique(combined["episode_id"]))),
-        "path_dim": (
-            int(combined["actor_path"].shape[1]) if "actor_path" in combined else 0
-        ),
+        "path_dim": (int(combined["actor_path"].shape[1]) if "actor_path" in combined else 0),
         "actor_command_dim": int(combined["command"].shape[1]),
         "path_feature_names": (
             list(pc_path_feature_names_for_dim(int(combined["actor_path"].shape[1])))

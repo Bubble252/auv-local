@@ -21,7 +21,9 @@ CurrentMode = Literal["config", "none", "uniform", "timevarying", "shear"]
 
 
 def _parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Evaluate the PC20 PD/PI teacher without a student")
+    parser = argparse.ArgumentParser(
+        description="Evaluate the PC20 PD/PI teacher without a student"
+    )
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seed-start", type=int, default=0)
@@ -45,6 +47,16 @@ def _parse_args() -> argparse.Namespace:
         choices=("config", "ground", "water_relative"),
         default="config",
         help="override the PC teacher speed loop for a controlled comparison",
+    )
+    parser.add_argument(
+        "--teacher-reference-mode",
+        choices=("alos_compensated", "command"),
+        default="alos_compensated",
+    )
+    parser.add_argument(
+        "--teacher-current-compensation-source",
+        choices=("truth", "estimated", "none"),
+        default="truth",
     )
     parser.add_argument("--horizontal-gain", type=float)
     parser.add_argument("--vertical-gain", type=float)
@@ -174,32 +186,24 @@ def _summary(
         "mean_abs_yaw_error_rad": float(np.mean(metrics["yaw_abs_sum"] / steps)),
         "mean_abs_pitch_error_rad": float(np.mean(metrics["pitch_abs_sum"] / steps)),
         "mean_abs_speed_error_mps": float(np.mean(metrics["speed_abs_sum"] / steps)),
-        "path_horizontal_rmse_m": float(
-            np.sqrt(np.mean(metrics["horizontal_sq_sum"] / steps))
-        ),
-        "path_vertical_rmse_m": float(
-            np.sqrt(np.mean(metrics["vertical_sq_sum"] / steps))
-        ),
-        "path_three_d_rmse_m": float(
-            np.sqrt(np.mean(metrics["three_d_sq_sum"] / steps))
-        ),
+        "path_horizontal_rmse_m": float(np.sqrt(np.mean(metrics["horizontal_sq_sum"] / steps))),
+        "path_vertical_rmse_m": float(np.sqrt(np.mean(metrics["vertical_sq_sum"] / steps))),
+        "path_three_d_rmse_m": float(np.sqrt(np.mean(metrics["three_d_sq_sum"] / steps))),
         "final_path_progress_m_mean": float(np.mean(metrics["final_progress_m"])),
         "path_completion_ratio_mean": float(
             np.mean(np.clip(metrics["final_progress_m"] / max(path_length_m, 1e-12), 0.0, 1.0))
         ),
         "final_goal_distance_m_mean": float(np.mean(metrics["final_goal_distance_m"])),
-        "final_goal_distance_m_p95": float(
-            np.percentile(metrics["final_goal_distance_m"], 95)
-        ),
+        "final_goal_distance_m_p95": float(np.percentile(metrics["final_goal_distance_m"], 95)),
         "material_saturation_rate": float(
             np.sum(metrics["material_saturation_steps"]) / np.sum(steps)
         ),
-        "action_saturation_threshold": float(
-            metrics["action_saturation_threshold"]
-        ),
+        "action_saturation_threshold": float(metrics["action_saturation_threshold"]),
         "action_channel_saturation_rate": (
             np.sum(metrics["action_saturation_steps"], axis=0) / np.sum(steps)
-        ).astype(float).tolist(),
+        )
+        .astype(float)
+        .tolist(),
         "action_any_surface_saturation_rate": float(
             np.sum(metrics["action_any_surface_saturation_steps"]) / np.sum(steps)
         ),
@@ -234,10 +238,7 @@ def _summary(
             "final_progress_m": float(metrics["final_progress_m"][index]),
             "final_goal_distance_m": float(metrics["final_goal_distance_m"][index]),
             "nav_position_error_rmse_m": float(
-                np.sqrt(
-                    metrics["nav_sq_sum"][index]
-                    / max(int(metrics["active_steps"][index]), 1)
-                )
+                np.sqrt(metrics["nav_sq_sum"][index] / max(int(metrics["active_steps"][index]), 1))
             ),
         }
         for index, seed in enumerate(seeds)
@@ -252,6 +253,8 @@ def _evaluate_variant(
     device: str,
     dtype: torch.dtype,
     teacher_speed_feedback: str,
+    teacher_reference_mode: str,
+    teacher_current_compensation_source: str,
     trace_seed: int | None = None,
     trace_stride: int = 10,
     nav_bias_calibrated: bool = False,
@@ -267,9 +270,9 @@ def _evaluate_variant(
     projection_hint = env.path.project(env.eta[:, :3]).segment_index
     teacher = BatchedPCTeacher(
         env,
-        speed_feedback=None
-        if teacher_speed_feedback == "config"
-        else teacher_speed_feedback,
+        speed_feedback=None if teacher_speed_feedback == "config" else teacher_speed_feedback,
+        reference_mode=teacher_reference_mode,
+        current_compensation_source=teacher_current_compensation_source,
     )
     teacher.reset(len(seeds))
     metrics = _new_metrics(
@@ -323,9 +326,7 @@ def _evaluate_variant(
             "roll": np.abs(env.eta[:, 3].detach().cpu().numpy()),
             "roll_rate": np.abs(env.nu[:, 3].detach().cpu().numpy()),
             "material_saturated": result.info["material_saturated"].detach().cpu().numpy(),
-            "nav_error": torch.linalg.norm(
-                env.sensor_output.p_nav - env.eta[:, :3], dim=1
-            )
+            "nav_error": torch.linalg.norm(env.sensor_output.p_nav - env.eta[:, :3], dim=1)
             .detach()
             .cpu()
             .numpy(),
@@ -348,8 +349,8 @@ def _evaluate_variant(
         metrics["material_saturation_steps"][active] += values["material_saturated"][active]
         action_saturated = np.abs(action_np) >= action_saturation_threshold
         metrics["action_saturation_steps"][active] += action_saturated[active]
-        metrics["action_any_surface_saturation_steps"][active] += (
-            action_saturated[active, :2].any(axis=1)
+        metrics["action_any_surface_saturation_steps"][active] += action_saturated[active, :2].any(
+            axis=1
         )
         metrics["roll_abs_sum"][active] += values["roll"][active]
         metrics["roll_abs_max"] = np.maximum(metrics["roll_abs_max"], values["roll"])
@@ -406,19 +407,14 @@ def _evaluate_variant(
                         "true_horizontal_error_m": float(
                             projection.horizontal_error_m[trace_index]
                         ),
-                        "true_vertical_error_m": float(
-                            projection.vertical_error_m[trace_index]
-                        ),
+                        "true_vertical_error_m": float(projection.vertical_error_m[trace_index]),
                         "command_heading_rad": float(command[trace_index, 0]),
                         "command_pitch_rad": float(command[trace_index, 1]),
                         "command_speed_mps": float(command[trace_index, 2]),
                         "true_heading_rad": float(env.eta[trace_index, 5]),
                         "true_pitch_rad": float(env.eta[trace_index, 4]),
                         "true_ground_surge_mps": float(ground_velocity[trace_index, 0]),
-                        "current_ned_mps": env.current_ned_mps[trace_index]
-                        .detach()
-                        .cpu()
-                        .tolist(),
+                        "current_ned_mps": env.current_ned_mps[trace_index].detach().cpu().tolist(),
                         "terminal_kind": int(terminal[trace_index]),
                     }
                 )
@@ -513,6 +509,8 @@ def main() -> int:
                 device=args.device,
                 dtype=dtype,
                 teacher_speed_feedback=args.teacher_speed_feedback,
+                teacher_reference_mode=args.teacher_reference_mode,
+                teacher_current_compensation_source=(args.teacher_current_compensation_source),
                 trace_seed=args.trace_seed,
                 trace_stride=args.trace_stride,
                 nav_bias_calibrated=args.nav_bias_calibrated,
@@ -541,7 +539,9 @@ def main() -> int:
         "seed_count": args.seed_count,
         "device": args.device,
         "dtype": args.dtype,
-        "teacher": "BatchedPCTeacher(20deg, ground-speed command, pitch PI)",
+        "teacher": "BatchedPCTeacher(ALOS guidance, current feedforward, REMUS PD/PI)",
+        "teacher_reference_mode": args.teacher_reference_mode,
+        "teacher_current_compensation_source": (args.teacher_current_compensation_source),
         "teacher_speed_feedback": args.teacher_speed_feedback,
         "guidance_overrides": guidance_overrides,
         "nav_usbl_gain_override": args.nav_usbl_gain,

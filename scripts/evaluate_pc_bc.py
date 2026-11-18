@@ -65,6 +65,16 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help="force a fixed curriculum stage for stage-matched BC evaluation",
     )
+    parser.add_argument(
+        "--teacher-reference-mode",
+        choices=("alos_compensated", "command"),
+        default="alos_compensated",
+    )
+    parser.add_argument(
+        "--teacher-current-compensation-source",
+        choices=("truth", "estimated", "none"),
+        default="truth",
+    )
     return parser.parse_args()
 
 
@@ -339,10 +349,7 @@ def _episode_summary(
                     None
                     if int(bucket_steps[:, index].sum()) <= 0
                     else float(
-                        np.sqrt(
-                            bucket_sq_sum[:, index].sum()
-                            / bucket_steps[:, index].sum()
-                        )
+                        np.sqrt(bucket_sq_sum[:, index].sum() / bucket_steps[:, index].sum())
                     )
                 )
                 for index, label in enumerate(PATH_PROGRESS_BUCKET_LABELS)
@@ -495,6 +502,8 @@ def _run_pair_batch(
     termination_mode: str,
     write_trace: bool,
     curriculum_stage: str | None,
+    teacher_reference_mode: str,
+    teacher_current_compensation_source: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     config = load_config(config_path)
     if termination_mode not in {"legacy", "endpoint_stop"}:
@@ -535,7 +544,11 @@ def _run_pair_batch(
     assert teacher_env.eta is not None and student_env.eta is not None
     teacher_true_projection_hint = teacher_env.path.project(teacher_env.eta[:, :3]).segment_index
     student_true_projection_hint = student_env.path.project(student_env.eta[:, :3]).segment_index
-    teacher = BatchedPCTeacher(teacher_env)
+    teacher = BatchedPCTeacher(
+        teacher_env,
+        reference_mode=teacher_reference_mode,
+        current_compensation_source=teacher_current_compensation_source,
+    )
     teacher.reset(len(seeds))
     student = PCBCPolicy(checkpoint_path, device=device)
     if student.model.path_dim != path_dim:
@@ -704,17 +717,11 @@ def _run_pair_batch(
                 )
                 if write_trace:
                     path_length = max(float(env.path.total_length_m), 1e-12)
-                    progress_ratio = (
-                        true_projection.progress_m.detach().cpu().numpy() / path_length
-                    )
+                    progress_ratio = true_projection.progress_m.detach().cpu().numpy() / path_length
                     row_indices = np.flatnonzero(pre_goal_mask)
                     if row_indices.size:
-                        bucket_indices = _path_progress_bucket_indices(
-                            progress_ratio[row_indices]
-                        )
-                        error_sq = (
-                            true_projection.error_3d_m.square().detach().cpu().numpy()
-                        )
+                        bucket_indices = _path_progress_bucket_indices(progress_ratio[row_indices])
+                        error_sq = true_projection.error_3d_m.square().detach().cpu().numpy()
                         np.add.at(
                             metrics["path_progress_bucket_steps"],
                             (row_indices, bucket_indices),
@@ -857,6 +864,8 @@ def _run_pair(
     termination_mode: str,
     write_trace: bool,
     curriculum_stage: str | None,
+    teacher_reference_mode: str,
+    teacher_current_compensation_source: str,
 ) -> tuple[
     dict[str, Any],
     dict[str, Any],
@@ -875,6 +884,8 @@ def _run_pair(
         termination_mode=termination_mode,
         write_trace=write_trace,
         curriculum_stage=curriculum_stage,
+        teacher_reference_mode=teacher_reference_mode,
+        teacher_current_compensation_source=teacher_current_compensation_source,
     )
     config = load_config(config_path)
     path_enabled = str(config.pc_stage) in {"C2", "C3", "C4", "C5", "C6"}
@@ -952,6 +963,8 @@ def main() -> int:
         termination_mode=args.termination_mode,
         write_trace=args.write_trace,
         curriculum_stage=args.curriculum_stage,
+        teacher_reference_mode=args.teacher_reference_mode,
+        teacher_current_compensation_source=args.teacher_current_compensation_source,
     )
     checkpoint_metadata = read_pc_bc_checkpoint_metadata(args.checkpoint)
     metric_definitions = {
@@ -985,9 +998,7 @@ def main() -> int:
             "current_speed_range_mps": list(stage_spec.current_speed_range_mps),
             "noise_scale_range": list(stage_spec.noise_scale_range),
             "shear_scale": stage_spec.shear_scale,
-            "current_outage_start_hazard_per_s": list(
-                stage_spec.current_outage_start_hazard_per_s
-            ),
+            "current_outage_start_hazard_per_s": list(stage_spec.current_outage_start_hazard_per_s),
             "current_outage_duration_s": list(stage_spec.current_outage_duration_s),
         }
     report = {
@@ -1000,6 +1011,8 @@ def main() -> int:
         "current_ablation": args.current_ablation,
         "curriculum_stage": args.curriculum_stage,
         "curriculum_stage_contract": stage_contract,
+        "teacher_reference_mode": args.teacher_reference_mode,
+        "teacher_current_compensation_source": (args.teacher_current_compensation_source),
         "actor_current_encoder": checkpoint_metadata["actor_current_encoder"],
         "actor_current_encoder_alpha": checkpoint_metadata["actor_current_encoder_alpha"],
         "seeds": list(seeds),
