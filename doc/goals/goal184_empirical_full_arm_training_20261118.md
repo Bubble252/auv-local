@@ -1,7 +1,7 @@
 # Goal184：empirical 归一化下的完整课程 arm 训练与测评
 
 **日期**：2026-11-18<br>
-**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_SUPERSEDED / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_V4_READY / PHASE_B_V4_PASS / C0_PROMOTION_SMOKE_PASS / REFERENCE_BC_AWAITING_OVERRIDE / MULTI_ARM_WAVE1_PLANNED / EVAL_SEEDS_REFROZEN / TEACHER_ALOS_TRUTH_COMP_PD_PI / HELDOUT_CLOSED`<br>
+**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_SUPERSEDED / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_V4_READY / PHASE_B_V4_PASS / C0_PROMOTION_SMOKE_PASS / REFERENCE_BC_OVERRIDE_APPROVED / WAVE1_ACTIVE / EVAL_SEEDS_REFROZEN / TEACHER_ALOS_TRUTH_COMP_PD_PI / HELDOUT_CLOSED`<br>
 **父 Goal**：Goal182、Goal183<br>
 **仓库**：`settled_局部规划器_反应式`<br>
 **执行提示词**：`/home/bubble/水下机器人/总协调/doc/ops/GOAL184_EMPIRICAL_FULL_ARMS_PROMPT_20261118.md`<br>
@@ -304,8 +304,10 @@ PE2E BCFT seed86201（单 seed 完整课程）
 
 **Wave 1：立即并行 PE2E BCFT + PE2E BCRES**
 
+- 用户 2026-11-18 已明确批准 `REFERENCE_BC_OVERRIDE`，PE2E 冻结表可用于 Wave 1 的 routine gate。
 - 两条 arm 使用同一 v4 PE2E BC（SHA `86cab3fe...`）、同一 PE2E 冻结表和同一 formal env，但必须各自独立 config、独立 run root、独立 manifest；不得共用输出目录。
-- PE2E BCRES 启动前只生成一个 Goal184 empirical BCRES config（MOD4、seed86201），运行 `check_training_profile.py` 和一次 1-it 1536-env contract smoke，验证 frozen-base/residual 接线；不按 seed/module 重复 smoke。
+- PE2E BCRES 配置：`configs/lowlevel/goal184/train_formal_mod4_pe2e_bcres_env_empirical_5d_m_seed86201.json`；MOD4、seed86201、`base_policy.mode=frozen_pc_bc_residual`、base checkpoint 为 v4 BC `86cab3fe...`、无 `warmstart_actor`、env-side empirical、runner empirical=false。BCRES 是冻结 BC 残差臂，保留 Goal182 reference recipe（actor/critic LR `3e-4`、`schedule=adaptive`、`init_noise_std=0.3`），不是 BC warmstart 配方，也不是超参扫描；BCFT 仍用受保护的 actor LR `1e-5`、fixed、std `0.05`。
+- PE2E BCRES 启动前运行 `check_training_profile.py` 和一次 1-it 1536-env contract smoke，验证 frozen-base/residual 接线；不按 seed/module 重复 smoke。
 - Wave 1 两条 run 建议占 2 张 GPU；其余空闲卡用于下面 ALOSB/TRRES 的补足，不得把 18-run 一次排满。
 
 **Wave 1 训练期间并行补足 ALOSB/TRRES**
