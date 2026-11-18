@@ -354,6 +354,15 @@ C1 0.1；因此这批记录最多只覆盖 C0/C1，不能覆盖 C2–C6。冻结
 - `run_goal182_route_gate_calibration.sh` 默认要求 C0–C6 全覆盖，可用
   `REQUIRED_STAGES` 显式覆盖，但覆盖会写进阈值表的 coverage provenance。
 
+**2026-11-18 后续复核**：逐阶段生产/消费已补齐。`calibrate_goal182_route_gate.py`
+现在在每个 stage 内独立滑窗，输出 `statistics_by_stage` 和 `thresholds_by_stage`，
+不会把 C0 与 C1 的边界拼进同一个 20-iteration 窗口；冻结表保留聚合统计供兼容。
+`RouteGateThresholdTable` 按 `curriculum_stage` 选择阈值，缺 stage 时 fail-closed；
+训练入口拒绝非 `FROZEN` 表，并拒绝多阶段课程使用旧单表。验证：
+`tests/test_goal182_route_gate_calibration.py`、
+`tests/test_lowlevel_curriculum_sampler.py`、`tests/test_lowlevel_curriculum_trainer.py`
+当前全部通过。实际 PE2E 7-stage 标定数值仍需在服务器用新 checkpoint 生成。
+
 因此，**当前 60-iteration 单跑不能直接生成首波最终阈值**。在启动 enforce 前必须二选一：
 
 1. 按 D13.6b 补一个覆盖 C0–C6 的最小 P0/reference routine calibration；
@@ -1078,7 +1087,8 @@ pe2e_residual_seed86201:
    与 stage 晋级路径一致，再启动 18-run。标定只做必要的最小预算，不扩成扫参。
    `run_goal182_route_gate_calibration.sh` 会把两张 `.thresholds.json` 安装到
    `THRESHOLDS_DIR`（默认 `$W/configs/governance/route_gate`），与 launcher 默认读取
-   路径一致，不再需要手工搬运。
+   路径一致，不再需要手工搬运。2026-11-18 后续复核已把计算方式升级为逐 stage
+   `thresholds_by_stage`；旧单表仍可解析但多阶段 enforce 会拒绝加载。
 9. INFRA-D12 已定 A：首波不实现 append，但第二波启动前必须完成 training-only 有界续路并加
    `INVALID_ROUTE_PROTOCOL` 审计；第二波 plan 中不得删掉或再次“延后”该项。
 10. D8/D9/D10 已按效率规则定：首波不为 route_profile、scale audit、C6 early stop 增加

@@ -21,6 +21,7 @@ from auv_lowlevel.curriculum import (
     CurriculumStageSampler,
     EpisodeManifestWriter,
     RouteGateThresholds,
+    RouteGateThresholdTable,
     RouteGateWindow,
     StageEvaluation,
     StageGate,
@@ -642,3 +643,66 @@ def test_route_gate_window_resets_on_stage_change() -> None:
     )
     assert status["window_fill"] == 1
     assert status["eligible"] is False
+
+
+def test_route_gate_threshold_table_selects_stage_and_fails_closed_when_missing() -> None:
+    table = RouteGateThresholdTable.from_payload(
+        {
+            "status": "FROZEN",
+            "thresholds_by_stage": {
+                "C0": {
+                    "cross_track_rmse_max_m": 0.25,
+                    "vertical_rmse_max_m": 0.25,
+                    "completion_min": 0.80,
+                    "safety_max": 0.0,
+                },
+                "C1": {
+                    "cross_track_rmse_max_m": 0.30,
+                    "vertical_rmse_max_m": 0.30,
+                    "completion_min": 0.80,
+                    "safety_max": 0.0,
+                },
+            },
+        }
+    )
+    gate = RouteGateWindow(window_size=1, consecutive_required=1, mode="enforce")
+    status = gate.observe(
+        stage="C0",
+        iteration=72,
+        metrics=_route_metrics(cross=0.28),
+        min_iterations=72,
+        thresholds=table,
+    )
+    assert status["threshold_stage"] == "C0"
+    assert status["would_pass"] is False
+    assert status["should_promote"] is False
+
+    status = gate.observe(
+        stage="C2",
+        iteration=73,
+        metrics=_route_metrics(),
+        min_iterations=72,
+        thresholds=table,
+    )
+    assert status["would_pass"] is None
+    assert status["reason"] == "CALIBRATION_MISSING"
+    assert status["should_promote"] is False
+
+
+def test_route_gate_threshold_table_accepts_legacy_single_table_as_default() -> None:
+    table = RouteGateThresholdTable.from_payload(
+        {
+            "status": "FROZEN",
+            "thresholds": {
+                "cross_track_rmse_max_m": 0.25,
+                "vertical_rmse_max_m": 0.25,
+                "completion_min": 0.80,
+                "safety_max": 0.0,
+            },
+        }
+    )
+    assert table.thresholds_by_stage == {}
+    assert table.missing_stages(("C0", "C1")) == ("C0", "C1")
+    resolved = table.for_stage("C6")
+    assert resolved is not None
+    assert resolved.cross_track_rmse_max_m == pytest.approx(0.25)

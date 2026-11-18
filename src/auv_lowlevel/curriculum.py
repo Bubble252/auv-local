@@ -321,6 +321,8 @@ class CurriculumStageSpec:
     route_axis_mode: str = ROUTE_AXIS_LEGACY
     soft_budget_iterations: int | None = None
     hard_cap_iterations: int | None = None
+    current_outage_start_hazard_per_s: tuple[float, float] = (0.0, 0.0)
+    current_outage_duration_s: tuple[float, float] = (0.0, 0.0)
 
     def __post_init__(self) -> None:
         if self.name not in CURRICULUM_STAGE_ORDER:
@@ -393,6 +395,23 @@ class CurriculumStageSpec:
             assert self.soft_budget_iterations is not None
             if self.soft_budget_iterations > self.hard_cap_iterations:
                 raise ValueError(f"{self.name} iteration soft budget exceeds hard cap")
+        for name in (
+            "current_outage_start_hazard_per_s",
+            "current_outage_duration_s",
+        ):
+            lower, upper = _ordered_range(getattr(self, name), f"{self.name}.{name}")
+            if lower < 0.0:
+                raise ValueError(f"{self.name}.{name} must be non-negative")
+        if self.current_outage_duration_s[1] > 0.3:
+            raise ValueError(f"{self.name}.current_outage_duration_s must not exceed 0.3 s")
+        if self.current_outage_start_hazard_per_s[1] > 0.0 and (
+            self.current_outage_duration_s[1] <= 0.0
+        ):
+            raise ValueError(f"{self.name}: positive outage hazard requires a positive duration")
+        if self.current_outage_duration_s[1] > 0.0 and (
+            self.current_outage_start_hazard_per_s[1] <= 0.0
+        ):
+            raise ValueError(f"{self.name}: positive outage duration requires a positive hazard")
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -420,6 +439,10 @@ class CurriculumStageSpec:
             "hard_cap_transitions": self.hard_cap_transitions,
             "soft_budget_iterations": self.soft_budget_iterations,
             "hard_cap_iterations": self.hard_cap_iterations,
+            "current_outage_start_hazard_per_s": list(
+                self.current_outage_start_hazard_per_s
+            ),
+            "current_outage_duration_s": list(self.current_outage_duration_s),
             "gate": self.gate.as_dict(),
         }
 
@@ -449,6 +472,8 @@ class CurriculumEpisodeSpec:
     vertical_amplitude_m: float = 0.0
     vertical_cycles: float = 1.0
     horizontal_amplitude_m: float = 0.0
+    current_outage_start_hazard_per_s: float = 0.0
+    current_outage_duration_s: float = 0.0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -498,6 +523,10 @@ class CurriculumEpisodeSpec:
             "vertical_amplitude_m": float(self.vertical_amplitude_m),
             "vertical_cycles": float(self.vertical_cycles),
             "horizontal_amplitude_m": float(self.horizontal_amplitude_m),
+            "current_outage_start_hazard_per_s": float(
+                self.current_outage_start_hazard_per_s
+            ),
+            "current_outage_duration_s": float(self.current_outage_duration_s),
         }
 
 
@@ -705,6 +734,8 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             vertical_amplitude_m=3.0,
             vertical_cycles=1.5,
             route_axis_mode=ROUTE_AXIS_COUPLED,
+            current_outage_start_hazard_per_s=(0.002, 0.008),
+            current_outage_duration_s=(0.05, 0.3),
         ),
         CurriculumStageSpec(
             name="C6",
@@ -729,6 +760,8 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             vertical_amplitude_m=5.0,
             vertical_cycles=1.0,
             route_axis_mode=ROUTE_AXIS_COUPLED,
+            current_outage_start_hazard_per_s=(0.008, 0.020),
+            current_outage_duration_s=(0.05, 0.3),
         ),
     )
     return {stage.name: stage for stage in stages}
@@ -927,6 +960,13 @@ class CurriculumStageSampler:
                 horizontal_amplitude = 0.0
         elif route_axis == ROUTE_AXIS_COUPLED:
             horizontal_amplitude = 0.0
+        outage_hazard = spec.current_outage_start_hazard_per_s[0] + uniform(0x209) * (
+            spec.current_outage_start_hazard_per_s[1]
+            - spec.current_outage_start_hazard_per_s[0]
+        )
+        outage_duration = spec.current_outage_duration_s[0] + uniform(0x20A) * (
+            spec.current_outage_duration_s[1] - spec.current_outage_duration_s[0]
+        )
         return CurriculumEpisodeSpec(
             stage=spec.name,
             seed=seed_value,
@@ -951,6 +991,8 @@ class CurriculumStageSampler:
             vertical_amplitude_m=vertical_amplitude,
             vertical_cycles=float(spec.vertical_cycles),
             horizontal_amplitude_m=horizontal_amplitude,
+            current_outage_start_hazard_per_s=float(outage_hazard),
+            current_outage_duration_s=float(outage_duration),
         )
 
     def sample_batch(
@@ -1092,6 +1134,105 @@ class RouteGateThresholds:
         }
 
 
+@dataclass(frozen=True)
+class RouteGateThresholdTable:
+    """Frozen route thresholds keyed by curriculum stage.
+
+    The legacy single-table format remains accepted as ``default``.  A table
+    with ``thresholds_by_stage`` is the protocol form: each stage must use its
+    own calibration distribution, and a missing stage fails closed at runtime.
+    """
+
+    thresholds_by_stage: Mapping[str, RouteGateThresholds]
+    default: RouteGateThresholds | None = None
+    status: str = "FROZEN"
+    control_contract: str | None = None
+    schema_version: str = "auv_goal182_route_gate_threshold_table.v1"
+
+    def __post_init__(self) -> None:
+        normalized: dict[str, RouteGateThresholds] = {}
+        for stage, thresholds in self.thresholds_by_stage.items():
+            if not isinstance(stage, str) or not stage:
+                raise ValueError("route gate threshold stage keys must be non-empty strings")
+            if not isinstance(thresholds, RouteGateThresholds):
+                raise TypeError("route gate threshold stage values must be RouteGateThresholds")
+            key = stage.upper()
+            if key in normalized:
+                raise ValueError(f"duplicate route gate threshold stage: {key}")
+            normalized[key] = thresholds
+        object.__setattr__(self, "thresholds_by_stage", normalized)
+
+    def for_stage(self, stage: str) -> RouteGateThresholds | None:
+        """Return the stage-specific threshold, falling back to legacy default."""
+
+        return self.thresholds_by_stage.get(str(stage).upper(), self.default)
+
+    def missing_stages(self, stages: Sequence[str]) -> tuple[str, ...]:
+        return tuple(
+            sorted(
+                str(stage).upper()
+                for stage in stages
+                if str(stage).upper() not in self.thresholds_by_stage
+            )
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "status": self.status,
+            "control_contract": self.control_contract,
+            "thresholds_by_stage": {
+                stage: thresholds.as_dict()
+                for stage, thresholds in sorted(self.thresholds_by_stage.items())
+            },
+            "default": None if self.default is None else self.default.as_dict(),
+        }
+
+    @classmethod
+    def from_payload(cls, value: Mapping[str, Any]) -> RouteGateThresholdTable:
+        """Parse a frozen calibration table or a legacy single-threshold JSON."""
+
+        raw_by_stage = value.get("thresholds_by_stage", value.get("stages"))
+        status = str(value.get("status", "FROZEN"))
+        control_contract = value.get("control_contract")
+        schema_version = str(
+            value.get("schema_version", "auv_goal182_route_gate_threshold_table.v1")
+        )
+        if raw_by_stage is None:
+            raw_thresholds = value.get("thresholds", value)
+            if not isinstance(raw_thresholds, Mapping):
+                raise ValueError("route gate threshold payload must contain a mapping")
+            return cls(
+                thresholds_by_stage={},
+                default=RouteGateThresholds.from_dict(raw_thresholds),
+                status=status,
+                control_contract=None if control_contract is None else str(control_contract),
+                schema_version=schema_version,
+            )
+        if not isinstance(raw_by_stage, Mapping):
+            raise ValueError("route gate thresholds_by_stage must be a mapping")
+        by_stage: dict[str, RouteGateThresholds] = {}
+        for stage, item in raw_by_stage.items():
+            if not isinstance(item, Mapping):
+                raise ValueError(f"route gate threshold for stage {stage!r} must be a mapping")
+            if isinstance(item.get("thresholds"), Mapping):
+                item = item["thresholds"]
+            by_stage[str(stage)] = RouteGateThresholds.from_dict(item)
+        default_value = value.get("default")
+        default = (
+            None
+            if default_value is None
+            else RouteGateThresholds.from_dict(default_value)
+        )
+        return cls(
+            thresholds_by_stage=by_stage,
+            default=default,
+            status=status,
+            control_contract=None if control_contract is None else str(control_contract),
+            schema_version=schema_version,
+        )
+
+
 ROUTE_GATE_METRIC_KEYS = {
     "cross_track_rmse_m": "/episode/cross_track_rmse_mean",
     "vertical_rmse_m": "/episode/vertical_rmse_mean",
@@ -1149,7 +1290,7 @@ class RouteGateWindow:
         iteration: int,
         metrics: Mapping[str, Any],
         min_iterations: int,
-        thresholds: RouteGateThresholds | None,
+        thresholds: RouteGateThresholds | RouteGateThresholdTable | None,
     ) -> dict[str, Any]:
         if stage != self.stage:
             self.stage = stage
@@ -1194,18 +1335,28 @@ class RouteGateWindow:
             if self._samples
             else {}
         )
+        threshold_stage: str | None = None
+        resolved_thresholds: RouteGateThresholds | None
+        if isinstance(thresholds, RouteGateThresholdTable):
+            resolved_thresholds = thresholds.for_stage(stage)
+            if resolved_thresholds is not None:
+                threshold_stage = (
+                    stage if str(stage).upper() in thresholds.thresholds_by_stage else "DEFAULT"
+                )
+        else:
+            resolved_thresholds = thresholds
         would_pass: bool | None = None
         reason = "WINDOW_NOT_FULL"
         if window_full and not eligible:
             reason = "SOFT_ITERATION_CAP_NOT_REACHED"
-        elif eligible and thresholds is None:
+        elif eligible and resolved_thresholds is None:
             reason = "CALIBRATION_MISSING"
-        elif eligible and thresholds is not None:
+        elif eligible and resolved_thresholds is not None:
             would_pass = bool(
-                means["cross_track_rmse_m"] <= thresholds.cross_track_rmse_max_m
-                and means["vertical_rmse_m"] <= thresholds.vertical_rmse_max_m
-                and means["completion_ratio"] >= thresholds.completion_min
-                and means["safety_rate"] <= thresholds.safety_max
+                means["cross_track_rmse_m"] <= resolved_thresholds.cross_track_rmse_max_m
+                and means["vertical_rmse_m"] <= resolved_thresholds.vertical_rmse_max_m
+                and means["completion_ratio"] >= resolved_thresholds.completion_min
+                and means["safety_rate"] <= resolved_thresholds.safety_max
             )
             reason = "ROUTE_GATE_PASS" if would_pass else "ROUTE_GATE_MISS"
         if would_pass is True and eligible:
@@ -1229,7 +1380,16 @@ class RouteGateWindow:
             "min_iterations": int(min_iterations),
             "eligible": bool(eligible),
             "window_mean": means,
-            "thresholds": None if thresholds is None else thresholds.as_dict(),
+            "thresholds": (
+                None if resolved_thresholds is None else resolved_thresholds.as_dict()
+            ),
+            "threshold_stage": threshold_stage,
+            "missing_stage": (
+                str(stage).upper()
+                if eligible and isinstance(thresholds, RouteGateThresholdTable)
+                and resolved_thresholds is None
+                else None
+            ),
             "would_pass": would_pass,
             "consecutive_passes": self._consecutive_passes,
             "consecutive_required": self.consecutive_required,
@@ -1717,6 +1877,7 @@ __all__ = [
     "LinearAlphaSchedule",
     "ROUTE_GATE_METRIC_KEYS",
     "RouteGateThresholds",
+    "RouteGateThresholdTable",
     "RouteGateWindow",
     "StageEvaluation",
     "StageGate",

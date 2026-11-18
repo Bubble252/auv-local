@@ -237,7 +237,7 @@
   },
   "schema_version": "auv_odarrl_control.v1",
   "sensors": {
-    "profile": "unbiased_small_noise_v2",
+    "profile": "unbiased_small_noise_v3",
     "seed": 81300
   },
   "termination": {

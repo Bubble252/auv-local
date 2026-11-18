@@ -14,6 +14,7 @@ from .curriculum import (
     CurriculumPromotionController,
     CurriculumStageSampler,
     RouteGateThresholds,
+    RouteGateThresholdTable,
     RouteGateWindow,
     StageBudgetStatus,
     StageEvaluation,
@@ -116,7 +117,7 @@ class CurriculumTrainerHook:
         force_current_encoder_alpha_zero: bool = False,
         promotion_enabled: bool = True,
         routine_gate: RouteGateWindow | None = None,
-        route_gate_thresholds: RouteGateThresholds | None = None,
+        route_gate_thresholds: RouteGateThresholds | RouteGateThresholdTable | None = None,
         stage_boundary_evals: bool = False,
         stage_boundary_retry_iterations: int | None = None,
     ) -> None:

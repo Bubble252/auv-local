@@ -49,13 +49,14 @@ def _manifest(tmp_path: Path, **kwargs) -> dict:
 
 def test_depth_manifest_separates_four_depths_and_two_routes(tmp_path: Path) -> None:
     manifest = _manifest(tmp_path)
+    matrix, _, _, _ = _inputs()
     assert manifest["scenario_count"] == 8
     assert manifest["expected_cells"] == 24
     assert manifest["axes"]["depth_profiles_m"] == [10.0, 80.0, 250.0, 500.0]
     assert manifest["axes"]["route_profiles"] == ["R_STRAIGHT", "R_3D_M"]
     assert manifest["axes"]["goal_radii_m"] == [2.0]
-    assert manifest["eval_seeds_start"] == 90001
-    assert manifest["eval_seeds"] == 3
+    assert manifest["eval_seeds_start"] == matrix["eval_seeds"][0]
+    assert manifest["eval_seeds"] == len(matrix["eval_seeds"])
 
 
 def test_depth_and_route_geometry_are_materialized(tmp_path: Path) -> None:

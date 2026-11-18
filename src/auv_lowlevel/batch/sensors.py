@@ -307,6 +307,15 @@ PROFILES["unbiased_small_noise_v2"] = replace(
     nav_noise_m=(0.001, 0.1),
 )
 
+# Goal184 default: same navigation/current noise contract as v2, with a much
+# shorter current-estimator low-pass time constant.  v2 remains untouched so
+# historical configs and checkpoints keep their original sensor behavior.
+PROFILES["unbiased_small_noise_v3"] = replace(
+    PROFILES["unbiased_small_noise_v2"],
+    name="unbiased_small_noise_v3",
+    current_est_tau_s=(0.05, 0.5),
+)
+
 
 # Keep the pre-2026-11-07 calibrated distribution available for historical
 # reproduction, and expose the old realistic ranges as an explicit stress arm.
@@ -796,6 +805,50 @@ class SyntheticSensorSuite:
         updated = self._params.noise_scale.clone()
         updated[mask_t] = scales
         self._params = replace(self._params, noise_scale=updated)
+
+    def set_current_outage_rows(
+        self,
+        mask: Tensor,
+        start_hazard_per_s: Tensor,
+        duration_s: Tensor,
+    ) -> None:
+        """Override current-estimator outage parameters on selected rows.
+
+        The fields retain the historical ``*_start_prob`` names, but are
+        interpreted by ``_start_outage`` as per-second hazards.
+        """
+
+        if self._params is None:
+            raise RuntimeError("sensors must be reset before overriding outage parameters")
+        mask_t = torch.as_tensor(mask, device=self.device, dtype=torch.bool)
+        if mask_t.shape != (self.num_envs,):
+            raise ValueError("outage mask has the wrong shape")
+        count = int(mask_t.sum().item())
+        if count == 0:
+            return
+        hazards = torch.as_tensor(start_hazard_per_s, device=self.device, dtype=self.dtype)
+        durations = torch.as_tensor(duration_s, device=self.device, dtype=self.dtype)
+        if hazards.shape == (self.num_envs,):
+            hazards = hazards[mask_t]
+        if durations.shape == (self.num_envs,):
+            durations = durations[mask_t]
+        if hazards.shape != (count,) or durations.shape != (count,):
+            raise ValueError("outage parameters must match the selected rows")
+        if not bool(torch.isfinite(hazards).all()) or bool((hazards < 0.0).any()):
+            raise ValueError("outage hazards must be finite and non-negative")
+        if not bool(torch.isfinite(durations).all()) or bool((durations < 0.0).any()):
+            raise ValueError("outage durations must be finite and non-negative")
+        if bool((durations > 0.3 + 1e-6).any()):
+            raise ValueError("outage durations must not exceed 0.3 s")
+        updated_hazards = self._params.current_est_outage_start_prob.clone()
+        updated_durations = self._params.current_est_outage_duration_s.clone()
+        updated_hazards[mask_t] = hazards
+        updated_durations[mask_t] = durations
+        self._params = replace(
+            self._params,
+            current_est_outage_start_prob=updated_hazards,
+            current_est_outage_duration_s=updated_durations,
+        )
 
     def prime(self, *, eta_true: Tensor, nu_true: Tensor, current_true_ned_mps: Tensor) -> SyntheticSensorOutput:
         """Measure the initial state at simulation time zero without advancing it."""

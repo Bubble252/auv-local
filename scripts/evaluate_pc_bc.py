@@ -19,6 +19,11 @@ from auv_lowlevel.batch.pc_bc import (
 from auv_lowlevel.batch.pc_env import BatchedPCLowLevelEnv
 from auv_lowlevel.batch.pc_teacher import BatchedPCTeacher
 from auv_lowlevel.config import load_config
+from auv_lowlevel.curriculum import (
+    CURRICULUM_STAGE_ORDER,
+    CurriculumStageSampler,
+    curriculum_stages_with_overrides,
+)
 
 CURRENT_ABLATION_MODES = frozenset({"none", "current-zero", "current-shuffle"})
 PATH_PROGRESS_BUCKET_LABELS = ("0-25%", "25-50%", "50-75%", "75-100%")
@@ -54,7 +59,36 @@ def _parse_args() -> argparse.Namespace:
             "'current-zero' zeros it; 'current-shuffle' permutes it within the batch."
         ),
     )
+    parser.add_argument(
+        "--curriculum-stage",
+        choices=CURRICULUM_STAGE_ORDER,
+        default=None,
+        help="force a fixed curriculum stage for stage-matched BC evaluation",
+    )
     return parser.parse_args()
+
+
+def _curriculum_sampler(config, stage: str | None) -> CurriculumStageSampler | None:
+    if stage is None:
+        return None
+    if not config.curriculum.enabled:
+        raise ValueError("--curriculum-stage requires curriculum.enabled=true")
+    stages = curriculum_stages_with_overrides(
+        [stage],
+        current_speed_range_mps=config.curriculum.current_speed_range_override_mps,
+        shear_scale=config.curriculum.shear_scale_override,
+        speed_protocol=config.curriculum.speed_protocol,
+    )
+    return CurriculumStageSampler(
+        stages=stages,
+        stage_mix=((stage, 1.0),),
+        current_variation_speed_amplitude_mps=(
+            0.0
+            if config.current.time_variation is None
+            else config.current.time_variation.speed_amplitude_mps
+        ),
+        speed_protocol=config.curriculum.speed_protocol,
+    )
 
 
 def _ablate_actor_current(
@@ -460,6 +494,7 @@ def _run_pair_batch(
     current_ablation: str,
     termination_mode: str,
     write_trace: bool,
+    curriculum_stage: str | None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     config = load_config(config_path)
     if termination_mode not in {"legacy", "endpoint_stop"}:
@@ -478,11 +513,22 @@ def _run_pair_batch(
     if current_ablation == "current-shuffle" and len(seeds) < 2:
         raise ValueError("current-shuffle requires at least two evaluation seeds")
     path_enabled = str(config.pc_stage) in {"C2", "C3", "C4", "C5", "C6"}
+    curriculum_sampler = _curriculum_sampler(config, curriculum_stage)
     teacher_env = BatchedPCLowLevelEnv(
-        config, num_envs=len(seeds), device=device, dtype=dtype, path_dim=path_dim
+        config,
+        num_envs=len(seeds),
+        device=device,
+        dtype=dtype,
+        path_dim=path_dim,
+        curriculum_sampler=curriculum_sampler,
     )
     student_env = BatchedPCLowLevelEnv(
-        config, num_envs=len(seeds), device=device, dtype=dtype, path_dim=path_dim
+        config,
+        num_envs=len(seeds),
+        device=device,
+        dtype=dtype,
+        path_dim=path_dim,
+        curriculum_sampler=curriculum_sampler,
     )
     teacher_env.reset(seeds)
     student_env.reset(seeds)
@@ -810,6 +856,7 @@ def _run_pair(
     current_ablation: str,
     termination_mode: str,
     write_trace: bool,
+    curriculum_stage: str | None,
 ) -> tuple[
     dict[str, Any],
     dict[str, Any],
@@ -827,9 +874,11 @@ def _run_pair(
         current_ablation=current_ablation,
         termination_mode=termination_mode,
         write_trace=write_trace,
+        curriculum_stage=curriculum_stage,
     )
     config = load_config(config_path)
     path_enabled = str(config.pc_stage) in {"C2", "C3", "C4", "C5", "C6"}
+    curriculum_sampler = _curriculum_sampler(config, curriculum_stage)
     path_length_m = (
         BatchedPCLowLevelEnv(
             config,
@@ -837,6 +886,7 @@ def _run_pair(
             device=device,
             dtype=dtype,
             path_dim=path_dim,
+            curriculum_sampler=curriculum_sampler,
         ).path.total_length_m
         if path_enabled
         else 0.0
@@ -901,6 +951,7 @@ def main() -> int:
         current_ablation=args.current_ablation,
         termination_mode=args.termination_mode,
         write_trace=args.write_trace,
+        curriculum_stage=args.curriculum_stage,
     )
     checkpoint_metadata = read_pc_bc_checkpoint_metadata(args.checkpoint)
     metric_definitions = {
@@ -918,6 +969,27 @@ def main() -> int:
         metric_definitions["path_progress_3d_rmse_m"] = (
             "pre-goal true-projection 3-D RMSE in four reference-path progress buckets"
         )
+    stage_contract: dict[str, Any] | None = None
+    if args.curriculum_stage is not None:
+        report_config = load_config(args.config)
+        stage_spec = curriculum_stages_with_overrides(
+            [args.curriculum_stage],
+            current_speed_range_mps=report_config.curriculum.current_speed_range_override_mps,
+            shear_scale=report_config.curriculum.shear_scale_override,
+            speed_protocol=report_config.curriculum.speed_protocol,
+        )[args.curriculum_stage]
+        stage_contract = {
+            "depth_range_m": list(stage_spec.depth_range_m),
+            "length_range_m": list(stage_spec.length_range_m),
+            "speed_range_mps": list(stage_spec.speed_range_mps),
+            "current_speed_range_mps": list(stage_spec.current_speed_range_mps),
+            "noise_scale_range": list(stage_spec.noise_scale_range),
+            "shear_scale": stage_spec.shear_scale,
+            "current_outage_start_hazard_per_s": list(
+                stage_spec.current_outage_start_hazard_per_s
+            ),
+            "current_outage_duration_s": list(stage_spec.current_outage_duration_s),
+        }
     report = {
         "schema_version": "auv_pc_bc_evaluation.v1",
         "config_path": str(args.config.resolve()),
@@ -926,6 +998,8 @@ def main() -> int:
         "path_zero": args.path_zero,
         "termination_mode": args.termination_mode,
         "current_ablation": args.current_ablation,
+        "curriculum_stage": args.curriculum_stage,
+        "curriculum_stage_contract": stage_contract,
         "actor_current_encoder": checkpoint_metadata["actor_current_encoder"],
         "actor_current_encoder_alpha": checkpoint_metadata["actor_current_encoder_alpha"],
         "seeds": list(seeds),
@@ -952,6 +1026,7 @@ def main() -> int:
         f"- path-zero: `{args.path_zero}`",
         f"- termination-mode: `{args.termination_mode}`",
         f"- current-ablation: `{args.current_ablation}`",
+        f"- curriculum-stage: `{args.curriculum_stage}`",
         f"- actor-current-encoder: `{checkpoint_metadata['actor_current_encoder']}`",
         "- `path_*`: true `eta` position; `alos_projection_*`: navigation-position diagnostic",
         "",

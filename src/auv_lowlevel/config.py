@@ -38,6 +38,7 @@ SUPPORTED_SENSOR_PROFILES = frozenset(
         "strong",
         "unbiased_noise_v1",
         "unbiased_small_noise_v2",
+        "unbiased_small_noise_v3",
     }
 )
 SUPPORTED_CURRENT_EST_LPF_TIME_BASES = frozenset(

@@ -25,6 +25,11 @@ from auv_lowlevel.batch.pc_path import (
 )
 from auv_lowlevel.batch.pc_teacher import BatchedPCTeacher
 from auv_lowlevel.config import load_config
+from auv_lowlevel.curriculum import (
+    CURRICULUM_STAGE_ORDER,
+    CurriculumStageSampler,
+    curriculum_stages_with_overrides,
+)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -46,6 +51,14 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--seed-role", default="training")
     parser.add_argument("--teacher-label", default=None)
     parser.add_argument("--teacher-selection", type=Path, default=None)
+    parser.add_argument(
+        "--curriculum-stages",
+        default=None,
+        help=(
+            "comma-separated fixed stages collected sequentially, e.g. "
+            "C0,C1,C2,C3,C4,C5,C6; each stage uses stage_mix=((stage,1.0),)"
+        ),
+    )
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -94,6 +107,20 @@ def _parse_seed_list(value: str | None, num_envs: int) -> tuple[int, ...] | None
     return seeds
 
 
+def _parse_curriculum_stages(value: str | None) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    stages = tuple(item.strip().upper() for item in value.split(",") if item.strip())
+    if not stages:
+        raise ValueError("--curriculum-stages must contain at least one stage")
+    if len(set(stages)) != len(stages):
+        raise ValueError("--curriculum-stages must not contain duplicates")
+    unknown = sorted(set(stages) - set(CURRICULUM_STAGE_ORDER))
+    if unknown:
+        raise ValueError(f"--curriculum-stages contains unknown stages: {unknown}")
+    return stages
+
+
 def _collect_config(
     config_path: Path,
     *,
@@ -108,18 +135,49 @@ def _collect_config(
     path_dim: int,
     actor_command_dim: int,
     seed_role: str,
+    curriculum_stage: str | None,
+    curriculum_manifest_path: Path | None,
 ) -> tuple[dict[str, np.ndarray], dict[str, Any]]:
     config = load_config(config_path)
     if config.arm != "PC" or config.policy_mode != "pure_controller":
         raise ValueError(f"{config_path} is not a PC pure-controller config")
     if config.sensors is None:
         raise ValueError(f"{config_path} requires a sensor profile")
+    curriculum_sampler = None
+    stage_spec = None
+    if curriculum_stage is not None:
+        if not config.curriculum.enabled:
+            raise ValueError(
+                f"{config_path} requires curriculum.enabled=true for "
+                "--curriculum-stages"
+            )
+        stages = curriculum_stages_with_overrides(
+            [curriculum_stage],
+            current_speed_range_mps=config.curriculum.current_speed_range_override_mps,
+            shear_scale=config.curriculum.shear_scale_override,
+            speed_protocol=config.curriculum.speed_protocol,
+        )
+        stage_spec = stages[curriculum_stage]
+        curriculum_sampler = CurriculumStageSampler(
+            stages=stages,
+            stage_mix=((curriculum_stage, 1.0),),
+            current_variation_speed_amplitude_mps=(
+                0.0
+                if config.current.time_variation is None
+                else config.current.time_variation.speed_amplitude_mps
+            ),
+            speed_protocol=config.curriculum.speed_protocol,
+        )
     env = BatchedPCLowLevelEnv(
         config,
         num_envs=num_envs,
         device=device,
         dtype=dtype,
         path_dim=path_dim,
+        curriculum_sampler=curriculum_sampler,
+        curriculum_manifest_path=(
+            curriculum_manifest_path if curriculum_sampler is not None else None
+        ),
     )
     seeds = seed_list or tuple(seed_start + index for index in range(num_envs))
     env.reset(seeds)
@@ -148,6 +206,7 @@ def _collect_config(
         "dvl_water_age_s": [],
         "usbl_age_s": [],
         "current_estimate_age_s": [],
+        "curriculum_stage": [],
     }
     if path_dim:
         arrays["actor_path"] = []
@@ -218,6 +277,14 @@ def _collect_config(
         arrays["current_estimate_age_s"].append(
             sensor.current_estimate_age_s.detach().cpu().numpy()
         )
+        if env.curriculum_specs is None:
+            stage_ids = np.full(num_envs, -1, dtype=np.int64)
+        else:
+            stage_ids = np.asarray(
+                [CURRICULUM_STAGE_ORDER.index(spec.stage) for spec in env.curriculum_specs],
+                dtype=np.int64,
+            )
+        arrays["curriculum_stage"].append(stage_ids)
         safety_events += int(result.info["safety_event"].sum().item())
 
         done = result.done.detach().cpu().numpy()
@@ -228,7 +295,9 @@ def _collect_config(
 
     combined = {
         name: np.concatenate(values, axis=0).astype(
-            np.float32 if name not in {"episode_id", "seed", "step"} else np.int64
+            np.float32
+            if name not in {"episode_id", "seed", "step", "curriculum_stage"}
+            else np.int64
         )
         for name, values in arrays.items()
     }
@@ -255,6 +324,36 @@ def _collect_config(
         "seed_role": seed_role,
         "sensor_profile": config.sensors.profile,
         "sensor_seed": config.sensors.seed,
+        "curriculum_stage": curriculum_stage,
+        "curriculum_stage_contract": (
+            None
+            if stage_spec is None
+            else {
+                "depth_range_m": list(stage_spec.depth_range_m),
+                "length_range_m": list(stage_spec.length_range_m),
+                "speed_range_mps": list(stage_spec.speed_range_mps),
+                "current_speed_range_mps": list(stage_spec.current_speed_range_mps),
+                "current_period_range_s": (
+                    None
+                    if stage_spec.current_period_range_s is None
+                    else list(stage_spec.current_period_range_s)
+                ),
+                "noise_scale_range": list(stage_spec.noise_scale_range),
+                "shear_scale": stage_spec.shear_scale,
+                "path_family_mix": [
+                    [family, weight] for family, weight in stage_spec.path_family_mix
+                ],
+                "current_outage_start_hazard_per_s": list(
+                    stage_spec.current_outage_start_hazard_per_s
+                ),
+                "current_outage_duration_s": list(
+                    stage_spec.current_outage_duration_s
+                ),
+            }
+        ),
+        "curriculum_speed_protocol": (
+            None if curriculum_stage is None else config.curriculum.speed_protocol
+        ),
         "teacher_parameters": {
             "pitch_integral_gain": teacher.pitch_integral_gain,
             "pitch_integral_limit_rad_s": teacher.pitch_integral_limit_rad_s,
@@ -271,6 +370,19 @@ def _collect_config(
         "steps_per_env": steps_per_env,
         "samples": int(combined["actor_state"].shape[0]),
         "episodes_started": int(next_episode - episode_base),
+        "episode_count_by_stage": {
+            stage: int(
+                np.unique(
+                    combined["episode_id"][
+                        combined["curriculum_stage"] == CURRICULUM_STAGE_ORDER.index(stage)
+                    ]
+                ).size
+            )
+            for stage in CURRICULUM_STAGE_ORDER
+            if np.any(
+                combined["curriculum_stage"] == CURRICULUM_STAGE_ORDER.index(stage)
+            )
+        },
         "safety_events": safety_events,
         "seed_start": seed_start,
         "seed_end": seed_start + num_envs - 1,
@@ -322,12 +434,20 @@ def main() -> int:
     if args.num_envs <= 0 or args.steps_per_env <= 0:
         raise ValueError("--num-envs and --steps-per-env must be positive")
     seed_list = _parse_seed_list(args.seed_list, args.num_envs)
+    curriculum_stages = _parse_curriculum_stages(args.curriculum_stages)
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     dataset_path = output / "demos.npz"
     manifest_path = output / "demos.manifest.json"
     if not args.overwrite and (dataset_path.exists() or manifest_path.exists()):
         raise FileExistsError(f"output already contains PC demonstrations: {output}")
+    curriculum_episode_manifest = output / "curriculum_episodes.jsonl"
+    if curriculum_stages and curriculum_episode_manifest.exists():
+        if not args.overwrite:
+            raise FileExistsError(
+                f"output already contains curriculum episodes: {curriculum_episode_manifest}"
+            )
+        curriculum_episode_manifest.unlink()
     dtype = torch.float32 if args.dtype == "float32" else torch.float64
     started_at = datetime.now(timezone.utc).isoformat()
     teacher_selection: dict[str, Any] | None = None
@@ -362,6 +482,7 @@ def main() -> int:
         "dvl_water_age_s",
         "usbl_age_s",
         "current_estimate_age_s",
+        "curriculum_stage",
     )
     if args.path_dim:
         names = (*names, "actor_path")
@@ -375,28 +496,36 @@ def main() -> int:
             if args.seed_start is None
             else args.seed_start
         )
-        arrays, metadata = _collect_config(
-            config_path,
-            output=output,
-            num_envs=args.num_envs,
-            steps_per_env=args.steps_per_env,
-            device=args.device,
-            dtype=dtype,
-            seed_start=seed_start,
-            seed_list=seed_list,
-            episode_base=episode_base,
-            path_dim=args.path_dim,
-            actor_command_dim=args.actor_command_dim,
-            seed_role=args.seed_role,
-        )
-        for name in names:
-            merged[name].append(arrays[name])
-        config_metadata.append(metadata)
-        episode_base = int(arrays["episode_id"].max()) + 1
-        print(
-            f"collected {metadata['samples']} samples from {config_path}",
-            flush=True,
-        )
+        for curriculum_stage in curriculum_stages or (None,):
+            arrays, metadata = _collect_config(
+                config_path,
+                output=output,
+                num_envs=args.num_envs,
+                steps_per_env=args.steps_per_env,
+                device=args.device,
+                dtype=dtype,
+                seed_start=seed_start,
+                seed_list=seed_list,
+                episode_base=episode_base,
+                path_dim=args.path_dim,
+                actor_command_dim=args.actor_command_dim,
+                seed_role=args.seed_role,
+                curriculum_stage=curriculum_stage,
+                curriculum_manifest_path=(
+                    curriculum_episode_manifest
+                    if curriculum_stage is not None
+                    else None
+                ),
+            )
+            for name in names:
+                merged[name].append(arrays[name])
+            config_metadata.append(metadata)
+            episode_base = int(arrays["episode_id"].max()) + 1
+            print(
+                f"collected {metadata['samples']} samples from {config_path}"
+                f" stage={curriculum_stage or 'config_default'}",
+                flush=True,
+            )
 
     payload = {
         name: np.concatenate(values, axis=0)
@@ -438,6 +567,17 @@ def main() -> int:
         "seed_role": args.seed_role,
         "teacher_label": args.teacher_label,
         "teacher_selection": teacher_selection,
+        "curriculum_stages": list(curriculum_stages),
+        "curriculum_episode_manifest": (
+            str(curriculum_episode_manifest.resolve())
+            if curriculum_episode_manifest.is_file()
+            else None
+        ),
+        "curriculum_episode_manifest_sha256": (
+            _sha256(curriculum_episode_manifest)
+            if curriculum_episode_manifest.is_file()
+            else None
+        ),
         "command_line": shlex.join(sys.argv),
         "started_at": started_at,
         "finished_at": datetime.now(timezone.utc).isoformat(),

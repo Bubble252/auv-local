@@ -77,6 +77,31 @@ def _stage_coverage(
     }
 
 
+def _window_statistics(
+    rows: list[dict[str, float]], window_size: int
+) -> dict[str, dict[str, float]]:
+    """Compute 20-iteration statistics without crossing a row-bucket boundary."""
+
+    if len(rows) < window_size:
+        raise ValueError(
+            f"need at least {window_size} complete rollout iterations; got {len(rows)}"
+        )
+    windows = [
+        rows[start : start + window_size]
+        for start in range(0, len(rows) - window_size + 1)
+    ]
+    statistics_by_metric: dict[str, dict[str, float]] = {}
+    for name in (*METRIC_KEYS, "completion_ratio"):
+        means = [statistics.fmean(window_row[name] for window_row in window) for window in windows]
+        statistics_by_metric[name] = {
+            "mean": float(statistics.fmean(means)),
+            "std": float(statistics.pstdev(means)),
+            "window_count": len(windows),
+            "iteration_count": len(rows),
+        }
+    return statistics_by_metric
+
+
 def calibrate(
     records: list[dict[str, Any]],
     *,
@@ -85,7 +110,7 @@ def calibrate(
     required_stages: tuple[str, ...] = (),
     min_stage_records: int = 0,
 ) -> dict[str, Any]:
-    rows: list[dict[str, float]] = []
+    rows_by_stage: dict[str, list[dict[str, float]]] = {}
     stages: list[str | None] = []
     for record in records:
         row: dict[str, float] = {}
@@ -99,8 +124,15 @@ def calibrate(
             if completion is None:
                 continue
             row["completion_ratio"] = completion
-            rows.append(row)
-            stages.append(record.get("curriculum_stage"))
+            raw_stage = record.get("curriculum_stage")
+            stage = (
+                str(raw_stage).upper()
+                if isinstance(raw_stage, str) and raw_stage.strip()
+                else "UNSPECIFIED"
+            )
+            rows_by_stage.setdefault(stage, []).append(row)
+            stages.append(None if stage == "UNSPECIFIED" else stage)
+    rows = [row for stage_rows in rows_by_stage.values() for row in stage_rows]
     if len(rows) < window_size:
         raise ValueError(
             f"need at least {window_size} complete rollout iterations; got {len(rows)}"
@@ -118,14 +150,22 @@ def calibrate(
             + ", ".join(coverage["insufficient"])
             + f"; minimum={min_stage_records}, coverage={coverage['counts']}"
         )
-    windows = [rows[start : start + window_size] for start in range(0, len(rows) - window_size + 1)]
+    stage_statistics = {
+        stage: _window_statistics(stage_rows, window_size)
+        for stage, stage_rows in sorted(rows_by_stage.items())
+    }
+    all_windows = [
+        stage_rows[start : start + window_size]
+        for stage, stage_rows in sorted(rows_by_stage.items())
+        for start in range(0, len(stage_rows) - window_size + 1)
+    ]
     statistics_by_metric: dict[str, dict[str, float]] = {}
     for name in (*METRIC_KEYS, "completion_ratio"):
-        means = [sum(window_row[name] for window_row in window) / window_size for window in windows]
+        means = [statistics.fmean(window_row[name] for window_row in window) for window in all_windows]
         statistics_by_metric[name] = {
             "mean": float(statistics.fmean(means)),
             "std": float(statistics.pstdev(means)),
-            "window_count": len(windows),
+            "window_count": len(all_windows),
             "iteration_count": len(rows),
         }
     return {
@@ -135,6 +175,7 @@ def calibrate(
         "window_scheme": "TRAINING_ROLLOUT_20_ITERATION_WINDOWS",
         "window_size": window_size,
         "statistics": statistics_by_metric,
+        "statistics_by_stage": stage_statistics,
         "stage_coverage": coverage,
     }
 
@@ -166,6 +207,30 @@ def build_thresholds(
         "vertical_rmse_max_m": upper("vertical_rmse_max_m", vertical_margin),
         "completion_min": float(completion_min),
         "safety_max": float(safety_max),
+    }
+
+
+def build_thresholds_by_stage(
+    calibration: dict[str, Any],
+    *,
+    cross_margin: float,
+    vertical_margin: float,
+    completion_margin: float = 0.05,
+    completion_floor: float = 0.80,
+    completion_ceiling: float = 0.90,
+    safety_max: float = 0.0,
+) -> dict[str, dict[str, float]]:
+    return {
+        stage: build_thresholds(
+            {"statistics": stage_statistics},
+            cross_margin=cross_margin,
+            vertical_margin=vertical_margin,
+            completion_margin=completion_margin,
+            completion_floor=completion_floor,
+            completion_ceiling=completion_ceiling,
+            safety_max=safety_max,
+        )
+        for stage, stage_statistics in calibration["statistics_by_stage"].items()
     }
 
 
@@ -226,10 +291,20 @@ def main() -> int:
         completion_ceiling=args.completion_ceiling,
         safety_max=args.safety_max,
     )
+    calibrated_by_stage = build_thresholds_by_stage(
+        calibration,
+        cross_margin=args.cross_margin,
+        vertical_margin=args.vertical_margin,
+        completion_margin=args.completion_margin,
+        completion_floor=args.completion_floor,
+        completion_ceiling=args.completion_ceiling,
+        safety_max=args.safety_max,
+    )
     payload = {
         **calibration,
         "control_contract": args.control_contract,
         "thresholds": calibrated,
+        "thresholds_by_stage": calibrated_by_stage,
         "reference": {
             "id": args.reference_id,
             "sha256": args.reference_sha256,
@@ -261,12 +336,14 @@ def main() -> int:
         "window_scheme": payload["window_scheme"],
         "window_size": payload["window_size"],
         "statistics": payload["statistics"],
+        "statistics_by_stage": payload["statistics_by_stage"],
         "stage_coverage": payload["stage_coverage"],
         "formula": payload["formula"],
         "margins": payload["margins"],
         "reference": payload["reference"],
         "record_files": payload["record_files"],
         "thresholds": calibrated,
+        "thresholds_by_stage": calibrated_by_stage,
     }
     args.output.with_suffix(".thresholds.json").write_text(
         json.dumps(frozen_table, indent=2, sort_keys=True) + "\n"

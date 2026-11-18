@@ -18,6 +18,11 @@ DEFAULT_FREEZE_MANIFEST = ROOT / "configs" / "governance" / "goal182_matrix_free
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--matrix", type=Path, default=DEFAULT_MATRIX)
+    parser.add_argument(
+        "--env-config",
+        type=Path,
+        help="formal env config; enables eval-seed vs training-seed split checks",
+    )
     parser.add_argument("--schema-only", action="store_true")
     parser.add_argument("--freeze-manifest", type=Path, default=DEFAULT_FREEZE_MANIFEST)
     parser.add_argument("--require-frozen", action="store_true")
@@ -33,6 +38,44 @@ def _load(path: Path) -> dict[str, Any]:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _seed_split_errors(matrix: dict[str, Any], env: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    evaluation = env.get("evaluation")
+    if not isinstance(evaluation, dict):
+        return ["env config: missing evaluation block"]
+    required = ("seed_start", "seed_count", "training_seed_start")
+    missing = [key for key in required if key not in evaluation]
+    if missing:
+        return [f"env config: evaluation missing {missing}"]
+    try:
+        seed_start = int(evaluation["seed_start"])
+        seed_count = int(evaluation["seed_count"])
+        training_seed_start = int(evaluation["training_seed_start"])
+    except (TypeError, ValueError):
+        return ["env config: evaluation seed fields must be integers"]
+    if seed_start < 0 or seed_count <= 0 or training_seed_start < 0:
+        return ["env config: evaluation seed fields must be non-negative with positive count"]
+    eval_pool = set(range(seed_start, seed_start + seed_count))
+    matrix_seeds = matrix.get("eval_seeds")
+    if not isinstance(matrix_seeds, list) or not matrix_seeds:
+        return ["matrix: eval_seeds must be a non-empty list"]
+    if any(not isinstance(seed, int) or isinstance(seed, bool) for seed in matrix_seeds):
+        return ["matrix: eval_seeds must contain integers"]
+    outside_pool = sorted(set(matrix_seeds) - eval_pool)
+    if outside_pool:
+        errors.append(
+            f"matrix eval seeds are outside env eval pool "
+            f"[{seed_start}, {seed_start + seed_count - 1}]: {outside_pool}"
+        )
+    in_training_stream = sorted(seed for seed in matrix_seeds if seed >= training_seed_start)
+    if in_training_stream:
+        errors.append(
+            f"matrix eval seeds enter training seed stream "
+            f"[{training_seed_start}, ...]: {in_training_stream}; INVALID_SEED_SPLIT"
+        )
+    return errors
 
 
 def _tier_errors(tier: dict[str, Any], top: dict[str, Any], errors: list[str]) -> None:
@@ -112,6 +155,14 @@ def main() -> int:
         errors.append("held-out seeds 100-149 must not be registered")
     if "never pool pressure" not in str(matrix.get("reporting_rule", "")):
         errors.append("reporting_rule must forbid pressure pooling")
+    if args.env_config is not None:
+        env_path = args.env_config if args.env_config.is_absolute() else ROOT / args.env_config
+        try:
+            env = _load(env_path)
+        except (OSError, ValueError) as error:
+            errors.append(f"cannot read env config {env_path}: {error}")
+        else:
+            errors.extend(_seed_split_errors(matrix, env))
     tiers = matrix.get("tiers", [])
     ids = [str(tier.get("tier_id")) for tier in tiers]
     expected_ids = [

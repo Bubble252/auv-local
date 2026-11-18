@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Audit Goal182 canonical evaluation artifacts.
+"""Audit Goal182 canonical evaluation artifacts and Goal184 training artifacts.
 
 Run mode checks ``summary.json``, ``episodes.jsonl`` and ``trace.npz`` for one
 or more evaluation run directories.  Evaluation-set mode additionally checks
 that the canonical ``matrix_manifest.json``, ``report_rows.jsonl`` and
-``report.md`` are present at the set root.
+``report.md`` are present at the set root.  Training mode checks one or more
+completed Goal184 curriculum runs, including per-stage provenance, finite PPO
+iteration records and empirical-normalized checkpoint metadata.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -19,6 +22,9 @@ from typing import Any
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+GOAL184_CURRICULUM_SCHEMA = "auv_pc_curriculum_episode_manifest.v1"
+GOAL184_STAGES = tuple(f"C{index}" for index in range(7))
+GOAL184_TRAINING_PROFILE = "PPO-FLAT-4096x48-E5-MB4"
 REQUIRED_EPISODE_FIELDS = {
     "episode_id",
     "seed",
@@ -483,19 +489,350 @@ def audit_eval_set(root: Path, *, expected_runs: int | None = None) -> list[str]
     return errors
 
 
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _finite_number(value: Any) -> bool:
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(float(value))
+    )
+
+
+def _audit_goal184_curriculum_episodes(
+    run_dir: Path,
+    manifest: dict[str, Any],
+    *,
+    min_episodes_per_stage: int,
+    errors: list[str],
+) -> dict[str, int]:
+    curriculum = manifest.get("curriculum")
+    if not isinstance(curriculum, dict):
+        errors.append(f"{run_dir}: training manifest has no curriculum block")
+        return {}
+    if curriculum.get("enabled") is not True:
+        errors.append(f"{run_dir}: curriculum.enabled is not true")
+    filename = curriculum.get("manifest_filename", "curriculum_episodes.jsonl")
+    if not isinstance(filename, str) or not filename or Path(filename).is_absolute():
+        errors.append(f"{run_dir}: invalid curriculum.manifest_filename={filename!r}")
+        return {}
+    episodes_path = (run_dir / filename).resolve()
+    try:
+        episodes_path.relative_to(run_dir.resolve())
+    except ValueError:
+        errors.append(f"{run_dir}: curriculum manifest path escapes the run directory")
+        return {}
+    if not episodes_path.is_file():
+        errors.append(f"{episodes_path}: missing curriculum episode manifest")
+        return {}
+
+    counts = {stage: 0 for stage in GOAL184_STAGES}
+    for line_number, line in enumerate(episodes_path.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as exc:
+            errors.append(f"{episodes_path}:{line_number}: invalid JSON: {exc}")
+            continue
+        if not isinstance(row, dict):
+            errors.append(f"{episodes_path}:{line_number}: expected a JSON object")
+            continue
+        if row.get("schema_version") != GOAL184_CURRICULUM_SCHEMA:
+            errors.append(f"{episodes_path}:{line_number}: unexpected schema_version")
+        stage = str(row.get("stage"))
+        if stage not in counts:
+            errors.append(f"{episodes_path}:{line_number}: unexpected stage {stage!r}")
+        else:
+            counts[stage] += 1
+        for key in ("depth_m", "speed_mps", "current_speed_mps"):
+            if key in row and not _finite_number(row[key]):
+                errors.append(f"{episodes_path}:{line_number}: non-finite {key}")
+
+    for stage, count in counts.items():
+        if count < min_episodes_per_stage:
+            errors.append(
+                f"{episodes_path}: stage {stage} has {count} episodes, "
+                f"expected at least {min_episodes_per_stage}"
+            )
+    return counts
+
+
+def _audit_goal184_iteration_records(
+    run_dir: Path,
+    manifest: dict[str, Any],
+    *,
+    expected_iterations: int,
+    enforce_contract_thresholds: bool,
+    errors: list[str],
+) -> dict[str, float | int]:
+    records = manifest.get("iteration_records")
+    if not isinstance(records, list) or not records:
+        records_path = run_dir / "iteration_records.jsonl"
+        if records_path.is_file():
+            records = []
+            for line_number, line in enumerate(
+                records_path.read_text(encoding="utf-8").splitlines(), 1
+            ):
+                if not line.strip():
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError as exc:
+                    errors.append(f"{records_path}:{line_number}: invalid JSON: {exc}")
+                    continue
+                if isinstance(record, dict):
+                    records.append(record)
+                else:
+                    errors.append(f"{records_path}:{line_number}: expected a JSON object")
+        else:
+            errors.append(f"{run_dir}: missing iteration records")
+            return {}
+
+    if len(records) != expected_iterations:
+        errors.append(
+            f"{run_dir}: {len(records)} iteration records, expected {expected_iterations}"
+        )
+
+    max_approx_kl = 0.0
+    max_clip_fraction = 0.0
+    max_ratio_max = 0.0
+    first_metrics: dict[str, Any] | None = None
+    for index, record in enumerate(records, 1):
+        if not isinstance(record, dict):
+            errors.append(f"{run_dir}: iteration record {index} is not an object")
+            continue
+        if record.get("iteration") != index:
+            errors.append(
+                f"{run_dir}: iteration record {index} has iteration={record.get('iteration')!r}"
+            )
+        stage = record.get("curriculum_stage")
+        if stage not in GOAL184_STAGES:
+            errors.append(f"{run_dir}: iteration {index} has invalid stage {stage!r}")
+        losses = record.get("losses")
+        if not isinstance(losses, dict) or not losses:
+            errors.append(f"{run_dir}: iteration {index} has no losses")
+        else:
+            for name, value in losses.items():
+                if not _finite_number(value):
+                    errors.append(f"{run_dir}: iteration {index} loss {name} is not finite")
+                    break
+        if record.get("losses_finite") is False:
+            errors.append(f"{run_dir}: iteration {index} reports losses_finite=false")
+        if not _finite_number(record.get("learning_rate")) or float(record["learning_rate"]) < 0:
+            errors.append(f"{run_dir}: iteration {index} has invalid learning_rate")
+        if not _finite_number(record.get("mean_noise_std")) or float(record["mean_noise_std"]) < 0:
+            errors.append(f"{run_dir}: iteration {index} has invalid mean_noise_std")
+
+        metrics = record.get("policy_update_metrics")
+        if not isinstance(metrics, dict):
+            errors.append(f"{run_dir}: iteration {index} has no policy_update_metrics")
+            continue
+        required = ("approx_kl", "clip_fraction", "ratio_mean", "ratio_max")
+        missing = [key for key in required if not _finite_number(metrics.get(key))]
+        if missing:
+            errors.append(
+                f"{run_dir}: iteration {index} has invalid policy metrics {missing}"
+            )
+            continue
+        approx_kl = float(metrics["approx_kl"])
+        clip_fraction = float(metrics["clip_fraction"])
+        ratio_mean = float(metrics["ratio_mean"])
+        ratio_max = float(metrics["ratio_max"])
+        if approx_kl < 0 or clip_fraction < 0 or clip_fraction > 1:
+            errors.append(f"{run_dir}: iteration {index} has out-of-range KL/clip metrics")
+        if ratio_mean <= 0 or ratio_max <= 0:
+            errors.append(f"{run_dir}: iteration {index} has non-positive ratio metrics")
+        max_approx_kl = max(max_approx_kl, approx_kl)
+        max_clip_fraction = max(max_clip_fraction, clip_fraction)
+        max_ratio_max = max(max_ratio_max, ratio_max)
+        if index == 1:
+            first_metrics = metrics
+
+    if enforce_contract_thresholds and first_metrics is not None:
+        if float(first_metrics["approx_kl"]) > 0.02:
+            errors.append(f"{run_dir}: first approx_kl exceeds 0.02")
+        if float(first_metrics["clip_fraction"]) > 0.25:
+            errors.append(f"{run_dir}: first clip_fraction exceeds 0.25")
+        if float(first_metrics["ratio_max"]) > 6.0:
+            errors.append(f"{run_dir}: first ratio_max exceeds 6.0")
+    return {
+        "records": len(records),
+        "max_approx_kl": max_approx_kl,
+        "max_clip_fraction": max_clip_fraction,
+        "max_ratio_max": max_ratio_max,
+    }
+
+
+def _audit_goal184_checkpoint(
+    run_dir: Path,
+    manifest: dict[str, Any],
+    *,
+    expected_final_stage: str,
+    require_empirical_normalization: bool,
+    errors: list[str],
+) -> None:
+    checkpoint_value = manifest.get("final_checkpoint")
+    if not isinstance(checkpoint_value, str) or not checkpoint_value:
+        errors.append(f"{run_dir}: manifest has no final_checkpoint")
+        return
+    checkpoint_path = Path(checkpoint_value)
+    if not checkpoint_path.is_absolute():
+        checkpoint_path = run_dir / checkpoint_path
+    if not checkpoint_path.is_file():
+        errors.append(f"{checkpoint_path}: final checkpoint is missing")
+        return
+    actual_sha = _sha256_file(checkpoint_path)
+    if manifest.get("final_checkpoint_sha256") != actual_sha:
+        errors.append(f"{checkpoint_path}: final checkpoint SHA-256 mismatch")
+
+    metadata = manifest.get("final_checkpoint_metadata")
+    if not isinstance(metadata, dict) or not metadata:
+        errors.append(f"{run_dir}: manifest has no final_checkpoint_metadata")
+        return
+    if metadata.get("pc_stage") != expected_final_stage:
+        errors.append(
+            f"{run_dir}: checkpoint pc_stage={metadata.get('pc_stage')!r}, "
+            f"expected {expected_final_stage}"
+        )
+    if not isinstance(metadata.get("normalization"), dict):
+        errors.append(f"{run_dir}: checkpoint has no normalization metadata")
+    pc_metadata = metadata.get("pc")
+    if not isinstance(pc_metadata, dict):
+        errors.append(f"{run_dir}: checkpoint has no pc metadata")
+        return
+    if require_empirical_normalization:
+        if manifest.get("normalization_mode") != "empirical":
+            errors.append(f"{run_dir}: manifest normalization_mode is not empirical")
+        if pc_metadata.get("normalization_mode") != "empirical":
+            errors.append(f"{run_dir}: checkpoint normalization_mode is not empirical")
+        if not isinstance(pc_metadata.get("normalization_state"), dict):
+            errors.append(f"{run_dir}: empirical checkpoint has no normalization_state")
+    for key in ("actor_normalization_schema_hash", "critic_normalization_schema_hash"):
+        value = pc_metadata.get(key)
+        if not isinstance(value, str) or len(value) != 64:
+            errors.append(f"{run_dir}: checkpoint {key} is missing or invalid")
+
+
+def audit_training_run(
+    run_dir: Path,
+    *,
+    expected_iterations: int = 2600,
+    expected_final_stage: str = "C6",
+    expected_curriculum_gate: str = "TRAINING_ROLLOUT_20_3",
+    min_episodes_per_stage: int = 1,
+    enforce_contract_thresholds: bool = False,
+    require_empirical_normalization: bool = True,
+) -> tuple[list[str], dict[str, Any]]:
+    """Audit one completed Goal184 training run and return ``(errors, summary)``."""
+
+    errors: list[str] = []
+    manifest_path = run_dir / "training_manifest.json"
+    if not manifest_path.is_file():
+        return [f"{manifest_path}: missing training manifest"], {}
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return [f"{manifest_path}: cannot read training manifest: {exc}"], {}
+    if not isinstance(manifest, dict):
+        return [f"{manifest_path}: training manifest must be an object"], {}
+
+    if manifest.get("status") != "completed":
+        errors.append(f"{manifest_path}: status={manifest.get('status')!r}, expected 'completed'")
+    if manifest.get("curriculum_final_stage") != expected_final_stage:
+        errors.append(
+            f"{manifest_path}: curriculum_final_stage="
+            f"{manifest.get('curriculum_final_stage')!r}, expected {expected_final_stage}"
+        )
+    if manifest.get("curriculum_current_gate") != expected_curriculum_gate:
+        errors.append(
+            f"{manifest_path}: curriculum_current_gate="
+            f"{manifest.get('curriculum_current_gate')!r}, expected {expected_curriculum_gate}"
+        )
+    if manifest.get("training_profile") != GOAL184_TRAINING_PROFILE:
+        errors.append(
+            f"{manifest_path}: training_profile={manifest.get('training_profile')!r}, "
+            f"expected {GOAL184_TRAINING_PROFILE}"
+        )
+    if isinstance(expected_iterations, bool) or expected_iterations <= 0:
+        raise ValueError("expected_iterations must be a positive integer")
+    if isinstance(min_episodes_per_stage, bool) or min_episodes_per_stage < 1:
+        raise ValueError("min_episodes_per_stage must be a positive integer")
+
+    stage_counts = _audit_goal184_curriculum_episodes(
+        run_dir,
+        manifest,
+        min_episodes_per_stage=min_episodes_per_stage,
+        errors=errors,
+    )
+    iteration_summary = _audit_goal184_iteration_records(
+        run_dir,
+        manifest,
+        expected_iterations=expected_iterations,
+        enforce_contract_thresholds=enforce_contract_thresholds,
+        errors=errors,
+    )
+    _audit_goal184_checkpoint(
+        run_dir,
+        manifest,
+        expected_final_stage=expected_final_stage,
+        require_empirical_normalization=require_empirical_normalization,
+        errors=errors,
+    )
+    return errors, {
+        "stage_counts": stage_counts,
+        "iterations": iteration_summary,
+        "final_stage": manifest.get("curriculum_final_stage"),
+        "curriculum_gate": manifest.get("curriculum_current_gate"),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--run-dir", type=Path)
     source.add_argument("--eval-set-root", type=Path)
+    source.add_argument(
+        "--train-run",
+        type=Path,
+        action="append",
+        help="completed Goal184 training run directory; repeat to audit multiple runs",
+    )
     parser.add_argument("--expected-episodes", type=int)
     parser.add_argument("--expected-runs", type=int)
+    parser.add_argument("--expected-iterations", type=int, default=2600)
+    parser.add_argument("--expected-final-stage", default="C6")
+    parser.add_argument("--expected-curriculum-gate", default="TRAINING_ROLLOUT_20_3")
+    parser.add_argument("--min-episodes-per-stage", type=int, default=1)
+    parser.add_argument("--enforce-contract-thresholds", action="store_true")
     args = parser.parse_args()
 
     if args.run_dir is not None:
         run_dir = args.run_dir if args.run_dir.is_absolute() else REPO_ROOT / args.run_dir
         errors = audit_run(run_dir, expected_episodes=args.expected_episodes)
         label = str(run_dir)
+    elif args.train_run is not None:
+        errors = []
+        for raw_run_dir in args.train_run:
+            run_dir = raw_run_dir if raw_run_dir.is_absolute() else REPO_ROOT / raw_run_dir
+            run_errors, summary = audit_training_run(
+                run_dir,
+                expected_iterations=args.expected_iterations,
+                expected_final_stage=args.expected_final_stage,
+                expected_curriculum_gate=args.expected_curriculum_gate,
+                min_episodes_per_stage=args.min_episodes_per_stage,
+                enforce_contract_thresholds=args.enforce_contract_thresholds,
+            )
+            errors.extend(run_errors)
+            if not run_errors:
+                print(f"Goal184 training audit OK: {run_dir} {json.dumps(summary, sort_keys=True)}")
+        label = ", ".join(str(path) for path in args.train_run)
     else:
         root = args.eval_set_root
         assert root is not None
@@ -503,11 +840,11 @@ def main() -> int:
         errors = audit_eval_set(root, expected_runs=args.expected_runs)
         label = str(root)
     if errors:
-        print(f"Goal182 artifact audit FAILED: {label}", file=sys.stderr)
+        print(f"Goal182/Goal184 artifact audit FAILED: {label}", file=sys.stderr)
         for error in errors:
             print(f"  - {error}", file=sys.stderr)
         return 1
-    print(f"Goal182 artifact audit OK: {label}")
+    print(f"Goal182/Goal184 artifact audit OK: {label}")
     return 0
 
 

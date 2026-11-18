@@ -1555,24 +1555,31 @@ realization；它不能回答“换垂向起伏、换路径 family、换长度�
   `ROUTE_GENERALIZATION` 前三名的独立 `DEPTH_GENERALIZATION`，不把四个深度乘进现有 22 路线 ×
   4 压力的路线泛化测评；`depth` 与 `route_profile` 必须分开计数和汇报。
 
-#### 4.12.9 默认导航传感器：`unbiased_small_noise_v2`（2026-11-16 已确认）
+#### 4.12.9 默认导航传感器：`unbiased_small_noise_v3`（2026-11-18 更新；v2 为历史基线）
 
-**状态：默认不锁真值。** 用户确认新增 profile `unbiased_small_noise_v2`，
-基于 `unbiased_noise_v1`，只把 `nav_noise_m` 从 `(0.05, 0.20)` 改为
-`(0.001, 0.1)`。该 profile 没有 bias、drift、delay、outage；
+**2026-11-18 更新（生效）**：新训练/评测默认改为 `unbiased_small_noise_v3` =
+`unbiased_small_noise_v2` + `current_est_tau_s=(0.05, 0.5) s`；v2 保持不变，
+只作历史兼容。C5/C6 另加 `0.05–0.3 s` short current-estimate outage（规划见
+Goal184 §4.1），outage 是 curriculum 事件 override，不是 profile 切换。
+以下 v2 描述作为历史基线保留。
+
+**状态：默认不锁真值。** 新默认 `unbiased_small_noise_v3` 继承 v2 的 `p_nav`
+与零均值噪声契约，并把 `current_est_tau_s` 缩短为 `(0.05, 0.5) s`。v2 基于
+`unbiased_noise_v1`，只把 `nav_noise_m` 从 `(0.05, 0.20)` 改为 `(0.001, 0.1)`；
+v2/v3 默认都没有 bias、drift、delay、outage；
 `p_nav = eta[:, :3] + zero_mean_nav_noise`，每步噪声幅度 `0.001–0.1 m`。
 `p_nav_truth_lock` 保留为 optional diagnostic，默认 `false`；只有显式打开时才
 `p_nav := eta[:, :3]` 并执行 `1e-4 m` 断言。
 
 | 项目 | 契约 |
 |---|---|
-| 默认 profile | `unbiased_small_noise_v2`，`nav_noise_m=(0.001, 0.1)` |
+| 默认 profile | 新协议 `unbiased_small_noise_v3`，`nav_noise_m=(0.001, 0.1)`，`current_est_tau_s=(0.05, 0.5)`；`unbiased_small_noise_v2` 仅历史兼容 |
 | 默认 `p_nav` | `eta[:, :3] + zero_mean_nav_noise`；无 bias/drift/delay/outage |
 | optional lock | `pc.p_nav_truth_lock=false` 默认；显式 `true` 时 `p_nav := eta[:, :3]`，`nav_age_s=0` |
 | lock 断言 | 仅当 `p_nav_truth_lock=true` 时每步 `max(abs(p_nav - eta[:, :3])) <= 1e-4 m`；超限判 `P_NAV_TRUTH_LOCK_VIOLATION` |
 | 语义标签 | 默认 `semantics=SYNTHETIC_UNBIASED_NAV`；lock 时 `semantics=ORACLE_NAVIGATION` |
 | 终止影响 | Goal182 的 `termination.position_source=eta` 已使终点终止使用真值；默认低噪声 `p_nav` 不影响 termination。若改成 `legacy`/`p_nav`，termination 会读低噪声导航；只有 lock 时才会读真值。终点捕获仍只是描述性统计，不进入评价指标（见 §5.2） |
-| 结果可比性 | 旧 `unbiased_noise_v1` 的 `nav_noise_m=0.05–0.20` 结果标 `historical_only`；`realistic_calibrated` 仍是 stress profile，不与默认主表混比 |
+| 结果可比性 | 旧 `unbiased_noise_v1` 的 `nav_noise_m=0.05–0.20` 和 `unbiased_small_noise_v2`（tau `0.5–1.5 s`）结果标 `historical_only`；`realistic_calibrated` 仍是 stress profile，不与默认主表混比 |
 | 部署诊断 | 默认 `success_pnav_tight` 是“低噪声 synthetic navigation”口径，不是真实部署；真实部署仍需 `realistic_calibrated` 或实机标定 |
 
 **范围边界**
@@ -1587,9 +1594,12 @@ realization；它不能回答“换垂向起伏、换路径 family、换长度�
   `p_nav`；
 - `0.001–0.1 m` 是 zero-mean noise，不是 bias，也不是对真实导航精度的声明；不得把
   默认低噪声结果写成“真实系统精度”或部署结论；
-- 新增 `unbiased_small_noise_v2`，全局 `unbiased_noise_v1` 保持不变，避免追溯改变
-  历史 config。manifest 记录 `profile=unbiased_small_noise_v2`、`nav_noise_m` 和
-  config SHA；旧 `unbiased_noise_v1` 0.05–0.20 结果标 `historical_only`；
+- 新增 `unbiased_small_noise_v3`，v2 与更早 profile 保持不变，避免追溯改变历史
+  config。manifest 记录 `profile=unbiased_small_noise_v3`、`nav_noise_m`、
+  `current_est_tau_s` 和 config SHA；v2 及 `unbiased_noise_v1` 0.05–0.20 结果标
+  `historical_only`；
+- C5/C6 的 short outage 由 curriculum episode override 提供，默认 profile 本身仍
+  不含 outage；不得把 outage 写进全局 profile 或扩展到 C0–C4；
 - `realistic_calibrated` 64-seed C3 的导航误差（mean 约 `0.61 m`、RMSE `0.68 m`、
   p95 `1.14–1.16 m`）保留为 stress / 历史证据；
 - 迁移到真实部署或 sim-to-real 时，必须重新启用 `realistic_calibrated` 或标定后的
@@ -1597,17 +1607,17 @@ realization；它不能回答“换垂向起伏、换路径 family、换长度�
 
 **其他传感器读取（默认低噪声和 optional lock 都不改变）**
 
-`unbiased_small_noise_v2` 不是 `clean`：没有 bias、drift、delay、outage，但保留每个控制步
+`unbiased_small_noise_v3` 不是 `clean`：没有 bias、drift、delay，默认没有 outage，但保留每个控制步
 的零均值测量噪声。`p_nav_truth_lock` 只替换 `p_nav`，下列通道仍按传感器链读取：
 
-| 通道 | 读取来源 | `unbiased_small_noise_v2` 残余噪声 | 主要消费者 |
+| 通道 | 读取来源 | `unbiased_small_noise_v3` 残余噪声 | 主要消费者 |
 |---|---|---|---|
 | `p_nav` | synthetic navigation | 默认 `0.001–0.1 m` zero-mean；lock 时 `0` | actor state、actor path、guidance 投影；若 termination 用 `p_nav` 也会读它 |
 | `attitude` | IMU | roll/pitch `0.002–0.01 rad`，heading `0.003–0.015 rad` | actor state、actor path 的 heading/pitch error、guidance 的 current body→NED |
 | `angular_rate` | gyro | `0.001–0.005 rad/s` | actor state |
 | `dvl_ground_body` | bottom DVL | `0.005–0.02 m/s` | actor state（`speed_feedback=ground`）、guidance route-speed floor |
 | `dvl_water_body` | water DVL | `0.005–0.02 m/s` | 当前 actor state 不直接消费；保留诊断/未来实验 |
-| `current_estimate_body` | current estimator LPF | `0.005–0.02 m/s`，`tau=0.5–1.5 s` | guidance 的 ALOS current compensation；actor 仅在 current encoder 启用时消费 |
+| `current_estimate_body` | current estimator LPF | `0.005–0.02 m/s`，`tau=0.05–0.5 s`；C5/C6 另有 `0.05–0.3 s` short outage | guidance 的 ALOS current compensation；actor 仅在 current encoder 启用时消费 |
 | `usbl_position` / raw USBL | USBL | `0.1–0.5 m` | 只作融合 innovation / telemetry；默认低噪声不改变 raw USBL，lock 下也不得回灌 `p_nav` |
 | `critic_state` | true `eta`、true `nu`、command error | 无 | critic |
 | `critic_path` 30D | true `eta` route、actuator、true current、sensor age/validity | sensor age/validity 仍来自仿真；`nav_innovation` 默认非零（≤`0.1 m`），lock 下为 0 | critic |
@@ -2137,8 +2147,8 @@ ALOS + 命令层残差。完整的 `run_id` 和 `eval_cell` 继续使用 §4.12.
   `goal182_eval_matrix.json` 已生成 DRAFT 并通过 checker；Goal182 artifact auditor
   仍缺失，正式评价前必须补齐。
 - evaluator summary 的 `success_rate` 仍是 p_nav tight；standing suite 的 primary 是
-  `success_eta_tight_at_done`。§4.12.9 默认是低噪声 `unbiased_small_noise_v2`
-  （`nav_noise_m=0.001–0.1 m`），`p_nav` 不再等于 `eta`；只有 optional
+  `success_eta_tight_at_done`。§4.12.9 默认是低噪声 `unbiased_small_noise_v3`
+  （`nav_noise_m=0.001–0.1 m`，`current_est_tau_s=0.05–0.5 s`），`p_nav` 不再等于 `eta`；只有 optional
   `p_nav_truth_lock=true` 时才需要 `1e-4 m` 断言。实现仍须把三口径对齐。见
   `src/auv_lowlevel/cli/evaluate_pc_ppo/summary.py:61`、
   `src/auv_lowlevel/outcome_contract.py:56`。
@@ -2351,7 +2361,7 @@ ALOS + 命令层残差。完整的 `run_id` 和 `eval_cell` 继续使用 §4.12.
   **已选 A（2026-11-16）**：`success_pnav_tight`、`success_eta_tight_ever`、
   `success_eta_tight_at_done` 三口径都输出；研究 primary 固定为
   `success_eta_tight_at_done`，`success_eta_tight_ever` 只作宽松辅助。
-  §4.12.9 默认是低噪声 `unbiased_small_noise_v2`（`nav_noise_m=0.001–0.1 m`），所以
+  §4.12.9 默认是低噪声 `unbiased_small_noise_v3`（`nav_noise_m=0.001–0.1 m`，`current_est_tau_s=0.05–0.5 s`），所以
   `success_pnav_tight` 是“低噪声 synthetic navigation”口径，不是真实部署；只有
   optional `p_nav_truth_lock=true` 时才变成 oracle-navigation 一致性检查。真实部署
   诊断必须另开 `realistic_calibrated` 评价。canonical summary 字段使用
@@ -2556,8 +2566,8 @@ current delay queue；只改当前帧而 history 仍是零，不算热启动。m
 - held-out `100–149`：关闭；
 - pressure profiles：`nominal / current10 / noise_n2 / plant20`；
 - radii：只保留 `default 2.0`；`strict125 1.25` 已从 Goal182 active protocol 移除；
-- navigation：Goal182 默认 `sensors.profile=unbiased_small_noise_v2`，
-  `nav_noise_m=(0.001, 0.1)`；`p_nav = eta[:, :3] + zero_mean_noise`，标签
+- navigation：Goal182 默认 `sensors.profile=unbiased_small_noise_v3`，
+  `nav_noise_m=(0.001, 0.1)`，`current_est_tau_s=(0.05, 0.5)`；`p_nav = eta[:, :3] + zero_mean_noise`，标签
   `SYNTHETIC_UNBIASED_NAV`。`p_nav_truth_lock` 是 optional diagnostic，默认
   `false`；只有显式打开时才 `p_nav := eta[:, :3]` 并标 `ORACLE_NAVIGATION`。
   旧 `unbiased_noise_v1` 0.05–0.20 结果和 `realistic_calibrated` 结果都不得与
@@ -2580,8 +2590,8 @@ current delay queue；只改当前帧而 history 仍是零，不算热启动。m
 - 后续 success 指标必须由 EV5 单独定义，不能把终点捕获事件换个名字当成 success；
 - EV5-A 的 success 定义：同时报告 `success_pnav_tight`、`success_eta_tight_ever`、
   `success_eta_tight_at_done`；研究 primary 使用 `eta_tight_at_done`，
-  `eta_tight_ever` 只作宽松辅助。Goal182 默认是低噪声 `unbiased_small_noise_v2`
-  （`nav_noise_m=0.001–0.1 m`），所以 `success_pnav_tight` 是“低噪声 synthetic
+  `eta_tight_ever` 只作宽松辅助。Goal182 默认是低噪声 `unbiased_small_noise_v3`
+  （`nav_noise_m=0.001–0.1 m`，`current_est_tau_s=0.05–0.5 s`），所以 `success_pnav_tight` 是“低噪声 synthetic
   navigation”口径，不是真实部署；只有 optional `p_nav_truth_lock=true` 时才变成
   oracle-navigation 一致性检查，并须满足 §4.12.9 的 `1e-4 m` 断言。真实部署导航
   诊断必须另开 `realistic_calibrated` 评价，不能混入主表。summary 的 canonical
@@ -2668,7 +2678,7 @@ episode = cell × eval_seed
 | seeds | 训练 `86201–86203`；评价 dev `20–22`（3 seeds）；held-out 关闭 | `INVALID_SEED_SPLIT` |
 | 启动与结束 | 先跑协议检查器，再跑实验，最后跑 artifact auditor；失败非零退出 | `INVALID_PROTOCOL` |
 | 速度 | 训练使用 `SPEED_V3_CENTER_OUT_5S`，每 `5 s` 重采样；评价固定 route speed；`speed + current + variation <= 2.5 m/s`；speed provenance 完整 | `INVALID_SPEED_CONTRACT` / `INVALID_SPEED_CURRICULUM` |
-| 导航位置 | Goal182 默认 `unbiased_small_noise_v2` + `nav_noise_m=(0.001, 0.1)`，`p_nav = eta + zero-mean noise`；`p_nav_truth_lock` 默认 `false`，只有显式 `true` 时 `p_nav := eta[:, :3]` 且每步 `max(abs(p_nav - eta)) <= 1e-4 m` | `NAV_NOISE_PROFILE_INVALID` / `P_NAV_TRUTH_LOCK_VIOLATION` |
+| 导航位置 | Goal182 默认 `unbiased_small_noise_v3` + `nav_noise_m=(0.001, 0.1)` + `current_est_tau_s=(0.05, 0.5)`，`p_nav = eta + zero-mean noise`；`p_nav_truth_lock` 默认 `false`，只有显式 `true` 时 `p_nav := eta[:, :3]` 且每步 `max(abs(p_nav - eta)) <= 1e-4 m` | `NAV_NOISE_PROFILE_INVALID` / `P_NAV_TRUTH_LOCK_VIOLATION` |
 | 主指标 | route 3D/cross/vertical、preterminal、completion/progress | 不得只看 success |
 | 训练路线 | D8 续路只允许 training-only、最多 4 段、逐 append manifest；评价路线固定 | `INVALID_ROUTE_PROTOCOL` |
 | 命名与汇报 | canonical `arm_id`/`run_id`/cell ID；matrix v2；`report_rows.jsonl` 与完整性计数 | `INVALID_EXPERIMENT_CONTRACT` |
@@ -2923,7 +2933,7 @@ D7 已定子项：
 - **D7.4 归因边界**：首轮 `C1_DUAL_PATH_PRIVILEGED` 不拆字段组；若 Gate 失败，才用
   mask 做离线/训练诊断，不把诊断结果直接写成新 winner。
 - **D7.5 truth-lock / 低噪声导航下的解释**：§4.12.9 默认是
-  `unbiased_small_noise_v2` 低噪声（`nav_noise_m=0.001–0.1 m`），actor path 的 position
+  `unbiased_small_noise_v3` 低噪声（`nav_noise_m=0.001–0.1 m`，`current_est_tau_s=0.05–0.5 s`），actor path 的 position
   源与 critic `route_truth` 的 `eta` 不完全相同，`nav_innovation` 默认非零；只有
   optional `p_nav_truth_lock=true` 时两者才相同且 `nav_innovation=0`。若仍运行 raw
   USBL 仿真，`usbl_innovation` 仍可能是非零 telemetry，但不得回灌 `p_nav`。
@@ -3233,6 +3243,7 @@ git diff --cached --check
 | 2026-11-16 | EV8 外部 suite 接入与测评命名 | 采用 A：主排名只用 `MAIN_RANKING`，前三名追加 `ROUTE_GENERALIZATION`；`EXTERNAL_GEOMETRY_SUITE`（suite D）只给最终 winner 做外部体检 | suite D 不参与 Gate、winner、前三名、early-stop 或 checkpoint 选择；只按 EV7 的正式 checkpoint 对 winner 的正式训练 seeds 逐一运行，并标 `EXTERNAL_GEOMETRY_ONLY`。命名统一为 `QUICK_SCREEN / MAIN_RANKING / SPEED_ENVELOPE / ROUTE_GENERALIZATION / DEPTH_GENERALIZATION`；旧名 `SCREEN / FORMAL_CORE / SPEED_EVAL / COLLECTION_EVAL / DEPTH_AUDIT / FORMAL_GEOMETRY` 只作 `legacy_alias`。见 §4.12.3、EV8 |
 | 2026-11-16 | EV9 canonical 产物 | 采用 A：固定 `matrix_manifest.json`、`report_rows.jsonl`、`report.md`；每个 run 使用 `summary.json`、`episodes.jsonl`、`trace.npz` | `matrix_manifest` 每张 frozen matrix 一份；`report_rows` 每个 cell 一行并聚合 `eval_seeds`；`episodes.jsonl` 每 episode 一行；两者用同一 `episode_id`，且主表必须能从明细复算。缺产物判 `INVALID_ARTIFACT_SET`，无法复算判 `INVALID_REPORT_PROVENANCE`；`trace.npz` 只作诊断，不参与 checkpoint/winner/前三名选择。见 §4.12.5、EV9 |
 | 2026-11-16 | Episode 初始状态 | 训练从路线起点 reset：`x/y ±0.5 m`、`z ±0.5 m`、roll 0、pitch/yaw 切向 `±10°`、前向速度 `0.8–1.2×` 命令、侧向/垂向 0、三轴角速度 `±0.05 rad/s`；正式评价使用无扰动名义起点 | 训练推进器 RPM 比例仍取 `U(0,1)`，但基准按初始速度前馈；动作/平滑历史清零，前两步不罚二阶平滑；history 用首帧填满。正式评价 `x/y/z/yaw/pitch` 抖动、初始角速度和速度比例扰动均为 0，RPM 比例 1.0；current/noise/plant 压力仍生效。current 估计用第一次有效测量热启动，禁止读真值。见 §4.12.10 |
+| 2026-11-18 | C5/C6 传感器退化范围 | 用户确认：C5/C6 去掉 current estimate 的 transport delay；保留 outage 和噪声。新训练/评测 profile 为 `unbiased_small_noise_v3`（v2 + `current_est_tau_s=0.05–0.5 s`），v2 仅历史兼容；C5/C6 `noise_scale=2.0–3.0`；BC demo、PPO 训练和后续实验都遵循同一契约 | `current_estimator_level` 仍只是 legacy metadata/provenance，`delayed_noisy` / `degraded_outage` 不得作为接线依据。真实 outage 规划见 Goal184 §4.1（`PLANNED / NOT_IMPLEMENTED`）：C5 hazard `0.002–0.008 /s`、duration `0.05–0.3 s`；C6 hazard `0.008–0.020 /s`、duration `0.05–0.3 s`；delay 恒为 0。不得用 `realistic_calibrated` 顺带引入 delay/bias |
 
 ## 14. 基础设施决策索引（INFRA-D1…INFRA-D12）
 
@@ -3264,11 +3275,12 @@ git diff --cached --check
 `INFRA-D11` 的真实阈值、20/3 smoke 和 `INFRA-D2` 的冻结数值。训练完成后由
 `scripts/build_goal182_eval_arms.py` 生成正式 arms manifest，再进入 `MAIN_RANKING`。
 `D13.6b` 另有覆盖率阻断：现有 60-iteration reference calibration 最多覆盖 C0/C1，
-但单张阈值表会套到 C0–C6；trainer/calibrator 已补 stage telemetry 和
-`--require-stages`，覆盖不足会 fail-closed。最终阈值前必须补 C0–C6 覆盖，或由用户
-显式接受 `PARTIAL_STAGE_COVERAGE`；不得把 C0 单段表写成完整冻结表。
+旧实现用单张阈值表套到 C0–C6。2026-11-18 已补逐 stage 生产/消费：calibrator 在每个
+stage 内独立滑窗并输出 `thresholds_by_stage`，trainer 按 stage 选择，缺 stage 或多阶段
+旧单表会 fail-closed。最终阈值前仍必须补 C0–C6 覆盖，或由用户显式接受
+`PARTIAL_STAGE_COVERAGE`；不得把 C0 单段表写成完整冻结表。
 最小 stage sweep 已落地：7 个单 stage env + 14 个 frozen-reference training config，
-每 stage 40 iterations、`promotion_enabled=false`、单 stage mix；launcher 按
-PE2E/ALOSB 两条 control 各串行跑 C0–C6，再池化 7 份 records 冻结一张表；每个 stage
-至少要求 20 条完整 iteration record。该 sweep 只补覆盖，不是参数/seed/route 扫参；
-尚未在服务器运行，因此数值仍是 `BLOCKER`。
+每 stage 100 iterations、`promotion_enabled=false`、单 stage mix；launcher 按
+PE2E/ALOSB 两条 control 各串行跑 C0–C6，再在每个 stage 内独立滑窗并冻结逐 stage 表；
+每个 stage 至少要求 20 条完整 iteration record。该 sweep 只补覆盖，不是参数/seed/route
+扫参；尚未在服务器运行，因此数值仍是 `BLOCKER`。

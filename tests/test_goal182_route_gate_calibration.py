@@ -231,8 +231,8 @@ def test_stage_calibration_configs_cover_c0_through_c6() -> None:
             assert config["environment"]["config"] == (
                 f"configs/lowlevel/goal182/calibration/env_{stage}.json"
             )
-            assert config["training"]["iterations"] == 40
-            assert config["runner"]["save_interval"] == 40
+            assert config["training"]["iterations"] == 100
+            assert config["runner"]["save_interval"] == 100
             assert config["base_policy"]["residual_scale"] == pytest.approx(1e-6)
 
 
@@ -256,3 +256,30 @@ def test_seven_stage_sweep_satisfies_coverage_and_window_requirements() -> None:
     assert calibration["stage_coverage"]["missing"] == []
     assert calibration["stage_coverage"]["insufficient"] == []
     assert calibration["statistics"]["cross_track_rmse_max_m"]["iteration_count"] == 280
+
+
+def test_calibration_windows_stay_inside_each_stage_and_emit_stage_thresholds() -> None:
+    module = _load()
+    records = []
+    for stage, base in (("C0", 1.0), ("C1", 100.0)):
+        for index in range(40):
+            record = _records(1)[0]
+            record["curriculum_stage"] = stage
+            record["episode_metrics"]["/episode/cross_track_rmse_mean"] = base + 0.01 * index
+            records.append(record)
+    calibration = module.calibrate(
+        records,
+        window_size=20,
+        required_stages=("C0", "C1"),
+        min_stage_records=20,
+    )
+    assert calibration["statistics_by_stage"]["C0"]["cross_track_rmse_max_m"]["mean"] < 2.0
+    assert calibration["statistics_by_stage"]["C1"]["cross_track_rmse_max_m"]["mean"] > 99.0
+    assert calibration["statistics"]["cross_track_rmse_max_m"]["window_count"] == 42
+    thresholds = module.build_thresholds_by_stage(
+        calibration,
+        cross_margin=0.10,
+        vertical_margin=0.10,
+    )
+    assert set(thresholds) == {"C0", "C1"}
+    assert thresholds["C0"]["cross_track_rmse_max_m"] < thresholds["C1"]["cross_track_rmse_max_m"]

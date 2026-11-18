@@ -84,7 +84,7 @@ from auv_lowlevel.curriculum import (
     CurriculumPromotionController,
     CurriculumStageSampler,
     LinearAlphaSchedule,
-    RouteGateThresholds,
+    RouteGateThresholdTable,
     RouteGateWindow,
     StageBudgetExhausted,
     curriculum_stages_with_overrides,
@@ -1697,9 +1697,31 @@ def main() -> int:
             if args.curriculum_route_thresholds is not None:
                 threshold_path = _resolve(args.curriculum_route_thresholds)
                 threshold_payload = json.loads(threshold_path.read_text(encoding="utf-8"))
-                if isinstance(threshold_payload.get("thresholds"), dict):
-                    threshold_payload = threshold_payload["thresholds"]
-                route_thresholds = RouteGateThresholds.from_dict(threshold_payload)
+                route_thresholds = RouteGateThresholdTable.from_payload(threshold_payload)
+                if args.curriculum_route_gate_mode == "enforce":
+                    if route_thresholds.status != "FROZEN":
+                        raise SystemExit(
+                            "route-gate enforce requires a FROZEN threshold table; "
+                            f"got status={route_thresholds.status!r}"
+                        )
+                    if (
+                        curriculum_sampler is not None
+                        and len(curriculum_sampler.stages) > 1
+                        and not route_thresholds.thresholds_by_stage
+                    ):
+                        raise SystemExit(
+                            "route-gate enforce for a multi-stage curriculum requires "
+                            "a per-stage thresholds_by_stage table"
+                        )
+                    if route_thresholds.thresholds_by_stage and curriculum_sampler is not None:
+                        missing_stages = route_thresholds.missing_stages(
+                            tuple(curriculum_sampler.stages)
+                        )
+                        if missing_stages:
+                            raise SystemExit(
+                                "route-gate threshold table is missing stages: "
+                                + ", ".join(missing_stages)
+                            )
             curriculum_hook = CurriculumTrainerHook(
                 controller=CurriculumPromotionController(
                     start_stage=environment.curriculum.initial_stage

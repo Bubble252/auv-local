@@ -2086,6 +2086,23 @@ class BatchedPCLowLevelEnv:
         )
         self.sensors.set_noise_scale_rows(mask, scales)
 
+    def _set_curriculum_outage(
+        self,
+        mask: Tensor,
+        specs: tuple[CurriculumEpisodeSpec, ...],
+    ) -> None:
+        hazards = torch.tensor(
+            [spec.current_outage_start_hazard_per_s for spec in specs],
+            device=self.device,
+            dtype=self.dtype,
+        )
+        durations = torch.tensor(
+            [spec.current_outage_duration_s for spec in specs],
+            device=self.device,
+            dtype=self.dtype,
+        )
+        self.sensors.set_current_outage_rows(mask, hazards, durations)
+
     def _record_curriculum_specs(
         self,
         mask: Tensor,
@@ -2179,6 +2196,7 @@ class BatchedPCLowLevelEnv:
         self.sensors.reset(seed_values)
         if curriculum_specs is not None:
             self._set_curriculum_noise_scales(mask, curriculum_specs)
+            self._set_curriculum_outage(mask, curriculum_specs)
             self._record_curriculum_specs(mask, curriculum_specs, reset_kind="reset")
             self._set_curriculum_stage_rows(mask, curriculum_specs)
         self.sensor_output = self.sensors.prime(
@@ -2343,6 +2361,7 @@ class BatchedPCLowLevelEnv:
         self.sensors.reset_rows(mask, seeds)
         if selected_specs is not None:
             self._set_curriculum_noise_scales(mask, selected_specs)
+            self._set_curriculum_outage(mask, selected_specs)
             self._record_curriculum_specs(
                 mask,
                 selected_specs,

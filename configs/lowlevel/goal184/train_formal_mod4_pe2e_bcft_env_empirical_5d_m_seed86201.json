@@ -54,8 +54,8 @@
     "output": "artifacts/lowlevel/goal184_empirical_full_arm_20261118/train/mod4/pe2e_bcft_empirical_seed86201",
     "seed": 86201,
     "trainable_scope": "actor_critic",
-    "warmstart_actor": "/data/yhx/underwater-robotics/runs/auv-local/goal183/20261118-goal183-c-recollect/pe2e_bc_empirical_c_recollect/pc_bc_actor.pt",
-    "warmstart_actor_sha256": "ce4290f90b8fb19d8e84984c4f335400076c5f02892f3cc26e2f33b37e708582"
+    "warmstart_actor": "/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-3f1b382/bc/pe2e_bc_stage_matched_v3/pc_bc_actor.pt",
+    "warmstart_actor_sha256": "2292c19567ddf685c8ad13bf8ce7db99bfb575628198402c2fe0acf91229ad29"
   },
   "history": {
     "current_frame_dropout_prob": 0.0,
