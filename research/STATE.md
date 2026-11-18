@@ -568,3 +568,13 @@ goal182_c0_fixed_std15_ablation: REJECTED at 1536 envs (noncanonical, GPU 4). Ke
 last_decision: continue
 last_updated: 2026-11-18
 ```
+
+
+## 2026-11-18 用户请求的控制收益/负担研究（追加，不替代主线）
+
+- 状态：EXPLORATORY_DIAGNOSIS_COMPLETE / decision=continue；原Goal184训练与Gate保持。
+- 报告：doc/reviews/goal184_strengths_tradeoffs_autoresearch_20261118.md。
+- 协议与续接点：research/experiments/2026-11-18-goal184-control-tradeoffs/protocol.md、findings.md。
+- 新证据：teacher实际两舵近限位约49.78%/48.65%，高于BCRES；BCRES请求变化幅度更大，但反转率不高于BCFT。四组速率事件重算mismatch=0。
+- 优先候选：单项原始舵请求与本步可执行值之差代价。速度PI组合为后续独立诊断；未验证、未实施。近限位惩罚下调优先级，std治理不能单独解决确定性裁剪。
+- 边界：没有新rollout/训练、held-out、自动commit/push；无后台loop能力，已保留文件续接点。
