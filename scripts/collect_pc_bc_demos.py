@@ -534,7 +534,14 @@ def main() -> int:
             float(np.deg2rad(20.0)),
             1525.0,
         ],
-        "teacher": "BatchedPCTeacher(ALOS guidance, current feedforward, REMUS PD/PI)",
+        "teacher": (
+            "BatchedPCTeacher(ALOS guidance, "
+            "compensate_current="
+            f"{(config_metadata[0]['teacher_parameters']['compensate_current'] if config_metadata else None)}, "
+            "current_compensation_source="
+            f"{(config_metadata[0]['teacher_parameters']['current_compensation_source'] if config_metadata else None)}, "
+            "REMUS PD/PI)"
+        ),
         "teacher_reference_mode": (
             config_metadata[0]["teacher_parameters"]["reference_mode"] if config_metadata else None
         ),

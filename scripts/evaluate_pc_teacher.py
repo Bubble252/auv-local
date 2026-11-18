@@ -539,7 +539,12 @@ def main() -> int:
         "seed_count": args.seed_count,
         "device": args.device,
         "dtype": args.dtype,
-        "teacher": "BatchedPCTeacher(ALOS guidance, current feedforward, REMUS PD/PI)",
+        "teacher": (
+            "BatchedPCTeacher(ALOS guidance, "
+            f"compensate_current={args.teacher_current_compensation_source != 'none'}, "
+            f"current_compensation_source={args.teacher_current_compensation_source}, "
+            "REMUS PD/PI)"
+        ),
         "teacher_reference_mode": args.teacher_reference_mode,
         "teacher_current_compensation_source": (args.teacher_current_compensation_source),
         "teacher_speed_feedback": args.teacher_speed_feedback,
