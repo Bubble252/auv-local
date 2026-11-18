@@ -185,6 +185,7 @@
 | Goal179 | settled_局部规划器_反应式 | P7_DIAGNOSTIC | draft (DRAFT_FOR_APPROVAL / NO_TRAINING_STARTED / HELDOUT_CLOSED) | 1 | 0 | 0 | configs/governance/goal179_matrix.json |
 | Goal180 | settled_局部规划器_反应式 | P7_PATH_CONDITIONED_POLICY | draft (DRAFT_FOR_APPROVAL) | 1 | 0 | 0 | - |
 | Goal181 | settled_局部规划器_反应式 | P7_ACTOR_ARCHITECTURE | draft (DRAFT_FOR_APPROVAL) | 1 | 0 | 0 | - |
+| Goal185 | settled_局部规划器_反应式 | P7_MODULE_ABLATION | draft (PROTOCOL_DRAFTED_BEFORE_MEASUREMENT) | 1 | 0 | 0 | - |
 
 ## Documents
 
@@ -1149,3 +1150,7 @@
 ### Goal181
 
 - `doc/goals/goal181_transformer_actor_architecture_20261114.md`
+
+### Goal185
+
+- `doc/goals/goal185_pe2e_bcres_module_ablation_20261118.md`
