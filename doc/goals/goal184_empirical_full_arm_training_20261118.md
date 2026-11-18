@@ -144,7 +144,7 @@ autoresearch:
 - 实现：`BatchedPCTeacher` 的 `reference_mode="alos_compensated"` + `current_compensation_source="none"` 会构造 `compensate_current=false` 的 ALOS guidance；`current_compensation_source="truth"` 才使用仿真真值 `env.current_ned_mps` 做前馈补偿。反馈始终使用真值 `eta/nu` 的 PD/PI。旧 `reference_mode="command"` 是不含 ALOS 的旧行为，只保留作诊断对照，不再用于正式 BC 采集。
 - 边界：不改变任一 arm 的 control contract、actor 观测、动作接口、reward、termination、success、radius、seed split 或 training profile；只改变 teacher demo 与 teacher 对照的数据来源。
 - 通用性：PE2E 不是 ALOS arm，teacher 使用 `alos_compensated + truth`；ALOSB env 的 `guidance.compensate_current=false`，teacher 必须使用 `alos_compensated + none`；未来任何 ALOS arm 若设计为补偿，才使用 `truth`（或该 arm 允许的 `estimated`）。TRRES 不用 BC demo，不受影响。不同 seed/module 仍复用同一套同族 BC，不重复采集。
-- canonical BC 适用范围（2026-11-18 起）：PE2E 系列的所有 seed/module（含 BCFT/BCRES）统一使用当前 v4 checkpoint `pe2e_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`，SHA `86cab3fef9ee5784c0d3ef9441b1a409636df45204902713bb2fc950ebb1c086`；ALOSB 系列必须使用 `alos_bc_stage_matched_v4_teacher_alos_nocomp/pc_bc_actor.pt`，之后其 seed/module 复用；TRRES 不用 BC。禁止重新启用旧 `2292c195...` 或更早的 `ce4290...`。
+- canonical BC 适用范围（2026-11-18 起）：PE2E 系列的所有 seed/module（含 BCFT/BCRES）统一使用当前 v4 checkpoint `pe2e_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`，SHA `86cab3fef9ee5784c0d3ef9441b1a409636df45204902713bb2fc950ebb1c086`；ALOSB_NOCOMP 使用 `alos_bc_stage_matched_v4_teacher_alos_nocomp/pc_bc_actor.pt`，ALOSB_COMP 使用 `alos_comp_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`，两线不共享 BC；TRRES 不用 BC。禁止重新启用旧 `2292c195...` 或更早的 `ce4290...`。
 - ALOS 补偿不匹配证据（2026-11-18）：在 `env_alos_formal_empirical.json` 的 C3、seeds `20–23`、`endpoint_stop` 下，`alos_bc_stage_matched_v4_teacher_alos_truth`（BC SHA `006aa44b78fc90a12ba7689aafb053dbb7995c03158a62d5b0f8b9b7d3ba532a`）3D `2.767 m`、同次 truth-comp teacher `2.787 m`；而旧 no-comp BC `47cda13...` 在同一 env 下 3D `2.533 m`。这说明 BC 本身贴合 teacher，但 truth 补偿 teacher 与 `compensate_current=false` 的 ALOSB 控制设计不匹配。该 truth demo/BC 对 ALOSB 标 `INVALID_ALOS_COMPENSATION_MISMATCH`，只作诊断，不得用于 ALOSB BC、标定或正式 arm。
 - 作废范围：现有 `STAGE_MATCHED_BC`（checkpoint SHA `2292c195...`）及其 demo（SHA `9a3d465a...`）是按旧 tangent-command teacher 采的，作废为 `historical_only`。必须重采 demo、重训 BC、重跑 BC_ONLY 和 Phase B 标定后，才能进入 Phase C。
 - provenance：`collect_pc_bc_demos.py` 的 manifest 必须写出 arm 的 `guidance.compensate_current`、`teacher_reference_mode`、`teacher_current_compensation_source` 和 teacher 实际的 `teacher_parameters.compensate_current`；启动 BC 训练或正式 arm 前必须检查两者一致。BC_ONLY/teacher 诊断也必须记录同一口径。
@@ -318,7 +318,7 @@ PE2E BCFT seed86201（单 seed 完整课程）
 3. **ALOS empirical BC**：沿用 Goal184 BC 配方训练 `alos_bc_stage_matched_v4_teacher_alos_nocomp/pc_bc_actor.pt`，记录 checkpoint SHA、normalization schema hash、val RMSE；此前 `alos_bc_stage_matched_v4_teacher_alos_truth`（SHA `006aa44b...`）及其 BC_ONLY C3 `2.767 / teacher 2.787` 只作诊断，不作为 ALOSB 结果。BC_ONLY C3/seeds `20–23` 对新 nocomp BC 只跑一次 screen，要求其 C3 3D 不差于同一 ALOS empirical env 下的旧 ALOS BC `47cda13...` 同环境基线；不扫 seed、不加诊断矩阵。
    - **2026-11-18 执行结果**：nocomp demo `688128` samples / `579` episodes，dataset SHA `7705f227f062357cf3e41a8fafa52b1f2b86a1198b530ca3346d97bf7f42c712`，curriculum SHA `15550fb43cc78a9a5eefa4efa9bc47c7aa319f514353cc421251615785bc2c3e`，manifest 的 `teacher_parameters.compensate_current=false`；BC SHA `f4ccb463d5e468ad4bbdf5b6de050cc7a1d00b40f16f83e8f49fc1ebb796093a`，best epoch `30`，val loss `0.0175871`。
    - **BC_ONLY C3 screen（seeds `20–23`，`endpoint_stop`）**：nocomp BC student 3D `3.2266 m` / horizontal `2.8498 m` / vertical `1.5130 m`，success `0.5`；同一 no-comp teacher 3D `2.7898 m` / horizontal `2.3179 m` / vertical `1.5525 m`，success `0.75`；旧 ALOS BC `47cda13...` 在同一 ALOS empirical env 下 3D `2.5330 m`。per-seed 上 nocomp BC 在 seed 20/23 失败，teacher 仅 seed 23 失败。
-   - **判定**：按 §5.3.1 的软门槛，nocomp BC 未达到旧 ALOS BC 同环境基线，标 `ALOSB_BC_SCREEN_FAIL_VS_OLD_BC`。ALOSB/TRRES 分支暂停，PE2E Wave 1 继续；不得用 truth BC 冒充 ALOSB，也不得自动放宽 screen。下一步需用户定夺：保持 no-comp 设计并接受 teacher-relative/较低 BC，或改 ALOSB 设计为补偿，或停止 ALOSB。
+   - **判定**：按 §5.3.1 的旧基线，nocomp BC 未达到旧 ALOS BC 2.533 m；按 §5.3.2 修订后的 teacher-relative screen 也未通过（3.227 vs teacher 2.790，success 0.5 vs 0.75），标 `WEAK_BC_INIT`。用户已批准 ALOSB 扩成 COMP 与 NO-COMP 双线；NOCOMP 可继续，但首条 BCFT 必须先过 75-it C0 晋级 smoke，否则只停 NOCOMP。不得用 truth BC 冒充 NOCOMP。
 4. **ALOSB 7-stage 标定**：生成 `stage_matched_alos_v4_100it_fixedlr` 的 7 个单-stage env/train config，`promotion_enabled=false`、LR `1e-12`、`schedule=fixed`、每 stage `100 it`；用空闲 GPU 分批跑（例如 5+2），冻结 `goal182_route_gate_alosb_20_3.thresholds.json`，要求 `status=FROZEN`、覆盖 C0–C6、reference 自检通过。
 5. **TRRES config**：ALOSB 表冻结后生成 `TRRES_CMD/TRRES_ACT` 的 Goal184 empirical config；TRRES 不用 BC、fresh init，但必须复用同一 ALOSB env 和 ALOSB 冻结表；首个 TRRES arm 前跑一次 75-it C0 晋级 smoke。
 6. **ALOSB 首条 arm 前的 75-it smoke**：ALOSB BCFT/BCRES 的第一条 arm 也要在 soft cap 72 后实际观察 C0→C1 晋级；通过后才扩 ALOSB 其余 module/seed。
@@ -329,6 +329,21 @@ PE2E BCFT seed86201（单 seed 完整课程）
 - ALOSB/TRRES 的补足只在 Wave 1 训练期间并行进行；若 ALOS demo/BC 出现 NaN、BC_ONLY 退化或 ALOSB reference 自检不过，只停 ALOSB/TRRES 分支，PE2E Wave 1 继续。
 - `REFERENCE_BC_OVERRIDE` 的批准只覆盖 PE2E 表；ALOSB 表冻结后仍需用户明确确认，才能用于正式 ALOSB routine gate。
 - 该计划不改变 §7 的效率约束：不扫 std/LR/seed/route，不重复 smoke，不一次性排满 18-run。
+
+### 5.3.2 ALOSB 双设计扩展：COMP 与 NO-COMP（2026-11-18 用户批准）
+
+用户 2026-11-18 决定把 ALOSB 扩成两条设计线，`COMP` 与 `NO-COMP` 都做。两条线必须完全隔离，不得共享 BC、阈值表或 run root。
+
+| control | env | guidance（训练/测评） | teacher demo | canonical BC | 冻结表 |
+|---|---|---|---|---|---|
+| `ALOSB_COMP` | `configs/lowlevel/goal184/env_alos_formal_empirical_comp.json` | `compensate_current=true`、`current_compensation_source=estimated` | `alos_compensated + truth` | `alos_comp_bc_stage_matched_v4_teacher_alos_truth` | `goal182_route_gate_alosb_comp_20_3.thresholds.json` |
+| `ALOSB_NOCOMP` | `configs/lowlevel/goal184/env_alos_formal_empirical.json` | `compensate_current=false`、`current_compensation_source=none` | `alos_compensated + none` | `alos_bc_stage_matched_v4_teacher_alos_nocomp`（SHA `f4ccb463...`） | `goal182_route_gate_alosb_nocomp_20_3.thresholds.json` |
+
+- **BC screen 修订**：旧 ALOS BC `47cda13...` 的 2.533 m 是 fixed-normalization、旧 teacher 的历史参考，不能作为 empirical 双设计线的硬门槛。ALOSB screen 改为 teacher-relative：student 3D 不超过同次 teacher 的 `1.10x`，且 success 不低于 teacher 减 `0.10`。COMP 的 truth BC 当前 `2.767 / teacher 2.787`、success `1.0 / 1.0`，PASS（仍需按 COMP env 重采/重训做正式记录）；NOCOMP 当前 `3.227 / teacher 2.790`、success `0.5 / 0.75`，FAIL，标 `WEAK_BC_INIT`。
+- **NOCOMP 的继续条件**：NOCOMP 允许作为 treatment 臂继续，但不得跳过首条 BCFT 的 75-it C0 晋级 smoke；若 smoke 不过或早期训练明显不稳定，只停 NOCOMP，不影响 COMP 与 PE2E。
+- **COMP 的先决条件**：COMP demo 必须用 `env_alos_formal_empirical_comp.json` 重采，teacher 用 truth；然后用同一 BC 配方训练 COMP BC，并跑一次 BC_ONLY C3/seeds `20–23` screen。此前在 no-comp env 上采的 truth demo/BC（`006aa44b...`）只作诊断，不作为 COMP canonical BC。
+- **标定隔离**：COMP 与 NOCOMP 各生成一套 7-stage 100-it 标定包，分别冻结两张 `status=FROZEN` 表；每张表仍需用户单独确认后才能用于正式 routine gate。
+- **启动节奏**：两线各先跑首条 BCFT 的 75-it C0 晋级 smoke；通过后各跑 BCFT seed86201 2600-it。BCRES 复用同线 BC 与表；TRRES_CMD/TRRES_ACT 不用 BC，fresh init，但必须复用同线 env 与同线冻结表。不得一次排满所有 module/seed。
 
 ### 5.4 可执行命令模板
 
