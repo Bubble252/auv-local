@@ -171,6 +171,54 @@ $PY $W/scripts/train_batch_lowlevel_ppo.py \
   --seed 86201
 ```
 
+### 5.4 GPU 安全排队（2026-11-18 用户指令）
+
+核心约束：**不得让其他用户的实验出问题**。4090 没有 MIG，只能时间片共享，
+因此用“启动前安全检查 + 进程级显存硬上限 + 运行中压力抢占”三层保护：
+
+- 启动条件（同时满足）：
+  - 目标卡 `free >= need + margin`（默认 `margin=1536 MiB`）；
+  - 其他用户当前占用 `<= other_max`（默认 `4096 MiB`）；
+  - 本队列在该卡的活跃任务按声明需求预留后仍有空间。
+- 启动时给本进程设置 CUDA allocator 硬上限
+  `cap = free - margin`（`scripts/_gpu_mem_cap.py`），本任务不可能占用
+  启动时未空闲的显存。
+- 运行中每 30 s 监控：若空闲低于 `512 MiB`，或其他用户占用比启动时增长
+  超过 `margin`，只停止**我们自己的**任务；绝不向其他用户进程发信号。
+- 硬上限在单条 run 内固定，不会随别人释放显存而长大；释放出来的空间由
+  后续排队 arm 或小任务（smoke/BC，`need` 更小）使用，提高整体利用率。
+- 2600-it 任务的 `need_mb=22000`；1-it smoke 约 `9000`；BC 约 `6000`。
+
+脚本：
+
+```bash
+# 单次 dry-run，只打印每张卡是否可用
+python3 scripts/goal185_gpu_queue.py --queue <queue.json> --gpus 0-7 \
+  --margin-mb 1536 --other-max-mb 4096 --dry-run
+
+# 常驻排队
+nohup python3 scripts/goal185_gpu_queue.py --queue <queue.json> --gpus 0-7 \
+  --margin-mb 1536 --other-max-mb 4096 \
+  --state <run>/queue_state.json --log <run>/queue.log \
+  > <run>/queue.out 2>&1 &
+```
+
+**Wave 1 停止安排**：现有 `PE2E BCFT/BCRES`（pid 由 `wave1_pids.txt` 记录）
+最多跑到 **2026-11-18 23:55**，由 `scripts/goal185_stop_at.py` 停止：
+
+```bash
+nohup python3 scripts/goal185_stop_at.py --at 2026-11-18T23:55:00 \
+  --job pe2e_bcft:<pid>:$R/full_wave1/pe2e_bcft_seed86201 \
+  --job pe2e_bcres:<pid>:$R/full_wave1/pe2e_bcres_seed86201 \
+  --log $R/logs/goal185_stop_at.log > $R/logs/goal185_stop_at.out 2>&1 &
+```
+
+训练器目前没有 SIGINT/SIGTERM 优雅落盘钩子，因此停止时以“最后一个
+`model_*.pt`（每 100 it 保存）+ 已 flush 的 `iteration_records.jsonl` /
+`curriculum_episodes.jsonl`”为准，并在 run 目录写
+`stopped_by_deadline_audit.json`（记录最后 iteration、checkpoint 路径与 SHA）。
+停止后 GPU1/2 释放，可直接进入 Goal185 的排队。
+
 ## 6. Gate 与判读
 
 训练内 stage gate：窗口 20、连续 3 次通过、最低 420 it、`mode=enforce`；
