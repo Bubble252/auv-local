@@ -1,7 +1,7 @@
 # Goal184：empirical 归一化下的完整课程 arm 训练与测评
 
 **日期**：2026-11-18<br>
-**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_SUPERSEDED / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_V4_READY / PHASE_B_V4_PASS / C0_PROMOTION_SMOKE_PASS / REFERENCE_BC_OVERRIDE_APPROVED / WAVE1_ACTIVE / EVAL_SEEDS_REFROZEN / TEACHER_ALOS_TRUTH_COMP_PD_PI / HELDOUT_CLOSED`<br>
+**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_SUPERSEDED / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_V4_READY / PHASE_B_V4_PASS / C0_PROMOTION_SMOKE_PASS / REFERENCE_BC_OVERRIDE_APPROVED / WAVE1_ACTIVE / EVAL_SEEDS_REFROZEN / TEACHER_ALOS_TRUTH_COMP_PD_PI / ALOS_TEACHER_COMP_MATCH_REQUIRED / HELDOUT_CLOSED`<br>
 **父 Goal**：Goal182、Goal183<br>
 **仓库**：`settled_局部规划器_反应式`<br>
 **执行提示词**：`/home/bubble/水下机器人/总协调/doc/ops/GOAL184_EMPIRICAL_FULL_ARMS_PROMPT_20261118.md`<br>
@@ -101,7 +101,7 @@ autoresearch:
 - 正式重冻结已完成：`configs/governance/goal182_eval_matrix.json` 的 `eval_seeds=[20,21,22]`，`configs/governance/goal182_matrix_freeze.json` 的 SHA 已同步为 `ac0dddb00cea1c5c22cee22be3f60c813eb8e649f4d31d6e0ee924b72a03fe1d`；`check_goal182_eval_matrix.py --require-frozen --env-config configs/lowlevel/goal184/env_path_fixed_speed_formal_empirical.json` 返回 `PASS goal182 eval matrix frozen`；
 - ALOSB 扩展前先只读审计旧 ALOS demo 的 sensor profile；若为 `realistic_calibrated` 或无法证明匹配，则重采一套 ALOS demo，再训练 ALOS empirical BC；
 - TRRES_CMD/TRRES_ACT 是 fresh init，不使用 BC demo；
-- BC teacher 采集口径（2026-11-18 用户定夺）：所有用到 BC 的 arm 一律使用 `ALOS guidance + 真值海流前馈补偿 + REMUS PD/PI` 生成 demo；只改 teacher demo 与 teacher 对照，不改 arm 的 control contract、actor 观测、动作接口、reward、termination、success、radius 或训练 profile；细则见 §4.2；
+- BC teacher 采集口径（2026-11-18 用户定夺并补充）：所有用到 BC 的 arm 使用 `ALOS guidance + REMUS PD/PI` 生成 demo，且 teacher 的 ALOS 补偿状态必须与该 arm 的 `guidance.compensate_current` 一致；只有 arm 设计为补偿时才使用真值前馈，`compensate_current=false` 的 ALOSB 必须用 `current_compensation_source=none`。只改 teacher demo 与 teacher 对照，不改 arm 的 control contract、actor 观测、动作接口、reward、termination、success、radius 或训练 profile；细则见 §4.2；
 - held-out `100–149` 不读取、不评价、不写 cache。
 
 ### 4.1 C5/C6 current-estimator outage 契约（IMPLEMENTED / TESTS_PASS / STAGE_MATCHED_BC_READY）
@@ -137,16 +137,17 @@ autoresearch:
 - 不把 outage 与 current/noise/plant 压力池化；C5/C6 的 outage 覆盖和 duty 必须单独报告；
 - realized duty 超出上表预期带时标 `OUTAGE_COVERAGE_ANOMALY`，先诊断，不得通过改 seed 或放宽参数掩盖。
 
-### 4.2 BC teacher 采集口径（ALOS + 真值洋流补偿 + PD/PI）
+### 4.2 BC teacher 采集口径（ALOS 补偿状态与 arm 设计一致 + PD/PI）
 
-用户 2026-11-18 定夺：所有用到 BC 的 arm，其 teacher demo 一律使用 **ALOS guidance + 真值海流前馈补偿 + REMUS PD/PI**。这是一条 teacher 采集协议，不是控制契约变更。
+用户 2026-11-18 定夺并随后补充：所有用到 BC 的 arm，其 teacher demo 使用 **ALOS guidance + REMUS PD/PI**；但 teacher 的 ALOS 是否带海流前馈补偿，必须与该 arm 自身的 ALOS 设计一致。arm 的 `guidance.compensate_current=true` 时，teacher 才能使用真值/估计海流前馈补偿；arm 的 `guidance.compensate_current=false` 时，teacher 仍使用 ALOS guidance，但必须 `current_compensation_source=none`，不得偷偷加补偿。PE2E 不是 ALOS arm，其 teacher 可作为 privileged 参考使用 `alos_compensated + truth`。这是一条 teacher 采集协议，不是控制契约变更。
 
-- 实现：`BatchedPCTeacher` 默认 `reference_mode="alos_compensated"`、`current_compensation_source="truth"`。参考姿态/水速来自 `BatchedThreeDAlosGuidance`，补偿使用仿真真值 `env.current_ned_mps`；反馈仍使用真值 `eta/nu` 的 PD/PI。旧 `reference_mode="command"` 只保留作诊断对照，不再用于正式 BC 采集。
+- 实现：`BatchedPCTeacher` 的 `reference_mode="alos_compensated"` + `current_compensation_source="none"` 会构造 `compensate_current=false` 的 ALOS guidance；`current_compensation_source="truth"` 才使用仿真真值 `env.current_ned_mps` 做前馈补偿。反馈始终使用真值 `eta/nu` 的 PD/PI。旧 `reference_mode="command"` 是不含 ALOS 的旧行为，只保留作诊断对照，不再用于正式 BC 采集。
 - 边界：不改变任一 arm 的 control contract、actor 观测、动作接口、reward、termination、success、radius、seed split 或 training profile；只改变 teacher demo 与 teacher 对照的数据来源。
-- 通用性：PE2E 与 ALOSB 各自的 BC 都遵守此口径；TRRES 不用 BC demo，不受影响。不同 seed/module 仍复用同一套同族 BC，不重复采集。
-- canonical BC 适用范围（2026-11-18 起）：PE2E 系列的所有 seed/module（含 BCFT/BCRES）统一使用当前 v4 checkpoint `pe2e_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`，SHA `86cab3fef9ee5784c0d3ef9441b1a409636df45204902713bb2fc950ebb1c086`；ALOSB 系列在首次启动前按同一 teacher 口径采自己的同族 BC，之后其 seed/module 复用；TRRES 不用 BC。禁止重新启用旧 `2292c195...` 或更早的 `ce4290...`。
+- 通用性：PE2E 不是 ALOS arm，teacher 使用 `alos_compensated + truth`；ALOSB env 的 `guidance.compensate_current=false`，teacher 必须使用 `alos_compensated + none`；未来任何 ALOS arm 若设计为补偿，才使用 `truth`（或该 arm 允许的 `estimated`）。TRRES 不用 BC demo，不受影响。不同 seed/module 仍复用同一套同族 BC，不重复采集。
+- canonical BC 适用范围（2026-11-18 起）：PE2E 系列的所有 seed/module（含 BCFT/BCRES）统一使用当前 v4 checkpoint `pe2e_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`，SHA `86cab3fef9ee5784c0d3ef9441b1a409636df45204902713bb2fc950ebb1c086`；ALOSB 系列必须使用 `alos_bc_stage_matched_v4_teacher_alos_nocomp/pc_bc_actor.pt`，之后其 seed/module 复用；TRRES 不用 BC。禁止重新启用旧 `2292c195...` 或更早的 `ce4290...`。
+- ALOS 补偿不匹配证据（2026-11-18）：在 `env_alos_formal_empirical.json` 的 C3、seeds `20–23`、`endpoint_stop` 下，`alos_bc_stage_matched_v4_teacher_alos_truth`（BC SHA `006aa44b78fc90a12ba7689aafb053dbb7995c03158a62d5b0f8b9b7d3ba532a`）3D `2.767 m`、同次 truth-comp teacher `2.787 m`；而旧 no-comp BC `47cda13...` 在同一 env 下 3D `2.533 m`。这说明 BC 本身贴合 teacher，但 truth 补偿 teacher 与 `compensate_current=false` 的 ALOSB 控制设计不匹配。该 truth demo/BC 对 ALOSB 标 `INVALID_ALOS_COMPENSATION_MISMATCH`，只作诊断，不得用于 ALOSB BC、标定或正式 arm。
 - 作废范围：现有 `STAGE_MATCHED_BC`（checkpoint SHA `2292c195...`）及其 demo（SHA `9a3d465a...`）是按旧 tangent-command teacher 采的，作废为 `historical_only`。必须重采 demo、重训 BC、重跑 BC_ONLY 和 Phase B 标定后，才能进入 Phase C。
-- provenance：`collect_pc_bc_demos.py` 的 manifest 必须写出 `teacher_reference_mode`、`teacher_current_compensation_source` 和 `teacher_parameters.compensate_current`；BC_ONLY/teacher 诊断也必须记录同一口径。
+- provenance：`collect_pc_bc_demos.py` 的 manifest 必须写出 arm 的 `guidance.compensate_current`、`teacher_reference_mode`、`teacher_current_compensation_source` 和 teacher 实际的 `teacher_parameters.compensate_current`；启动 BC 训练或正式 arm 前必须检查两者一致。BC_ONLY/teacher 诊断也必须记录同一口径。
 - 过期包隔离：旧 `configs/lowlevel/goal184/calibration/recollected_matched_bc/` 已移到 `_goal184_artifacts/expired_configs/recollected_matched_bc_20261118/`，不删除、不提交、不启动。
 
 ## 5. 执行计划
@@ -313,8 +314,8 @@ PE2E BCFT seed86201（单 seed 完整课程）
 **Wave 1 训练期间并行补足 ALOSB/TRRES**
 
 1. **ALOSB empirical env/config（不改控制契约）**：从 Goal182 formal ALOS env 派生 Goal184 版本，只允许 `normalization.mode=empirical`、`sensors.profile=unbiased_small_noise_v3`、C5/C6 outage 契约和 formal curriculum 与 Goal184 一致；保留 `pc_control_mode=alos`、ALOS guidance、command residual、command-track reward 和 actor command dim=3。
-2. **ALOS demo 重采**：按 §4.2 的 `ALOS guidance + 真值海流前馈补偿 + REMUS PD/PI` 采一套 7-stage demo，seeds 与 PE2E v4 对齐（`91000–91023`），输出 `demos_goal184_alos_v4_teacher_alos_truth/`；manifest 必须写出 teacher 口径、compensate_current、dataset/curriculum SHA。旧 ALOS demo/BC `47cda13...` 只作历史对照，不得直接用于新协议。
-3. **ALOS empirical BC**：沿用 Goal184 BC 配方训练 `alos_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`，记录 checkpoint SHA、normalization schema hash、val RMSE；BC_ONLY C3/seeds `20–23` 只跑一次 screen，要求新 ALOS BC 的 C3 3D 不差于旧 ALOS BC `47cda13...` 的同环境基线；不扫 seed、不加诊断矩阵。
+2. **ALOS demo 重采**：ALOSB env 的 `guidance.compensate_current=false`，因此 teacher 必须使用 `alos_compensated + current_compensation_source=none`（ALOS guidance，但不加海流补偿），不能用 `truth`。7-stage demo，seeds 与 PE2E v4 对齐（`91000–91023`），输出 `demos_goal184_alos_v4_teacher_alos_nocomp/`；manifest 必须写出 arm 的 `compensate_current=false`、teacher 口径、dataset/curriculum SHA。此前已采的 `demos_goal184_alos_v4_teacher_alos_truth/` 是补偿不匹配，标 `INVALID_ALOS_COMPENSATION_MISMATCH`，只作诊断，不得用于 ALOSB。旧 ALOS demo/BC `47cda13...` 只作历史对照。
+3. **ALOS empirical BC**：沿用 Goal184 BC 配方训练 `alos_bc_stage_matched_v4_teacher_alos_nocomp/pc_bc_actor.pt`，记录 checkpoint SHA、normalization schema hash、val RMSE；此前 `alos_bc_stage_matched_v4_teacher_alos_truth`（SHA `006aa44b...`）及其 BC_ONLY C3 `2.767 / teacher 2.787` 只作诊断，不作为 ALOSB 结果。BC_ONLY C3/seeds `20–23` 对新 nocomp BC 只跑一次 screen，要求其 C3 3D 不差于同一 ALOS empirical env 下的旧 ALOS BC `47cda13...` 同环境基线；不扫 seed、不加诊断矩阵。
 4. **ALOSB 7-stage 标定**：生成 `stage_matched_alos_v4_100it_fixedlr` 的 7 个单-stage env/train config，`promotion_enabled=false`、LR `1e-12`、`schedule=fixed`、每 stage `100 it`；用空闲 GPU 分批跑（例如 5+2），冻结 `goal182_route_gate_alosb_20_3.thresholds.json`，要求 `status=FROZEN`、覆盖 C0–C6、reference 自检通过。
 5. **TRRES config**：ALOSB 表冻结后生成 `TRRES_CMD/TRRES_ACT` 的 Goal184 empirical config；TRRES 不用 BC、fresh init，但必须复用同一 ALOSB env 和 ALOSB 冻结表；首个 TRRES arm 前跑一次 75-it C0 晋级 smoke。
 6. **ALOSB 首条 arm 前的 75-it smoke**：ALOSB BCFT/BCRES 的第一条 arm 也要在 soft cap 72 后实际观察 C0→C1 晋级；通过后才扩 ALOSB 其余 module/seed。
