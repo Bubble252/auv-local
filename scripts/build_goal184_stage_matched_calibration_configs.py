@@ -27,14 +27,14 @@ DEFAULT_SOURCE_TRAIN = (
 )
 DEFAULT_OUTPUT = (
     REPO_ROOT / "configs" / "lowlevel" / "goal184" / "calibration"
-    / "stage_matched_v3_100it_fixedlr"
+    / "stage_matched_v4_teacher_alos_truth_100it_fixedlr"
 )
 STAGES = tuple(f"C{index}" for index in range(7))
 REFERENCE_LEARNING_RATE = 1e-12
 CALIBRATION_ITERATIONS = 100
 REFERENCE_NOISE_STD = 0.05
 EXPECTED_WARMSTART_SHA256 = (
-    "2292c19567ddf685c8ad13bf8ce7db99bfb575628198402c2fe0acf91229ad29"
+    "86cab3fef9ee5784c0d3ef9441b1a409636df45204902713bb2fc950ebb1c086"
 )
 
 
@@ -81,8 +81,8 @@ def build_stage_environment(source_env: dict, stage: str) -> dict:
     payload["curriculum"]["stage_mix"] = [{"stage": stage, "weight": 1.0}]
     payload["experiment"].update(
         {
-            "name": f"goal184_route_gate_calibration_env_stage_matched_v3_{stage}",
-            "output": f"artifacts/lowlevel/goal184/calibration/stage_matched_v3/env_{stage}",
+            "name": f"goal184_route_gate_calibration_env_stage_matched_v4_{stage}",
+            "output": f"artifacts/lowlevel/goal184/calibration/stage_matched_v4/env_{stage}",
         }
     )
     return payload
@@ -100,10 +100,10 @@ def build_stage_training(source_train: dict, stage: str, environment_relative: s
     payload["runner"]["save_interval"] = CALIBRATION_ITERATIONS
     payload["experiment"].update(
         {
-            "name": f"goal184_route_gate_calibration_stage_matched_v3_{stage}",
+            "name": f"goal184_route_gate_calibration_stage_matched_v4_{stage}",
             "output": (
                 "artifacts/lowlevel/goal184/calibration/"
-                f"stage_matched_v3/reference_pe2e_{stage}"
+                f"stage_matched_v4/reference_pe2e_{stage}"
             ),
             "seed": 86201,
         }

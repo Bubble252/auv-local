@@ -1,0 +1,59 @@
+{
+  "files": {
+    "env": {
+      "C0": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C0.json",
+      "C1": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C1.json",
+      "C2": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C2.json",
+      "C3": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C3.json",
+      "C4": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C4.json",
+      "C5": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C5.json",
+      "C6": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C6.json"
+    },
+    "train": {
+      "C0": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C0.json",
+      "C1": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C1.json",
+      "C2": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C2.json",
+      "C3": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C3.json",
+      "C4": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C4.json",
+      "C5": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C5.json",
+      "C6": "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C6.json"
+    }
+  },
+  "files_sha256": {
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C0.json": "29470cc046d0411443ce91f5df3dd63f9ebd6fe1284944de36c3cf79507e4f90",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C1.json": "f310a1ab3e46a15f32091ada02ebbd3c5c632920391686658636cc196236dc93",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C2.json": "e5db3f0d4e6d0edb65dc27a102dbbfb1b0c4a9737ad8380657f4fd437c84d7ba",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C3.json": "0e37dbb4bdbae33f7e5f98fd2d33aae0553503eac0bb8d72df1fed65464041c3",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C4.json": "9926d7cafcfa878b154a23296292b380b062a2bcf7c4aae97a69b1740a4fcee8",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C5.json": "b8a2c706aad330618e03ee6f71635f773ce2003e23d2db26be7f442931d290d6",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_C6.json": "0a5ea079dd945b91476702f6a1090988d25c57233e6f776a31dc6d96672665b9",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C0.json": "fbd09603283c642ded72c4a22db438c855957ac1f9b49e0ad197308a7f985e22",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C1.json": "6a1933224b7d8f2c6f1e69822f6a5a6a7f567309691e296b1ecc5042cdbc60fa",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C2.json": "511bf64b1f79f920643a6a3a5d043a54d08c600b713ac93ca0e3b6a82a1a827b",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C3.json": "9b773772402319709c53c76c6256d3ddf316a96abe246af77f34ba883e67ac37",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C4.json": "dfebc3cbb478dce90c937f3bb9e82778d2fccc1ec82eaa48b00a0561c6781ecd",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C5.json": "fe4bacb0a57261ca05dfbb3b01c7beeac1a1c156a86321eea75fd91d5ed2c3fe",
+    "configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/train_C6.json": "25c930a393c2e4517ac2ddeb9c7279ecc490087f1329be451faca89d9c7b9407"
+  },
+  "iterations": 100,
+  "learning_rate": 1e-12,
+  "noise_std": 0.05,
+  "normalization_mode": "empirical",
+  "schedule": "fixed",
+  "schema_version": "auv_goal184_route_gate_calibration_configs.v1",
+  "sensor_profile": "unbiased_small_noise_v3",
+  "source_env": "configs/lowlevel/goal184/env_path_fixed_speed_formal_empirical.json",
+  "source_env_sha256": "db4de5ff1ed1d5cb9b4b37da6d04df95c82855d61d609cc6e0e5d61512cc9729",
+  "source_train": "configs/lowlevel/goal184/train_formal_mod4_pe2e_bcft_env_empirical_5d_m_seed86201.json",
+  "source_train_sha256": "0266775a3e0b7dc9d174dc08ffffe8d5a8bff1b969d4dafe2be03e57259670f4",
+  "stages": [
+    "C0",
+    "C1",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "C6"
+  ],
+  "warmstart_actor_sha256": "86cab3fef9ee5784c0d3ef9441b1a409636df45204902713bb2fc950ebb1c086"
+}

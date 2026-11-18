@@ -15,10 +15,10 @@ CALIBRATION = (
     / "lowlevel"
     / "goal184"
     / "calibration"
-    / "stage_matched_v3_100it_fixedlr"
+    / "stage_matched_v4_teacher_alos_truth_100it_fixedlr"
 )
 STAGES = tuple(f"C{index}" for index in range(7))
-WARMSTART_SHA256 = "2292c19567ddf685c8ad13bf8ce7db99bfb575628198402c2fe0acf91229ad29"
+WARMSTART_SHA256 = "86cab3fef9ee5784c0d3ef9441b1a409636df45204902713bb2fc950ebb1c086"
 
 
 def _payload(path: Path) -> dict:
@@ -79,7 +79,7 @@ def test_goal184_stage_matched_calibration_train_configs_are_negligible_updates(
         assert payload["experiment"]["warmstart_actor_sha256"] == WARMSTART_SHA256
         assert payload["environment"]["config"] == (
             f"configs/lowlevel/goal184/calibration/"
-            f"stage_matched_v3_100it_fixedlr/env_{stage}.json"
+            f"stage_matched_v4_teacher_alos_truth_100it_fixedlr/env_{stage}.json"
         )
         training = load_training_config(path)
         assert training.iterations == 100

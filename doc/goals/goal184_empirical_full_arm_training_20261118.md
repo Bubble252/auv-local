@@ -1,7 +1,7 @@
 # Goal184：empirical 归一化下的完整课程 arm 训练与测评
 
 **日期**：2026-11-18<br>
-**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_SUPERSEDED / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_READY / SERVER_1IT_SMOKE_PASSED / REFERENCE_BC_INVALID_FOR_ROUTINE / EVAL_SEEDS_REFROZEN / TEACHER_ALOS_TRUTH_COMP_PD_PI / HELDOUT_CLOSED`<br>
+**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_SUPERSEDED / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_V4_READY / SERVER_1IT_SMOKE_PASSED / REFERENCE_BC_INVALID_FOR_ROUTINE / EVAL_SEEDS_REFROZEN / TEACHER_ALOS_TRUTH_COMP_PD_PI / HELDOUT_CLOSED`<br>
 **父 Goal**：Goal182、Goal183<br>
 **仓库**：`settled_局部规划器_反应式`<br>
 **执行提示词**：`/home/bubble/水下机器人/总协调/doc/ops/GOAL184_EMPIRICAL_FULL_ARMS_PROMPT_20261118.md`<br>
@@ -192,18 +192,19 @@ autoresearch:
 - 本地 PPO smoke 无法执行：当前 `.venv` 缺 `rsl_rl`；已改为本地校验 warmstart 契约（dims、current encoder、empirical schema hash 全部匹配），完整 1-iteration 1536-env smoke 已在服务器跑通；
 - 用户已于 2026-11-18 授权并完成：commit/push 到 server bare repo、服务器 clean worktree、BC/curriculum artifact 搬运、1-iteration 1536-env smoke；
 - `configs/lowlevel/goal184/calibration/recollected_matched_bc/` 是未跟踪的过期旧 BC 标定包，不得加入 commit，也不得启动；
-- `configs/lowlevel/goal184/calibration/stage_matched_v3_100it_fixedlr/` 是新的 stage-matched 标定包，必须显式加入 commit（只 add 该子目录），但标定本身仍需服务器执行。
+- `configs/lowlevel/goal184/calibration/stage_matched_v3_100it_fixedlr/` 是旧 teacher 口径的标定包，标 `PRE_TEACHER_CHANGE`，不得再启动；
+- `configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/` 是新 teacher 口径的标定包，必须显式加入 commit（只 add 该子目录），但标定本身仍需服务器执行。
 
 ### 5.2.2 STAGE_MATCHED 标定包：路径、用途与启动
 
-- 包路径：`configs/lowlevel/goal184/calibration/stage_matched_v3_100it_fixedlr/`；
-- 内容：`manifest.json` + `env_C0..C6.json` + `train_C0..C6.json`，共 15 个文件；manifest SHA-256 `93766aaf6d6fe4d5667173ab2f97d7aedd146afdf4b38d63c1c7d4aad1a63e75`；
+- 包路径：`configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr/`；
+- 内容：`manifest.json` + `env_C0..C6.json` + `train_C0..C6.json`，共 15 个文件；manifest SHA-256 `740cfbb576a91195d1060701ba8cf9f1436b041a3131c788470a21183d58aacb`；
 - 用途：仅用于 PE2E 7-stage `REFERENCE_BC` 标定，产出逐 stage 阈值；不是 treatment 配置，不能直接拿来跑正式 arm；
-- 固定参数：`unbiased_small_noise_v3`、env-side `empirical`、runner `empirical_normalization=false`、`init_noise_std=0.05`、LR `1e-12`、`schedule=fixed`、每个 stage `100` it、warmstart SHA `2292c19567ddf685c8ad13bf8ce7db99bfb575628198402c2fe0acf91229ad29`；radius 只用 `2.0 m`；
+- 固定参数：`unbiased_small_noise_v3`、env-side `empirical`、runner `empirical_normalization=false`、`init_noise_std=0.05`、LR `1e-12`、`schedule=fixed`、每个 stage `100` it、warmstart SHA `86cab3fef9ee5784c0d3ef9441b1a409636df45204902713bb2fc950ebb1c086`；radius 只用 `2.0 m`；
 - 阶段抽样预检 PASS：用每个 env 的 `stage_mix` + `speed_protocol` 各采样 200 个 seed，7 个 stage 的 depth/noise/current 全部落在 `default_curriculum_stages()` 对应范围内，且没有跨 stage 混入；C0 为 `9.5–10.5 m / noise 0 / current 0.15–0.25 m/s`，C6 为 `400–500 m / noise 2–3 / current 0.4–0.675 m/s`；
 - outage 抽样预检 PASS：C0–C4 hazard/duration 均为 0；C5 hazard `0.00208–0.00795 /s`、duration `0.053–0.298 s`；C6 hazard `0.00816–0.01989 /s`、duration `0.053–0.298 s`；transport delay 仍为 0；
 - 标定命令 dry-run PASS：用 7×25 条合成 `iteration_records.jsonl` 按 §5.2.2 的 7 个 `--records` 调用 `calibrate_goal182_route_gate.py`，输出覆盖 C0–C6 各 25 条，`statistics_by_stage`/`thresholds_by_stage` 均含 7 个 stage，冻结表 `status=FROZEN`；该 dry-run 只验证命令和格式，不代表真实 reference 数值；
-- 路径绑定：当前 7 个 `train_C*.json` 的 `experiment.warmstart_actor` 固定为 `/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-3f1b382/bc/pe2e_bc_stage_matched_v3/pc_bc_actor.pt`；若换 run root，必须重新生成配置并更新 SHA，不能只改命令行 `--output`；
+- 路径绑定：当前 7 个 `train_C*.json` 的 `experiment.warmstart_actor` 固定为 `/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-64d8225/bc/pe2e_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`；若换 run root，必须重新生成配置并更新 SHA，不能只改命令行 `--output`；
 - 运行前提已满足：STAGE_MATCHED_BC 的服务器 1-it 1536-env smoke 已 PASS；7 个 stage 都必须 `completed`，每个 stage 至少 20 条三指标非空的 iteration，否则不得冻结；
 - 判读：标定器必须输出 `FROZEN`、`statistics_by_stage` 和 `thresholds_by_stage`；如果 reference 自己不过阈值，判 `REFERENCE_BC_INVALID_FOR_ROUTINE`，只保留证据，不得安装为 routine gate；
 - 启动模板（从干净 server worktree 运行，`W/R/PY/CORE` 替换为实际路径）：
@@ -214,8 +215,8 @@ R=/data/yhx/underwater-robotics/runs/auv-local/goal184/<run_id>
 PY=/data/yhx/underwater-robotics/envs/venvs/isaaclab/bin/python
 CORE=/data/yhx/underwater-robotics/worktrees/auv-core/g04-sync/20261114-g04-sync-0e0bfb1/src
 export PYTHONPATH="$W/src:$CORE"
-CAL="$W/configs/lowlevel/goal184/calibration/stage_matched_v3_100it_fixedlr"
-OUT="$R/route_gate_calibration_pe2e_stage_matched_100it_fixedlr"
+CAL="$W/configs/lowlevel/goal184/calibration/stage_matched_v4_teacher_alos_truth_100it_fixedlr"
+OUT="$R/route_gate_calibration_pe2e_stage_matched_v4_100it_fixedlr"
 
 for stage in C0 C1 C2 C3 C4 C5 C6; do
   CUDA_VISIBLE_DEVICES=3 "$PY" "$W/scripts/train_batch_lowlevel_ppo.py" \
@@ -237,8 +238,8 @@ done
   --records "$OUT/reference_pe2e_C6/iteration_records.jsonl" \
   --control-contract PE2E \
   --calibration-source REFERENCE_BC \
-  --reference-id stage_matched_bc_pe2e_stage_sweep \
-  --reference-sha256 2292c19567ddf685c8ad13bf8ce7db99bfb575628198402c2fe0acf91229ad29 \
+  --reference-id stage_matched_bc_v4_teacher_alos_truth_sweep \
+  --reference-sha256 86cab3fef9ee5784c0d3ef9441b1a409636df45204902713bb2fc950ebb1c086 \
   --require-stages C0,C1,C2,C3,C4,C5,C6 \
   --min-stage-records 20 \
   --output "$OUT/thresholds/goal182_route_gate_pe2e_20_3.json"
