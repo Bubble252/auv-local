@@ -1,0 +1,64 @@
+{
+  "bc_path": "/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-64d8225/bc/alos_bc_stage_matched_v4_teacher_alos_nocomp/pc_bc_actor.pt",
+  "bc_sha256": "f4ccb463d5e468ad4bbdf5b6de050cc7a1d00b40f16f83e8f49fc1ebb796093a",
+  "env_source": "configs/lowlevel/goal184/env_alos_formal_empirical.json",
+  "env_source_sha256": "a662dd4bf509decfd7f31d91affc232dcaa07fe0eec4f39921c6c45ae4d36de9",
+  "files": {
+    "env": {
+      "C0": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C0.json",
+      "C1": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C1.json",
+      "C2": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C2.json",
+      "C3": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C3.json",
+      "C4": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C4.json",
+      "C5": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C5.json",
+      "C6": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C6.json"
+    },
+    "formal": {
+      "bcft": "configs/lowlevel/goal184/train_formal_mod4_alosb_bcft_nocomp_env_empirical_5d_m_seed86201.json",
+      "bcres": "configs/lowlevel/goal184/train_formal_mod4_alosb_bcres_nocomp_env_empirical_5d_m_seed86201.json"
+    },
+    "train": {
+      "C0": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C0.json",
+      "C1": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C1.json",
+      "C2": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C2.json",
+      "C3": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C3.json",
+      "C4": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C4.json",
+      "C5": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C5.json",
+      "C6": "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C6.json"
+    }
+  },
+  "files_sha256": {
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C0.json": "36fb3b42bd12ba5ce417ef6425e1b776d18e1270a29df0755b128a8f4b9d5bde",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C1.json": "cb2e5b43c80adfbe6a2e1fb1ef2c5f1267830551e8f55113b1bfc7fe02737a22",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C2.json": "14f5256262db50d7da7d48f2d3785685274c23fa48049499341f6cc631e70a69",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C3.json": "b3c26ec2ccf66b018457f1582ae7c78ff039c10040fbd2557d3035ed5c6e85d8",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C4.json": "6fb9119a799745dba4ef469b637c7d72a0f18b0aec8914a4c70ba07b1243b431",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C5.json": "d220cc33fda391a8777e0d76cbe88bfd5aa2c00042c07deed0bfa39df07da17f",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/env_C6.json": "f781b61173b93899e5995de6922e85c1fe21c34bf520f97cdd6a4e64ecb90e17",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C0.json": "9183bf527025ffc08e8f73041ac637eaba5063ae03b4d6d0ac1774a06b71b5fa",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C1.json": "e99ea5119eb48bd1c4f4820f28deb80672c4cfbbad909bd1a82f6b513deaa90a",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C2.json": "2c18cd8cb9de2430a0dca9a6257669fffeb3cf01e33372e436bffaf0e0cfdc36",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C3.json": "6e002c9703292a8c27bbd51ec5ef033def020b52e62f45121c0998a290acbcb2",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C4.json": "081fcee85dc8682b78772cad1f26aad54e83d2728a290c11f3df3803ffe2722f",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C5.json": "efe94ea0bb28f3e557ee7336863359a4b6ef0094c8de7869de51a9f06f08ce73",
+    "configs/lowlevel/goal184/calibration/stage_matched_alosb_nocomp_v4_100it_fixedlr/train_C6.json": "3422d17db620f8ad06f98b2d76e01918e499ad58ef48d3ed0b1730ffcc4ee31f",
+    "configs/lowlevel/goal184/train_formal_mod4_alosb_bcft_nocomp_env_empirical_5d_m_seed86201.json": "abe7ca032d6c4670ff5d5eea674af3a73ef39203f3cd0735b3c8f1ece3772d97",
+    "configs/lowlevel/goal184/train_formal_mod4_alosb_bcres_nocomp_env_empirical_5d_m_seed86201.json": "ff3ce845d2128eece0c7472de10c52d341b6b5e5eadf3a1f6e3d2518e9ad6209"
+  },
+  "iterations": 100,
+  "learning_rate": 1e-12,
+  "line": "nocomp",
+  "normalization_mode": "empirical",
+  "schedule": "fixed",
+  "schema_version": "auv_goal184_alosb_dual_configs.v1",
+  "sensor_profile": "unbiased_small_noise_v3",
+  "stages": [
+    "C0",
+    "C1",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "C6"
+  ]
+}
