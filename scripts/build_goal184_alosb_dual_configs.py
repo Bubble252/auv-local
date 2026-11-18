@@ -124,7 +124,10 @@ def _calibration_train(line: str, stage: str, env_path: Path, formal: Path) -> P
         "learning_rate_dade_head",
     ):
         payload["algorithm"].pop(key, None)
-    payload["base_policy"]["residual_scale"] = 1e-6
+    if payload["base_policy"].get("mode") == "frozen_pc_bc_residual":
+        payload["base_policy"]["residual_scale"] = 1e-6
+    else:
+        payload["base_policy"].pop("residual_scale", None)
     payload["training"]["iterations"] = 100
     payload["runner"]["save_interval"] = 100
     payload["experiment"].update(

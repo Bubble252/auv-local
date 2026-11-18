@@ -23,8 +23,7 @@
   "base_policy": {
     "checkpoint": null,
     "checkpoint_sha256": null,
-    "mode": "none",
-    "residual_scale": 1e-06
+    "mode": "none"
   },
   "encoder": {
     "dropout": 0,
