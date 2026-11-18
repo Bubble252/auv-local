@@ -144,6 +144,7 @@ autoresearch:
 - 实现：`BatchedPCTeacher` 默认 `reference_mode="alos_compensated"`、`current_compensation_source="truth"`。参考姿态/水速来自 `BatchedThreeDAlosGuidance`，补偿使用仿真真值 `env.current_ned_mps`；反馈仍使用真值 `eta/nu` 的 PD/PI。旧 `reference_mode="command"` 只保留作诊断对照，不再用于正式 BC 采集。
 - 边界：不改变任一 arm 的 control contract、actor 观测、动作接口、reward、termination、success、radius、seed split 或 training profile；只改变 teacher demo 与 teacher 对照的数据来源。
 - 通用性：PE2E 与 ALOSB 各自的 BC 都遵守此口径；TRRES 不用 BC demo，不受影响。不同 seed/module 仍复用同一套同族 BC，不重复采集。
+- canonical BC 适用范围（2026-11-18 起）：PE2E 系列的所有 seed/module（含 BCFT/BCRES）统一使用当前 v4 checkpoint `pe2e_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`，SHA `86cab3fef9ee5784c0d3ef9441b1a409636df45204902713bb2fc950ebb1c086`；ALOSB 系列在首次启动前按同一 teacher 口径采自己的同族 BC，之后其 seed/module 复用；TRRES 不用 BC。禁止重新启用旧 `2292c195...` 或更早的 `ce4290...`。
 - 作废范围：现有 `STAGE_MATCHED_BC`（checkpoint SHA `2292c195...`）及其 demo（SHA `9a3d465a...`）是按旧 tangent-command teacher 采的，作废为 `historical_only`。必须重采 demo、重训 BC、重跑 BC_ONLY 和 Phase B 标定后，才能进入 Phase C。
 - provenance：`collect_pc_bc_demos.py` 的 manifest 必须写出 `teacher_reference_mode`、`teacher_current_compensation_source` 和 `teacher_parameters.compensate_current`；BC_ONLY/teacher 诊断也必须记录同一口径。
 - 过期包隔离：旧 `configs/lowlevel/goal184/calibration/recollected_matched_bc/` 已移到 `_goal184_artifacts/expired_configs/recollected_matched_bc_20261118/`，不删除、不提交、不启动。
