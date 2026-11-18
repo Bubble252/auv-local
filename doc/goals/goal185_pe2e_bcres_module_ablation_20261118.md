@@ -137,18 +137,29 @@ MOD0 与 MOD2/MOD1 共用同一无 current BC；DADE warm start 是零输出，
   - 判读：路径误差不差于 v4，但速度跟踪 `speed_rmse 0.81 vs 0.46`、success
     telemetry 更弱。MOD2/1/0 的结果带 BC 质量混杂，只能作描述性消融，
     不能单独把退化归因给模块。
-- [ ] **Step 2：合同 smoke**
+- [x] **Step 2：合同 smoke**
   - 4 个 MOD 各跑一次 1-it 1536-env contract smoke；
   - 检查 frozen BC 加载、MOD0 的 `dade_enabled=false`、`critic_path_dim`、
     课程 provenance、manifest；
   - 不按 seed 重复 smoke。
-- [ ] **Step 3：排队训练**
+  - 2026-11-18 23:21 已完成：`mod3/mod2/mod1/mod0` 各 1-it 1536-env，
+    全部 `rc=0`；manifest 核对：
+    MOD3 `ce=true/cpd=0/dade=true`、MOD2 `ce=false/cpd=30/dade=true`、
+    MOD1 `ce=false/cpd=0/dade=true`、MOD0 `ce=false/cpd=0/dade=false/raw`，
+    BC 分别指向 v4 与 `f593cd99...`。
+- [x] **Step 3：排队训练（已挂起，等待空闲卡）**
   - 顺序 `MOD3 → MOD2 → MOD1 → MOD0`，先只跑 seed86201；
   - 每条 2600 it，`--curriculum-eval-stage-boundaries --curriculum-route-gate-mode enforce`，
     阈值表用
     `route_gate_calibration_pe2e_stage_matched_v4_100it_fixedlr/thresholds/goal182_route_gate_pe2e_20_3.thresholds.json`
     （SHA `20ab53f6...`，`status=FROZEN`，C0–C6 全覆盖）；
   - 单卡单进程，用 `wait_pid` 链式排队；不一次排满。
+  - 2026-11-18 23:22 已挂起 `scripts/goal185_gpu_queue.py`：
+    - server worktree：`/data/yhx/underwater-robotics/worktrees/auv-local/goal185/20261118-goal185-d7ea65d`
+    - run root：`/data/yhx/underwater-robotics/runs/auv-local/goal185/20261118-goal185-d7ea65d`
+    - queue：`queue.json`（4 条，`need_mb=22000`，无 deadline）
+    - 当前无卡满足 22 GB + 1.5 GB margin，队列在等待；PE2E 于 23:55 停止后
+      GPU1/2 释放，MOD3/MOD2 应自动启动。
 - [ ] **Step 4：评价**
   - 每条 arm 跑完整 `arms × levels × radii(2.0) × zero baselines`；
   - 审计产物，缺 cell 标 `INVALID_INCOMPLETE_EVAL`。
