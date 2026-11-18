@@ -1,7 +1,7 @@
 # Goal184：empirical 归一化下的完整课程 arm 训练与测评
 
 **日期**：2026-11-18<br>
-**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_SUPERSEDED / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_V4_READY / PHASE_B_V4_PASS / C0_PROMOTION_SMOKE_PASS / REFERENCE_BC_AWAITING_OVERRIDE / EVAL_SEEDS_REFROZEN / TEACHER_ALOS_TRUTH_COMP_PD_PI / HELDOUT_CLOSED`<br>
+**状态**：`ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_SUPERSEDED / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_V4_READY / PHASE_B_V4_PASS / C0_PROMOTION_SMOKE_PASS / REFERENCE_BC_AWAITING_OVERRIDE / MULTI_ARM_WAVE1_PLANNED / EVAL_SEEDS_REFROZEN / TEACHER_ALOS_TRUTH_COMP_PD_PI / HELDOUT_CLOSED`<br>
 **父 Goal**：Goal182、Goal183<br>
 **仓库**：`settled_局部规划器_反应式`<br>
 **执行提示词**：`/home/bubble/水下机器人/总协调/doc/ops/GOAL184_EMPIRICAL_FULL_ARMS_PROMPT_20261118.md`<br>
@@ -276,6 +276,8 @@ done
 
 ### 5.3 arm 扩展顺序
 
+以下为默认扩展顺序；用户 2026-11-18 已明确允许 Wave 1 受控并行，实际启动波次以 §5.3.1 为准。
+
 ```text
 PE2E BCFT seed86201（单 seed 完整课程）
   -> 同 seed formal eval
@@ -288,6 +290,39 @@ PE2E BCFT seed86201（单 seed 完整课程）
 ```
 
 只有当前一步的 smoke/早期稳定性通过且 GPU 空闲时才启动下一步；资源充足时允许在独立 config、独立 run root、依赖就绪的前提下受控并行，但不得一次性排满 18-run。
+
+#### 5.3.1 为什么当前只有 PE2E BCFT/BCRES 能先开，以及并行补足计划
+
+用户 2026-11-18 明确允许同时推进多个 arm。这里把“当前缺什么”和“训练期间如何补足”固定下来，避免把依赖缺失误写成 arm 不可做。
+
+| Arm | 现在缺什么 | 当前能否启动 |
+|---|---|---|
+| PE2E BCFT seed86201 | 无；v4 BC、formal env/config、PE2E 冻结阈值已就绪 | 批准 `REFERENCE_BC_OVERRIDE` 后即可 |
+| PE2E BCRES seed86201 | 只缺 Goal184 empirical BCRES config；复用同一 v4 BC 和 PE2E 阈值 | 生成 config + profile/1-it contract smoke 后即可 |
+| ALOSB BCFT/BCRES | 缺 Goal184 empirical ALOSB env/config、ALOS demo/BC、ALOSB 7-stage 冻结阈值 | 不能直接开；按下面步骤补足后可开 |
+| ALOSB TRRES_CMD/TRRES_ACT | 不用 BC，但同样缺 ALOSB env/config 和 ALOSB 冻结阈值 | 不能直接开；ALOSB 表冻结后可开 |
+
+**Wave 1：立即并行 PE2E BCFT + PE2E BCRES**
+
+- 两条 arm 使用同一 v4 PE2E BC（SHA `86cab3fe...`）、同一 PE2E 冻结表和同一 formal env，但必须各自独立 config、独立 run root、独立 manifest；不得共用输出目录。
+- PE2E BCRES 启动前只生成一个 Goal184 empirical BCRES config（MOD4、seed86201），运行 `check_training_profile.py` 和一次 1-it 1536-env contract smoke，验证 frozen-base/residual 接线；不按 seed/module 重复 smoke。
+- Wave 1 两条 run 建议占 2 张 GPU；其余空闲卡用于下面 ALOSB/TRRES 的补足，不得把 18-run 一次排满。
+
+**Wave 1 训练期间并行补足 ALOSB/TRRES**
+
+1. **ALOSB empirical env/config（不改控制契约）**：从 Goal182 formal ALOS env 派生 Goal184 版本，只允许 `normalization.mode=empirical`、`sensors.profile=unbiased_small_noise_v3`、C5/C6 outage 契约和 formal curriculum 与 Goal184 一致；保留 `pc_control_mode=alos`、ALOS guidance、command residual、command-track reward 和 actor command dim=3。
+2. **ALOS demo 重采**：按 §4.2 的 `ALOS guidance + 真值海流前馈补偿 + REMUS PD/PI` 采一套 7-stage demo，seeds 与 PE2E v4 对齐（`91000–91023`），输出 `demos_goal184_alos_v4_teacher_alos_truth/`；manifest 必须写出 teacher 口径、compensate_current、dataset/curriculum SHA。旧 ALOS demo/BC `47cda13...` 只作历史对照，不得直接用于新协议。
+3. **ALOS empirical BC**：沿用 Goal184 BC 配方训练 `alos_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`，记录 checkpoint SHA、normalization schema hash、val RMSE；BC_ONLY C3/seeds `20–23` 只跑一次 screen，要求新 ALOS BC 的 C3 3D 不差于旧 ALOS BC `47cda13...` 的同环境基线；不扫 seed、不加诊断矩阵。
+4. **ALOSB 7-stage 标定**：生成 `stage_matched_alos_v4_100it_fixedlr` 的 7 个单-stage env/train config，`promotion_enabled=false`、LR `1e-12`、`schedule=fixed`、每 stage `100 it`；用空闲 GPU 分批跑（例如 5+2），冻结 `goal182_route_gate_alosb_20_3.thresholds.json`，要求 `status=FROZEN`、覆盖 C0–C6、reference 自检通过。
+5. **TRRES config**：ALOSB 表冻结后生成 `TRRES_CMD/TRRES_ACT` 的 Goal184 empirical config；TRRES 不用 BC、fresh init，但必须复用同一 ALOSB env 和 ALOSB 冻结表；首个 TRRES arm 前跑一次 75-it C0 晋级 smoke。
+6. **ALOSB 首条 arm 前的 75-it smoke**：ALOSB BCFT/BCRES 的第一条 arm 也要在 soft cap 72 后实际观察 C0→C1 晋级；通过后才扩 ALOSB 其余 module/seed。
+
+**边界与失败处理**
+
+- Wave 1 的两条 PE2E arm 与后续 ALOSB/TRRES 不得共享 run root、checkpoint 或阈值输出；每个 arm 的 config SHA、BC SHA、threshold SHA、run manifest 分开记录。
+- ALOSB/TRRES 的补足只在 Wave 1 训练期间并行进行；若 ALOS demo/BC 出现 NaN、BC_ONLY 退化或 ALOSB reference 自检不过，只停 ALOSB/TRRES 分支，PE2E Wave 1 继续。
+- `REFERENCE_BC_OVERRIDE` 的批准只覆盖 PE2E 表；ALOSB 表冻结后仍需用户明确确认，才能用于正式 ALOSB routine gate。
+- 该计划不改变 §7 的效率约束：不扫 std/LR/seed/route，不重复 smoke，不一次性排满 18-run。
 
 ### 5.4 可执行命令模板
 
@@ -395,7 +430,7 @@ $PY scripts/check_goal182_eval_matrix.py   --require-frozen   --env-config confi
 
 ## 7. 效率约束
 
-- 先一条 arm，再按资源扩 seed/arm；不在训练前批量采集所有 demo；
+- 用户 2026-11-18 已明确允许 Wave 1 并行 PE2E BCFT + PE2E BCRES；同一 control 的新 seed/未验证 arm 仍按“先 smoke/早期稳定性，再扩展”执行；ALOSB/TRRES 依赖按 §5.3.1 在 Wave 1 期间补足后再开；
 - 不做 std/LR/seed/route 扫参；不重复 smoke；
 - 必要预实验只包括：STAGE_MATCHED_BC 1-it smoke、已冻结 route-gate 标定、75-it C0 gate smoke、协议检查；
 - ALOS demo 只在确认 profile 不匹配时采一套，不为每个 module/seed 重采；
