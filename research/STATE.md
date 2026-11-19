@@ -16,6 +16,10 @@ goal183_root_cause: same old demo SHA and same episode split; empirical BC metad
 goal183_smoke: 1536-env 1-iteration contract smoke PASS: KL 0.005010, clip 0.054077, ratio_max 1.625438, peak reserved 8438 MiB, losses finite. Checkpoint infos contain empirical mode/schema/statistics; actor count 354690+73728, critic count 73728. A 64-env smoke was non-gate due to 3072 samples.
 goal183_next: Plan C is selected and its BC_ONLY is teacher-matched but still 0.4618 m behind the contaminated fixed reference on 3D. Only allowed next step is uploading the C checkpoint, updating warmstart path/SHA, and running a 1-iteration 1536-env smoke from a clean server worktree. Do not start 72 iterations, switch to B, or scan std/LR/seed/route.
 goal184_status: ACTIVE / OLD_C_1IT_SMOKE_PASSED / STAGE_MATCHED_BC_SUPERSEDED / BC_ONLY_SMOKE_PASS / ROUTE_GATE_PER_STAGE_READY / TRAINING_ARTIFACT_AUDIT_READY / CALIBRATION_CONFIGS_V4_READY / PHASE_B_V4_PASS / C0_PROMOTION_SMOKE_PASS / REFERENCE_BC_OVERRIDE_APPROVED / WAVE1_ACTIVE / EVAL_SEEDS_REFROZEN / TEACHER_ALOS_TRUTH_COMP_PD_PI / ALOS_TEACHER_COMP_MATCH_REQUIRED / ALOSB_DUAL_COMP_NOCOMP / ALOSB_NOCOMP_WEAK_BC_INIT / HELDOUT_CLOSED
+goal185_status: BLOCKED_PENDING_USER_DECISION / EXECUTED_2026-11-19_INVALID / C0_GATE_FAIL_X4 / ADAPTIVE_LR_CAP_AND_STAGE_BUDGET_RECORDED
+goal185_plan: doc/goals/goal185_pe2e_bcres_module_ablation_20261118.md
+goal185_blocker: research/blockers/2026-11-19-goal185-c0-and-stage-budget.md
+goal185_next: 等用户定夺 FIX-1..FIX-7；先不要重跑、不要改代码；定夺后补 falsification 和 LEDGER decision。
 goal184_plan: doc/goals/goal184_empirical_full_arm_training_20261118.md
 goal184_prompt: /home/bubble/水下机器人/总协调/doc/ops/GOAL184_EMPIRICAL_FULL_ARMS_PROMPT_20261118.md
 goal184_scope: 从 Goal183 empirical 配方和 Goal184 STAGE_MATCHED_BC checkpoint 出发，先跑一条单 seed 的完整 C0-C6 课程训练和正式测评；资源允许时按顺序扩 seed/arm，不一次性排满 18-run。旧 GOAL182 infra prompt 只作引用，不作执行主协议；不扫 std/LR/seed/route。

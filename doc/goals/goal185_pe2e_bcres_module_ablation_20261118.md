@@ -1,7 +1,7 @@
 # Goal185：PE2E × BCRES 模块集消融（MOD3 → MOD0）
 
 **日期**：2026-11-18<br>
-**状态**：`PROTOCOL_DRAFTED_BEFORE_MEASUREMENT`<br>
+**状态**：`BLOCKED_PENDING_USER_DECISION / EXECUTED_2026-11-19_INVALID`<br>
 **上游**：Goal184 Wave 1（MOD4）、Goal182 模块集轴注册表
 
 ## Research Contract
@@ -291,3 +291,139 @@ git diff --cached --check
 5. 评价半径只 2.0 m，success/timeout/pre-goal 只作 telemetry；
 6. held-out 100–149 关闭；不扫 seed、不扩 arm、不一次排满。
 ```
+
+## 10. 执行现状与待定夺修复项（2026-11-19）
+
+### 10.1 执行结果
+
+2026-11-19 00:05:29，队列因 `pe2e_bcres_mod0_seed86201` 退出 `rc=1`
+触发 `--stop-on-failure`，daemon 退出。四臂结果：
+
+| arm | 状态 | 说明 |
+|---|---|---|
+| MOD3 | `INVALID` | 120 it，`StageBudgetExhausted: stage=C0 consumed=120 hard_cap=120` |
+| MOD2 | `INVALID` | 启动后 7 it 被 `other-growth` 安全停（SIGTERM），未真正训练 |
+| MOD1 | `INVALID` | 120 it，同一 `StageBudgetExhausted` |
+| MOD0 | `INVALID` | 120 it，同一 `StageBudgetExhausted` |
+
+- 不是 OOM：日志 traceback 是 `StageBudgetExhausted`。
+- 不是 BC 未加载：MOD3 iteration 18 的 cross 仍是 `0.375 m`；
+  manifest 的 `base_checkpoint` 和 SHA 都是 v4 `86cab3fe...`。
+- 不是 env 不同：Goal184/Goal185 的 `environment_config_sha256` 都是
+  `db4de5ff1ed1d5cb9b4b37da6d04df95c82855d61d609cc6e0e5d61512cc9729`。
+- 不是 seed 不同：都是 `86201`。
+- 不是 MOD 外超参变化：MOD3 config 与 MOD4 的 diff 只有 `name`、`output`、
+  `pc.critic_path_dim 30→0`。
+
+### 10.2 根因 A：adaptive LR 在 minibatch 内连续放大
+
+rsl_rl `ppo.py` 的 adaptive 规则：每个 minibatch 根据 KL 调 LR，
+`KL > 2*desired_kl` 时 `/1.5`，`KL < desired_kl/2` 时 `*1.5`，硬上限 `1e-2`。
+本 goal 配置为 `desired_kl=0.01`、初始 `lr=3e-4`。
+
+MOD3 前 10 it：
+
+| it | lr | KL | clip | ratio_max | cross (m) |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 0.00228 | 0.0018 | 0.001 | 1.20 | - |
+| 2 | 0.01000 | 0.1028 | 0.614 | 8.12 | - |
+| 3 | 0.00444 | 0.0417 | 0.403 | 3.07 | - |
+| 6 | 0.01000 | 0.2635 | 0.763 | 13.58 | - |
+| 7 | 0.00001 | 0.0607 | 0.240 | 28.38 | - |
+
+cross-track 轨迹：17 it `0.375` → 19 it `0.624`（KL `0.0315`）→ 120 it `1.251 m`。
+MOD1：17 it `0.432` → 120 it `1.292 m`。MOD0：17 it `0.478` → 120 it `0.716 m`。
+C0 晋升阈值 `0.621 m`，MOD0 是擦线失败。
+
+按 LR 分桶统计（MOD3）：
+
+| LR 区间 | KL 中位数 | KL 最大 | clip 最大 |
+|---|---:|---:|---:|
+| `≤1e-3` | 0.0139 | 0.061 | 0.40 |
+| `1e-3–3e-3` | 0.0077 | 0.037 | 0.32 |
+| `3e-3–5e-3` | 0.0100 | 0.049 | 0.44 |
+| `5e-3–1e-2` | 0.0116 | 0.264 | 0.76 |
+| `=1e-2` | 0.0061 | 0.103 | 0.61 |
+
+结论：`1e-2` 本身不是充分条件（MOD1/MOD0 在 `1e-2` 稳定），但 MOD3 的
+低 KL `0.0018` 触发连续放大到 `1e-2`，下一次更新过大后崩坏。
+
+### 10.3 根因 B：route gate 的 `min_iterations` 使用全局 iteration
+
+代码位置：
+
+- `src/auv_lowlevel/curriculum.py:1329`：
+  `eligible = window_full and int(iteration) >= int(min_iterations)`
+- `src/auv_lowlevel/curriculum_trainer.py:241`：
+  `min_iterations=int(spec.soft_budget_iterations or 0)`
+- `src/auv_lowlevel/curriculum_trainer.py:170-177`：
+  `_stage_boundary_target(entry) = entry + soft_budget_iterations`
+
+`iteration` 传的是全局 `completed_iterations`，不是 stage-local。因此除 C0 外，
+只要全局 iteration 超过当前 stage 的 soft budget，窗口满 20 + 连续 3 次通过
+就会晋升。Goal184 MOD4 的实际预算：
+
+| stage | 实际 it | 设计 soft budget | 差 |
+|---|---:|---:|---:|
+| C0 | 112 | 72 | +40（正常等待 gate） |
+| C1 | 22 | 108 | -86 |
+| C2 | 24 | 156 | -132 |
+| C3 | 60 | 216 | -156 |
+| C4 | 36 | 252 | -216 |
+| C5 | 84 | 336 | -252 |
+| C6 | 317 | 420 | 最后阶段，未再晋升 |
+
+这与 MOD4 的分阶段曲线一一对应：
+
+- C0–C2：任务容易，C1/C2 只训 22/24 it，指标仍好，主要是 BC 老本。
+- C3–C4：任务跳到 coupled vertical `2 m × 2 cycles`、深度 80–250 m、
+  current 0.3–0.6，但只训 60/36 it，success 掉到 0.84–0.86。
+- C5：最难（shear 0.5、outage、vertical `3 m × 1.5`），只训 84 it，
+  success 0.749。
+- C6：训了 317 it，是 C1–C5 总和的 1.4 倍，所以回升到 0.80。
+
+结论：Goal184 MOD4 的 `655 it` 不是完整课程结果，不能当干净基线。
+修成 stage-local 后，总训练量约 `1600–2600 it`，单条约 `15–25 小时`。
+
+### 10.4 根因 C：队列与资源保护
+
+- `--stop-on-failure` 让 MOD0 的 `StageBudgetExhausted` abort 整个队列，
+  MOD2 没机会重排。
+- `need_mb=22000` 偏保守；MOD3 实际峰值约 19–20 GB，容易被
+  `other-growth` 误杀（MOD2 只跑 7 it）。
+- daemon 退出后 `queue_state.json` 仍把 MOD3/MOD1/MOD0 标为 `running`。
+- 当前无我们的训练进程；GPU1–7 空，GPU0 是 zyt。
+
+### 10.5 待定夺清单
+
+| ID | 项目 | 建议 | 状态 |
+|---|---|---|---|
+| FIX-1 | `min_iterations` 改 stage-local | 必须；否则消融仍被预算错配扭曲 | `[ ]` 待定夺 |
+| FIX-2 | adaptive LR 上限 `1e-2 → 3e-3` | 必须；同时限制每 iteration 放大次数或加 warmup | `[ ]` 待定夺 |
+| FIX-3 | 队列 `stop-on-failure` / `need_mb` / state | 必须 | `[ ]` 待定夺 |
+| FIX-4 | C0 hard cap `120 → 160` | 建议；当前只剩 8 it 余量 | `[ ]` 待定夺 |
+| FIX-5 | MOD3/MOD4 actor 初始化 RNG 配对 | 建议；否则不是严格同初始化 | `[ ]` 待定夺 |
+| FIX-6 | `StageBudgetExhausted` 优雅保存 checkpoint | 建议；避免没有 `final.pt` | `[ ]` 待定夺 |
+| FIX-7 | 重跑 MOD4 干净基线 | 依赖 FIX-1 | `[ ]` 待定夺 |
+| FIX-8 | blocker / LEDGER / 文档 | 已记录 blocker，LEDGER 待定夺后写 | `[x]` 已记录 |
+
+### 10.6 未决问题
+
+1. LR 上限选 `3e-3` 还是 `1e-3`？是否加每 iteration 放大次数限制或 warmup？
+2. 是否修 `min_iterations` 并重跑 MOD4？修后 4 条约 25 小时。
+3. MOD2/1/0 复用无 current BC 的质量混杂是否接受？
+4. C0 阈值 `0.621` 是否继续沿用（不重标定）？
+5. 队列资源策略是否调整（单臂失败继续、`need_mb` 降低）？
+
+### 10.7 证据路径
+
+- 队列日志：`/data/yhx/underwater-robotics/runs/auv-local/goal185/20261118-goal185-d7ea65d/logs/queue.log`
+- MOD 日志：`/data/yhx/underwater-robotics/runs/auv-local/goal185/20261118-goal185-d7ea65d/full_wave/mod{3,2,1,0}/pe2e_bcres_mod*_seed86201.log`
+- 队列状态：`/data/yhx/underwater-robotics/runs/auv-local/goal185/20261118-goal185-d7ea65d/queue_state.json`
+- 训练记录：`/data/yhx/underwater-robotics/runs/auv-local/goal185/20261118-goal185-d7ea65d/full_wave/mod*/pe2e_bcres_seed86201/iteration_records.jsonl`
+- 冻结阈值：`/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-64d8225/route_gate_calibration_pe2e_stage_matched_v4_100it_fixedlr/thresholds/goal182_route_gate_pe2e_20_3.thresholds.json`
+- Goal184 MOD4：`/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-64d8225/full_wave1/pe2e_bcres_seed86201/iteration_records.jsonl`
+
+### 10.8 Blocker 记录
+
+`research/blockers/2026-11-19-goal185-c0-and-stage-budget.md`
