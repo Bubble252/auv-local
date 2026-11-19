@@ -147,7 +147,7 @@ r_gap      = -5.0 * g
     （Goal185 的 smoke 跑在加入 LR guard 之前的配置，正式队列从未启动过）；
     `a6e3b59` 在 `rsl_train_cfg()` 中过滤 runner-only 键，并补回归测试。
 - [ ] Step 3：正式训练队列，2630 it，seed86201，MOD4 → MOD3 → MOD2 → MOD1 → MOD0（运行中）。
-  - 2026-11-19 20:43 已挂起：PID `3769887`，run root
+  - 2026-11-19 20:43 启动，run root
     `/data/yhx/underwater-robotics/runs/auv-local/goal186/20261119-goal186-10360ff`；
   - 队列 `queue.json` 5 条，`need_mb=22000`，`margin=1536`，
     `other_max=4096`；按 GPU 空闲情况动态取卡；
@@ -156,6 +156,11 @@ r_gap      = -5.0 * g
   - 修复队列自身容量判定：运行中改为
     `total_mb - other_mb >= need_mb`，不再把自身占用算成“其他增长”
     （旧逻辑会在任务启动后误杀自己）。
+  - 20:58 停止旧队列进程 `3769887`：该队列会在其他用户显存增长时主动
+    SIGINT 自己的任务（MOD2 已被 `other-growth` 挤掉），与“MOD4/MOD3
+    不要轻易退出”冲突。MOD4（PID `3769892`，GPU1）与 MOD3（PID
+    `3769893`，GPU2）保持原进程继续跑；MOD2 状态 `stopped`，MOD1/MOD0
+    `pending`，不再自动抢占。
 - [ ] Step 4：完整 `2.0 m` 半径评价矩阵；审计产物。
 - [ ] Step 5：写 result md、LEDGER、commit。
 
@@ -171,19 +176,81 @@ CUDA_VISIBLE_DEVICES=<gpu> PYTHONPATH=$W/src:$CORE AUV_GOVERNANCE_ROOT=$GOV $PY 
 
 队列只允许使用空闲卡；不得影响其他用户。正式启动前需用户确认。
 
-MOD4–MOD0 队列 manifest：
+### 5.4 断点续训与剩余 MOD（2026-11-19）
+
+实现（commit `78bfed7`、`dbfa7bf`、`a26f3f7`、`cbc5171`、`ce39ad9`）：
+
+- checkpoint 额外写入 `completed_iterations`、`total_env_steps`、
+  `adaptive_learning_rate`、`num_envs`、`num_steps_per_env`；
+- 恢复 policy / optimizer / iter / std / empirical normalization /
+  curriculum controller / stage mix ramp / route-gate 20-it 窗口；
+- rsl_rl 的 `iter` 是“最后完成的下标”，恢复时 `+1`，避免重跑同一
+  iteration；记录文件截断到断点，重放区间不会留下重复行；
+- `--resume-latest` 按 mtime 倒序试读，跳过写坏或半截的 `.pt`；
+- `--save-interval N` 覆盖 config 的 100 it；新队列用 10 it（约 5.5 min）。
+
+限制：
+
+- IsaacLab 的 episode 状态不入 checkpoint；恢复保证“策略/优化器/课程连续”，
+  不是逐 bit 复现；
+- 最多重放 `save_interval` 内已完成的 iteration；
+- `10360ff` 的 MOD4/MOD3 checkpoint 没有新 metadata：进度按 `iter+1`
+  计算，LR 从 `iteration_records.json` 回溯，curriculum 从同目录
+  `curriculum_state.json`（该文件每个 iteration 都会写）恢复；
+  route-gate 窗口从 0 重新填满 20 it；
+- 这两臂若被杀可以续训，最多丢 100 it（约 55 min），不会退回 LR warmup。
+
+验证（GPU6，512 envs × 24 steps，8 GB cap；只验证路径，不作为正式指标）：
+
+- 12 it 正常跑完 → 从 `model_6.pt` 续到 10 it：记录 `1..10` 连续、
+  无重复；`resume_start_iteration=7`；LR 从 checkpoint 的 `3e-4`
+  接着走；最终 `total_env_steps=122880=10×512×24`；
+- 200 it 任务跑到第 30 it 被 `kill -9` → `--resume-latest` 从
+  `model_28.pt` 续到 40 it：记录 `1..40` 严格单调、无重复；
+  最终 `total_env_steps=491520=40×512×24`；
+- 定向单测 `68 passed`。
+
+剩余 MOD（MOD2/MOD1/MOD0，默认不自动启动）：
 
 ```bash
-python3 $W/scripts/build_goal186_queue.py \
-  --worktree $W \
-  --run-root $R \
+W=/data/yhx/underwater-robotics/worktrees/auv-local/goal186/20261119-goal186-78bfed7
+R=/data/yhx/underwater-robotics/runs/auv-local/goal186/20261119-goal186-resume-ce39ad9
+T=/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-64d8225/route_gate_calibration_pe2e_stage_matched_v4_100it_fixedlr/thresholds
+PY=/data/yhx/underwater-robotics/envs/venvs/isaaclab/bin/python
+PYTHONPATH=$W/src:/data/yhx/underwater-robotics/worktrees/auv-core/g04-sync/20261114-g04-sync-0e0bfb1/src \
+  $PY $W/scripts/build_goal186_queue.py \
+  --worktree $W --run-root $R \
   --thresholds $T/goal182_route_gate_pe2e_20_3.thresholds.json \
-  --output $R/queue.json
+  --modules mod2,mod1,mod0 --save-interval 10 \
+  --need-mb 22000 --output $R/queue.json
 
-python3 $W/scripts/goal185_gpu_queue.py \
+PYTHONPATH=$W/src:/data/yhx/underwater-robotics/worktrees/auv-core/g04-sync/20261114-g04-sync-0e0bfb1/src \
+  $PY $W/scripts/goal185_gpu_queue.py \
   --queue $R/queue.json --gpus 0-7 \
-  --margin-mb 1536 --other-max-mb 4096 \
+  --no-preempt --max-restarts 5 --restart-delay-seconds 120 \
+  --margin-mb 1536 --other-max-mb 0 \
   --state $R/queue_state.json --log $R/queue.log
+```
+
+- `--no-preempt`：别人显存涨了也不主动杀自己的任务；
+- `--max-restarts 5`：只在进程真的退出（含 OOM/被 kill）后，
+  用 `--resume-latest` 从最新 checkpoint 重启；
+- `--other-max-mb 0`：关闭“其他用户占用超过 4 GB 就不许用卡”，
+  改为只要求 `free >= need + margin`，并用 allocator cap 把自己锁在
+  启动时可用显存之内；
+- 启动前先加 `--dry-run` 检查；当前没有 22 GB 空闲卡，队列会等待，
+  不会挤占 MOD4/MOD3。
+
+手动续训模板（必须沿用同一 output/config/seed/env 数）：
+
+```bash
+CUDA_VISIBLE_DEVICES=<gpu> PYTHONPATH=$W/src:$CORE \
+  $PY $W/scripts/train_batch_lowlevel_ppo.py \
+  --training-config $W/configs/lowlevel/goal186/train_formal_mod2_pe2e_bcres_reward_v2_seed86201.json \
+  --iterations 2630 --output $R/full_wave/mod2/pe2e_bcres_reward_v2_seed86201 \
+  --seed 86201 --resume-latest --save-interval 10 \
+  --curriculum-eval-stage-boundaries --curriculum-route-gate-mode enforce \
+  --curriculum-route-thresholds $T/goal182_route_gate_pe2e_20_3.thresholds.json
 ```
 
 ## 6. Gate
