@@ -1,7 +1,7 @@
 # Goal186：PE2E BCRES reward v2（请求-可执行 gap + 垂向权重）
 
 **日期**：2026-11-19<br>
-**状态**：`PROTOCOL_DRAFTED_BEFORE_MEASUREMENT / NOT_STARTED`
+**状态**：`IMPLEMENTATION_VERIFIED / QUEUE_PENDING`
 
 ## Research Contract
 
@@ -40,6 +40,10 @@ autoresearch:
 
 为什么现在做：执行器项几乎不参与优化，而 BCRES 的确定性饱和与垂向误差都
 不是探索噪声能解释的；需要一次最小 reward 变更验证机制。
+
+本轮用户明确要求把 reward v2 落实到同一次 MOD4–MOD0 队列，而不是只跑
+MOD4 单臂。五条 arm 共用同一份 reward v2 env，只保留各自原有的模块开关、
+BC checkpoint、seed 和训练协议差异。
 
 ## 2. 假设
 
@@ -91,7 +95,11 @@ r_gap      = -5.0 * g
 
 - 新建 env v2 配置，不直接改旧
   `configs/lowlevel/goal184/env_path_fixed_speed_formal_empirical.json`；
-- 新建训练配置，指向 env v2；
+- 新建五份训练配置，分别对应 MOD4/MOD3/MOD2/MOD1/MOD0，全部指向 env v2；
+- MOD4 以当前 MOD3 训练配置为模板，只把 `pc.critic_path_dim` 改回 `30`，
+  其余算法、BC、课程和模块设置保持一致；
+- 队列 manifest 由 `scripts/build_goal186_queue.py` 生成，顺序为
+  MOD4 → MOD3 → MOD2 → MOD1 → MOD0；
 - 旧 BC checkpoint 与旧 run 的 env SHA 不变。
 
 ## 5. 执行计划
@@ -112,10 +120,21 @@ r_gap      = -5.0 * g
 
 ### 5.2 步骤
 
-- [ ] Step 0：写 env v2 与训练 config；运行协议/profile 检查。
-- [ ] Step 1：实现 reward 字段与 `applied.total` 输入管线；补单测。
+- [x] Step 0：写 env v2 与训练 config；运行协议/profile 检查。
+  - `configs/lowlevel/goal186/env_path_fixed_speed_formal_empirical_reward_v2.json`
+  - `configs/lowlevel/goal186/train_formal_mod{4,3,2,1,0}_pe2e_bcres_reward_v2_seed86201.json`
+  - `scripts/build_goal186_reward_v2_configs.py` 可重复生成；
+  - 五份训练 config 的 `check_training_profile.py` 全部 `PASS`。
+- [x] Step 1：实现 reward 字段与 `applied.total` 输入管线；补单测。
+  - `RewardConfig.w_action_feasible_gap_pc`，默认 `0.0`；
+  - reward 只对两片舵计算
+    `mean((requested[:2] - feasible[:2])^2)`；
+  - env 把 `applied.total / action_full_scale` 作为 `feasible_normalized`
+    传入，因此用的是速率限制后的真实可执行指令；
+  - 定向测试 `55 passed`；完整回归 `2290 passed, 11 skipped`；
+  - 冻结 trace 因新增零值 breakdown 字段更新一次哈希，未改动作、观测或 RNG。
 - [ ] Step 2：1-it 1536-env contract smoke；核对 manifest、BC 加载、课程 provenance。
-- [ ] Step 3：正式训练 2630 it，seed86201，单 arm（PE2E BCRES）。
+- [ ] Step 3：正式训练队列，2630 it，seed86201，MOD4 → MOD3 → MOD2 → MOD1 → MOD0。
 - [ ] Step 4：完整 `2.0 m` 半径评价矩阵；审计产物。
 - [ ] Step 5：写 result md、LEDGER、commit。
 
@@ -130,6 +149,21 @@ CUDA_VISIBLE_DEVICES=<gpu> PYTHONPATH=$W/src:$CORE AUV_GOVERNANCE_ROOT=$GOV $PY 
 ```
 
 队列只允许使用空闲卡；不得影响其他用户。正式启动前需用户确认。
+
+MOD4–MOD0 队列 manifest：
+
+```bash
+python3 $W/scripts/build_goal186_queue.py \
+  --worktree $W \
+  --run-root $R \
+  --thresholds $T/goal182_route_gate_pe2e_20_3.thresholds.json \
+  --output $R/queue.json
+
+python3 $W/scripts/goal185_gpu_queue.py \
+  --queue $R/queue.json --gpus 0-7 \
+  --margin-mb 1536 --other-max-mb 4096 \
+  --state $R/queue_state.json --log $R/queue.log
+```
 
 ## 6. Gate
 

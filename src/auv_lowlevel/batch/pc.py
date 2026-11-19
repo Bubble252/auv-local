@@ -68,6 +68,7 @@ class PCRewardBreakdown:
     speed_smooth: Tensor | None = None
     energy: Tensor | None = None
     action_smooth: Tensor | None = None
+    action_feasible_gap: Tensor | None = None
     stall_gate: Tensor | None = None
     stall_ratio: Tensor | None = None
     reference_ground_speed_mps: Tensor | None = None
@@ -279,6 +280,7 @@ class BatchedPCRewardComputer:
         previous_previous_actuator: Tensor | None = None,
         requested_normalized: Tensor,
         previous_requested_normalized: Tensor,
+        feasible_normalized: Tensor | None = None,
         reward_ground_surge_mps: Tensor | None = None,
         reference_ground_speed_mps: Tensor | None = None,
         hold_fraction: Tensor | None = None,
@@ -332,6 +334,20 @@ class BatchedPCRewardComputer:
                 raise ValueError("previous_previous_actuator must have shape (N, 3)")
         if requested.shape != (count, 3) or previous_requested.shape != (count, 3):
             raise ValueError("requested action vectors must have shape (N, 3)")
+        reward = self.config.reward
+        if feasible_normalized is None:
+            feasible = None
+            if reward.w_action_feasible_gap_pc > 0.0:
+                raise ValueError(
+                    "feasible_normalized is required when "
+                    "reward.w_action_feasible_gap_pc is positive"
+                )
+        else:
+            feasible = torch.as_tensor(
+                feasible_normalized, device=self.device, dtype=self.dtype
+            )
+            if feasible.shape != (count, 3):
+                raise ValueError("feasible_normalized must have shape (N, 3)")
         reward_surge = (
             surge
             if reward_ground_surge_mps is None
@@ -395,7 +411,6 @@ class BatchedPCRewardComputer:
                 terminal,
             )
 
-        reward = self.config.reward
         if reward.cmd_heading_std_rad is None:
             command_yaw = -reward.w_cmd_yaw * torch.abs(heading) / torch.pi
         else:
@@ -466,6 +481,16 @@ class BatchedPCRewardComputer:
             )
         else:
             action_smooth_reward = torch.zeros_like(heading)
+
+        if feasible is None:
+            action_feasible_gap_reward = torch.zeros_like(heading)
+        else:
+            feasible_gap = torch.mean(
+                (requested[:, :2] - feasible[:, :2]).square(), dim=1
+            )
+            action_feasible_gap_reward = (
+                -reward.w_action_feasible_gap_pc * feasible_gap
+            )
 
         magnitude_excess = _positive_part(torch.abs(requested) - 1.0).mean(dim=1)
         requested_delta = requested - previous_requested
@@ -572,6 +597,7 @@ class BatchedPCRewardComputer:
             - reward.w_p * rate_penalty
             + action_reward
             + action_smooth_reward
+            + action_feasible_gap_reward
             + saturation_reward
             + route_reward
             + material_saturation_reward
@@ -673,6 +699,7 @@ class BatchedPCRewardComputer:
             roll_rate=-reward.w_p * rate_penalty,
             action=action_reward,
             action_smooth=action_smooth_reward,
+            action_feasible_gap=action_feasible_gap_reward,
             saturation=saturation_reward,
             route_speed=route_reward,
             stall_gate=stall_gate,

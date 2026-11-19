@@ -783,6 +783,7 @@ class RewardConfig:
     w_action_smooth_pc: float = 0.0
     w_action_clip_attempt_pc: float = 0.0
     w_sat_pc: float = 0.1
+    w_action_feasible_gap_pc: float = 0.0
     w_route_speed_pc: float = 0.0
     w_route_ground_speed_stall: float = 0.0
     route_ground_speed_stall_threshold_mps: float = 0.25
@@ -836,6 +837,7 @@ class RewardConfig:
             ("w_material_sat_pc", self.w_material_sat_pc),
             ("w_action_smooth_pc", self.w_action_smooth_pc),
             ("w_action_clip_attempt_pc", self.w_action_clip_attempt_pc),
+            ("w_action_feasible_gap_pc", self.w_action_feasible_gap_pc),
             ("w_path_speed_smooth", self.w_path_speed_smooth),
             ("w_path_energy", self.w_path_energy),
             ("w_path_3d", self.w_path_3d),
@@ -2080,6 +2082,7 @@ def _parse_reward(value: Any) -> RewardConfig:
             "w_action_smooth_pc",
             "w_action_clip_attempt_pc",
             "w_sat_pc",
+            "w_action_feasible_gap_pc",
             "w_route_speed_pc",
             "w_route_ground_speed_stall",
             "route_ground_speed_stall_threshold_mps",
@@ -2176,6 +2179,10 @@ def _parse_reward(value: Any) -> RewardConfig:
             clip_attempt_weight, "reward.w_action_clip_attempt_pc"
         ),
         w_sat_pc=_non_negative(clip_attempt_weight, "reward.w_sat_pc"),
+        w_action_feasible_gap_pc=_non_negative(
+            data.get("w_action_feasible_gap_pc", 0.0),
+            "reward.w_action_feasible_gap_pc",
+        ),
         w_route_speed_pc=_non_negative(
             data.get("w_route_speed_pc", 0.0), "reward.w_route_speed_pc"
         ),

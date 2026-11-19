@@ -641,3 +641,55 @@ export PYTHONPATH=$PWD/src
 - ruff：改动文件 `All checks passed!`；
 - 是否新增失败：`no`；
 - 结论：`PASS`（仅基础设施；训练与正式评价尚未启动）。
+
+## 15. Goal186 reward v2 输入管线
+
+```yaml
+goal: Goal186
+repository: settled_局部规划器_反应式
+base_commit: 6fc455a
+branch: refactor/goal186-reward-v2-20261119
+scope: reward-input-and-config
+public_api_change: additive
+training_started: false
+```
+
+本轮按 Goal186 预注册决策增加 `w_action_feasible_gap_pc`。reward 只读取两片
+舵的请求-可执行误差，输入来自 `applied.total / action_full_scale`，即动作
+管线完成幅值与速率限制后的物理指令；RPM 不参与该 gap。旧配置不声明新字段时
+默认权重为 `0.0`，因此旧 reward 数值不变。
+
+改动文件：
+
+- `src/auv_lowlevel/config.py`
+- `src/auv_lowlevel/batch/pc.py`
+- `src/auv_lowlevel/batch/pc_env/core.py`
+- `tests/test_lowlevel_pc_reward_termination.py`
+- `tests/test_lowlevel_pc_env.py`
+- `tests/test_goal186_reward_v2_configs.py`
+- `tests/test_g04_big3_pc_env_trace.py`
+- `scripts/build_goal186_reward_v2_configs.py`
+- `scripts/build_goal186_queue.py`
+- `configs/lowlevel/goal186/`
+
+| 项目 | 变更前 | 变更后 | 证据 |
+|---|---|---|---|
+| 旧 reward 默认行为 | 无 gap 项 | 权重默认 0，数值不变 | 旧行为测试与全量回归 |
+| gap 输入 | 无 | 速率限制后的 `applied.total` | env 端到端单测 |
+| gap 覆盖通道 | 无 | 仅 rudder/stern，按 mean | reward 单测显式忽略 RPM 差异 |
+| 冻结 trace | 旧 breakdown | 新增零值 `action_feasible_gap` 字段 | `5fcc6931...` |
+| 动作/观测/RNG | — | 未改 | 全量回归 |
+
+验证结果：
+
+- reward/env/config 定向测试：`55 passed`；
+- PPO config/optimizer 回归：`53 passed`；
+- 全量测试：`2290 passed, 11 skipped`；
+- 五份训练 config 的 training-profile checker：全部 `PASS`；
+- ruff check：改动文件 `All checks passed!`；
+- ruff format：新增脚本与新测试已格式化；三个大文件存在存量格式欠账，
+  本轮不整体重排；
+- code shape：changed-file 检查仍报告既有超大文件与函数长度欠账；
+  本轮没有引入新的文件类型或重复实现；
+- 是否新增失败：`no`；
+- 结论：`PASS`（实现与配置已验证；smoke、训练和正式评价尚未启动）。

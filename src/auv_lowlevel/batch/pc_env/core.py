@@ -2572,6 +2572,7 @@ class BatchedPCLowLevelEnv:
             previous_previous_actuator=self._previous_previous_actuator,
             requested_normalized=applied.normalized,
             previous_requested_normalized=previous_requested,
+            feasible_normalized=applied.total / self.reward_computer.action_full_scale,
             reward_ground_surge_mps=observation.ground_velocity_body_mps[:, 0],
             reference_ground_speed_mps=reward_reference_ground_speed,
             hold_fraction=self.hold_fraction,

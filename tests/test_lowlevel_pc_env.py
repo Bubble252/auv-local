@@ -123,6 +123,23 @@ def test_c0_clean_env_reset_and_short_rollout() -> None:
     )
 
 
+def test_pc_env_feeds_rate_limited_fins_to_feasible_gap_reward() -> None:
+    config = _pc_config("C3", profile="clean")
+    config = replace(
+        config,
+        reward=replace(config.reward, w_action_feasible_gap_pc=5.0),
+    )
+    env = BatchedPCLowLevelEnv(config, num_envs=1, validate_finite=True)
+    env.reset([701])
+
+    result = env.step(torch.ones((1, 3), dtype=torch.float64))
+    feasible_fin = math.radians(150.0 * config.plant.dt_s) / math.radians(20.0)
+    expected_gap = -5.0 * (1.0 - feasible_fin) ** 2
+
+    assert result.reward.action_feasible_gap is not None
+    assert result.reward.action_feasible_gap.item() == pytest.approx(expected_gap)
+
+
 def test_pc_alos_compensation_uses_masked_estimated_current() -> None:
     config = _pc_config("C3", profile="realistic", current_enabled=True)
     config = replace(

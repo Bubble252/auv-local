@@ -320,6 +320,63 @@ def test_pc_route_speed_reward_is_goal_distance_independent() -> None:
     torch.testing.assert_close(near.route_speed, far.route_speed)
 
 
+def test_pc_action_feasible_gap_reward_uses_only_fin_error() -> None:
+    base = _pc_config(hold_bonus=False)
+    enabled = replace(
+        base,
+        reward=replace(base.reward, w_action_feasible_gap_pc=5.0),
+    )
+    common = {
+        "heading_error_rad": torch.zeros(1),
+        "pitch_error_rad": torch.zeros(1),
+        "ground_surge_mps": torch.ones(1),
+        "reference_speed_mps": torch.ones(1),
+        "roll_rad": torch.zeros(1),
+        "roll_rate_rad_s": torch.zeros(1),
+        "actual_actuator": torch.zeros((1, 3)),
+        "previous_actuator": torch.zeros((1, 3)),
+        "requested_normalized": torch.tensor([[1.0, -0.5, 0.25]]),
+        "previous_requested_normalized": torch.zeros((1, 3)),
+        "feasible_normalized": torch.tensor([[0.15, -0.25, -0.75]]),
+    }
+
+    legacy = BatchedPCRewardComputer(base).compute(**common)
+    treatment = BatchedPCRewardComputer(enabled).compute(**common)
+    expected_gap = -5.0 * ((1.0 - 0.15) ** 2 + (-0.5 + 0.25) ** 2) / 2.0
+
+    assert legacy.action_feasible_gap is not None
+    assert legacy.action_feasible_gap.item() == pytest.approx(0.0)
+    assert treatment.action_feasible_gap is not None
+    assert treatment.action_feasible_gap.item() == pytest.approx(expected_gap)
+    assert treatment.total.item() - legacy.total.item() == pytest.approx(expected_gap)
+
+
+def test_pc_action_feasible_gap_requires_input_when_enabled() -> None:
+    config = _pc_config(hold_bonus=False)
+    common = {
+        "heading_error_rad": torch.zeros(1),
+        "pitch_error_rad": torch.zeros(1),
+        "ground_surge_mps": torch.ones(1),
+        "reference_speed_mps": torch.ones(1),
+        "roll_rad": torch.zeros(1),
+        "roll_rate_rad_s": torch.zeros(1),
+        "actual_actuator": torch.zeros((1, 3)),
+        "previous_actuator": torch.zeros((1, 3)),
+        "requested_normalized": torch.zeros((1, 3)),
+        "previous_requested_normalized": torch.zeros((1, 3)),
+    }
+    legacy = BatchedPCRewardComputer(config).compute(**common)
+    assert legacy.action_feasible_gap is not None
+    assert legacy.action_feasible_gap.item() == pytest.approx(0.0)
+
+    enabled = replace(
+        config,
+        reward=replace(config.reward, w_action_feasible_gap_pc=5.0),
+    )
+    with pytest.raises(ValueError, match="feasible_normalized is required"):
+        BatchedPCRewardComputer(enabled).compute(**common)
+
+
 def test_hold_tracker_uses_simulation_time_and_resets_on_error() -> None:
     config = _pc_config(hold_bonus=True)
     tracker = BatchedCommandHoldTracker(config)
