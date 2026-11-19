@@ -1154,3 +1154,7 @@
 ### Goal185
 
 - `doc/goals/goal185_pe2e_bcres_module_ablation_20261118.md`
+
+### Goal186
+
+- `doc/goals/goal186_pe2e_bcres_reward_v2_20261119.md`

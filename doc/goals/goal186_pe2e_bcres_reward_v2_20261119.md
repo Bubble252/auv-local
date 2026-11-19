@@ -1,0 +1,193 @@
+# Goal186：PE2E BCRES reward v2（请求-可执行 gap + 垂向权重）
+
+**日期**：2026-11-19<br>
+**状态**：`PROTOCOL_DRAFTED_BEFORE_MEASUREMENT / NOT_STARTED`
+
+## Research Contract
+
+```yaml
+autoresearch:
+  required: true
+  triggers:
+    - gate_fail_twice
+    - no_metric_movement_after_3_fixes
+    - heldout_collapse
+    - seed_noise_ambiguous
+  ledger: research/LEDGER.jsonl
+  blockers_dir: research/blockers/
+  reading_dir: research/paper_reading/
+  max_outer_loops: 3
+  check_command: python ../scripts/check_research_ledger.py --goal Goal186 --goal-doc doc/goals/goal186_pe2e_bcres_reward_v2_20261119.md --strict
+```
+
+## 1. 背景与证据
+
+上游结果：
+
+- Goal184 C5 确定性 BCRES：材料饱和率 `56.4%`，方向舵 `39.0%`、艉翼 `33.2%`。
+- 请求每步变化均值 `4.02°/2.50°`，物理上限 `3°/步`。
+- 请求与本步可执行量 gap：均值 `1.83°/1.59°`，p95 `9.50°/9.17°`。
+- 当前执行器 reward 合计 `<0.4%` 预算；`cmd_speed` 占约 `49.5%`。
+- C5 全程垂向平均绝对误差 `1.168 m`，横向 `0.577 m`；垂向 p95 `4.088 m`，
+  横向 p95 `1.839 m`。
+
+决策记录：
+
+- `doc/reviews/goal185_reward_config_audit_20261119.md`
+- D-1：gap `lambda=5`；D-3：`w_path_vertical=2.5`；
+  D-5：`w_sat_pc=0.0` 显式保留，别名置零；
+  D-2/D-4/D-6/D-7/D-8：其他项保持不动或显式保留。
+
+为什么现在做：执行器项几乎不参与优化，而 BCRES 的确定性饱和与垂向误差都
+不是探索噪声能解释的；需要一次最小 reward 变更验证机制。
+
+## 2. 假设
+
+1. **H1（gap）**：加入 `w_action_feasible_gap_pc=5.0` 后，确定性 gap 与材料
+   饱和下降；如果成立，应看到 gap、速率裁剪、请求每步变化下降，而 cross/
+   vertical/3D 不出现超过 10% 的退化。若 gap 下降但路线明显变差，H1 失败。
+2. **H2（vertical）**：`w_path_vertical=2.5` 后，全程垂向平均绝对误差和 p95
+   下降；如果成立，应看到垂向误差下降且 RPM 饱和不显著恶化。若垂向不降、
+   RPM 先饱和，H2 失败，瓶颈在控制权限/制导。
+3. **H3（falsification）**：若饱和下降但路线、速度或 completion 明显变差，
+   说明“减少不可执行请求”与任务跟踪存在强冲突，不能继续加 reward 权重，
+   应回到执行器权限/制导诊断。
+
+## 3. 数据与隔离
+
+- 训练数据：现有 stage-matched BC demo 与 BC checkpoint，不重采 BC。
+- BC checkpoint：
+  `/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-64d8225/bc/pe2e_bc_stage_matched_v4_teacher_alos_truth/pc_bc_actor.pt`
+  SHA `86cab3fef9ee5784c0d3ef9441b1a409636df45204902713bb2fc950ebb1c086`
+- seed：训练 `86201`；评价使用预注册 dev seeds，held-out 关闭。
+- 禁止：用评价 trace 调 reward/权重；用 held-out 调参；静默续跑旧 run。
+- oracle fallback：禁止。
+
+## 4. 方法
+
+Reward v2 只改三项：
+
+1. 新增 `w_action_feasible_gap_pc = 5.0`：
+
+```text
+a_req      = applied.normalized[:2]
+a_feasible = applied.total[:2] / action_full_scale[:2]
+g          = mean_over_fins( (a_req - a_feasible)^2 )
+r_gap      = -5.0 * g
+```
+
+2. `w_path_vertical: 1.5 → 2.5`。
+3. `w_sat_pc: 0.0` 显式保留；`w_action_clip_attempt_pc: 0.0`（别名置零）。
+
+其他 reward 字段全部保留显式值：
+
+- 速度项 `w_cmd_speed=2.5`、`cmd_speed_std_mps=0.25` 不变；
+- 终端奖励全 0；
+- 近零平滑/能量项保持原值；
+- 路线停滞项保持 0；
+- std、LR、课程、架构、残差权限不变。
+
+配置落地：
+
+- 新建 env v2 配置，不直接改旧
+  `configs/lowlevel/goal184/env_path_fixed_speed_formal_empirical.json`；
+- 新建训练配置，指向 env v2；
+- 旧 BC checkpoint 与旧 run 的 env SHA 不变。
+
+## 5. 执行计划
+
+### 5.1 不可协商的运行契约
+
+| 项目 | 强制要求 | 失败标签 |
+|---|---|---|
+| 训练课程 | `curriculum.enabled=true`；冻结 stage mix；逐 episode `curriculum_episodes.jsonl` | `INVALID_NONCURRICULUM` |
+| 训练 profile | `PPO-FLAT-4096x48-E5-MB4`；启动前运行 `check_training_profile.py` | `INVALID_PROFILE` |
+| 训练速度 | 每个 stage 满足 `speed + current + variation <= 2.5 m/s` | `INVALID_SPEED_CONTRACT` |
+| 正式评价 | 完整 `arms × levels × radii(2.0) × zero baselines` | `INVALID_INCOMPLETE_EVAL` |
+| 评价 seeds | 预注册 dev seeds；held-out 关闭 | `INVALID_SEED_SPLIT` |
+| 启动与结束 | 先协议检查，再实验，最后产物审计；失败非零退出 | `INVALID_PROTOCOL` |
+| 主指标 | 全程 cross/vertical/3D、速度误差、分段/keypoint | 不能只看 success |
+| 终点口径 | success/timeout/pre_goal_3d 只作 telemetry，不作好坏判据 | — |
+| 执行器口径 | gap、材料饱和、RPM、近限位只作 telemetry/风险指标 | — |
+
+### 5.2 步骤
+
+- [ ] Step 0：写 env v2 与训练 config；运行协议/profile 检查。
+- [ ] Step 1：实现 reward 字段与 `applied.total` 输入管线；补单测。
+- [ ] Step 2：1-it 1536-env contract smoke；核对 manifest、BC 加载、课程 provenance。
+- [ ] Step 3：正式训练 2630 it，seed86201，单 arm（PE2E BCRES）。
+- [ ] Step 4：完整 `2.0 m` 半径评价矩阵；审计产物。
+- [ ] Step 5：写 result md、LEDGER、commit。
+
+### 5.3 运行命令模板
+
+```bash
+W=<goal186 worktree>
+PY=/data/yhx/underwater-robotics/envs/venvs/isaaclab/bin/python
+R=/data/yhx/underwater-robotics/runs/auv-local/goal186/20261119-goal186-<sha>
+T=/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-64d8225/route_gate_calibration_pe2e_stage_matched_v4_100it_fixedlr/thresholds
+CUDA_VISIBLE_DEVICES=<gpu> PYTHONPATH=$W/src:$CORE AUV_GOVERNANCE_ROOT=$GOV $PY $W/scripts/train_batch_lowlevel_ppo.py   --training-config $W/configs/lowlevel/goal186/train_formal_mod4_pe2e_bcres_reward_v2_seed86201.json   --iterations 2630   --curriculum-eval-stage-boundaries   --curriculum-route-gate-mode enforce   --curriculum-route-thresholds $T/goal182_route_gate_pe2e_20_3.thresholds.json   --output $R/train/pe2e_bcres_reward_v2_seed86201   --seed 86201
+```
+
+队列只允许使用空闲卡；不得影响其他用户。正式启动前需用户确认。
+
+## 6. Gate
+
+| check | 阈值 |
+|---|---|
+| 主指标 | 全程 cross/vertical/3D RMSE 与 p95；与旧 BCRES 同 stage/seed 对照 |
+| H1 软判据 | 确定性 gap、材料饱和下降；cross/3D 退化不超过 10% |
+| H2 软判据 | 垂向平均绝对误差/p95 下降；RPM >95% 占比不显著上升 |
+| 速度 | 速度 RMSE/偏差不恶化超过 0.05 m/s |
+| 稳定性 | 0 error / 0 NaN / 0 safety event |
+| 终点 telemetry | success/timeout/pre_goal_3d 只记录，不作 Gate |
+| 执行器 telemetry | gap、材料饱和、RPM、近限位只记录，不作独立 Gate |
+
+失败裁决：
+
+| 观察 | 判读 | 下一步 |
+|---|---|---|
+| gap/饱和下降，路线退化 >10% | H1 失败 | 回到执行器权限/制导诊断，不再加 reward |
+| 垂向不降、RPM 先饱和 | H2 失败 | 查垂向权限/制导，不加权重 |
+| 所有指标持平 | 机制未打中 | 检查 gap 输入与策略均值，不扫 lambda |
+| 安全事件出现 | 立即停止 | 按安全流程处理，不继续训练 |
+
+## 7. Git
+
+禁止 `git add -A`。只 add 本次相关文件，提交前运行：
+
+```bash
+python ../scripts/check_research_ledger.py --goal Goal186   --goal-doc doc/goals/goal186_pe2e_bcres_reward_v2_20261119.md --strict
+git diff --cached --check
+```
+
+不自动 commit/push；用户明确要求后才提交。
+
+## 8. Goal 提示词
+
+```text
+你现在执行 Goal186：PE2E BCRES reward v2（gap λ=5 + vertical 2.5）。
+
+先读：
+- doc/goals/goal186_pe2e_bcres_reward_v2_20261119.md
+- doc/reviews/goal185_reward_config_audit_20261119.md
+- doc/goals/goal185_pe2e_bcres_module_ablation_20261118.md
+
+硬约束：
+1. 只改 reward 三项：新增 gap λ=5、vertical 1.5→2.5、w_sat_pc 显式 0；
+2. 不改速度项、终端项、std、LR、课程、架构、残差权限；
+3. 不重采 BC；使用现有 BC checkpoint；
+4. 新 env v2 配置，不直接改旧 env JSON；
+5. 训练必须启用课程学习并保留逐 episode provenance；
+6. 评价完整 arms × levels × radii(2.0) × zero baselines；
+7. success/timeout/pre_goal_3d 与饱和率只作 telemetry，不作好坏判据；
+8. 启动前用户确认；不得影响其他用户的 GPU 任务。
+
+执行顺序：
+- 写 env v2 与训练 config；
+- 实现 reward gap 输入与单测；
+- 1-it smoke；
+- 正式训练；
+- 完整评价；
+- result md、ledger、commit。
+```
