@@ -534,7 +534,17 @@ class CurriculumTrainerHook:
 
         if isinstance(completed_transitions, bool) or completed_transitions < 0:
             raise ValueError("completed_transitions must be a non-negative integer")
-        self._write_state(completed_transitions, None, finalized=True)
+        completed_iterations = (
+            None
+            if self._last_state_payload is None
+            else self._last_state_payload.get("completed_iterations")
+        )
+        self._write_state(
+            completed_transitions,
+            None,
+            completed_iterations=completed_iterations,
+            finalized=True,
+        )
 
     def current_encoder_alpha(self, completed_transitions: int) -> float:
         """Return the stage-aware actor current-encoder alpha."""
