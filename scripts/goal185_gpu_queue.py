@@ -301,7 +301,8 @@ def main() -> int:
                 if gpu_state["free_mb"] < args.preempt_floor_mb:
                     reason = "free-floor"
                 elif (
-                    gpu_state["free_mb"] < int(job["need_mb"])
+                    gpu_state["total_mb"] - gpu_state["other_mb"]
+                    < int(job["need_mb"])
                     or gpu_state["other_mb"] > args.other_max_mb
                 ):
                     reason = "other-growth"

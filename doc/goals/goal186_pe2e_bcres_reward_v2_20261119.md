@@ -1,7 +1,7 @@
 # Goal186：PE2E BCRES reward v2（请求-可执行 gap + 垂向权重）
 
 **日期**：2026-11-19<br>
-**状态**：`IMPLEMENTATION_VERIFIED / QUEUE_PENDING`
+**状态**：`SMOKE_VERIFIED / QUEUE_ARMED`
 
 ## Research Contract
 
@@ -133,7 +133,19 @@ r_gap      = -5.0 * g
     传入，因此用的是速率限制后的真实可执行指令；
   - 定向测试 `55 passed`；完整回归 `2290 passed, 11 skipped`；
   - 冻结 trace 因新增零值 breakdown 字段更新一次哈希，未改动作、观测或 RNG。
-- [ ] Step 2：1-it 1536-env contract smoke；核对 manifest、BC 加载、课程 provenance。
+- [x] Step 2：1-it 1536-env contract smoke；核对 manifest、BC 加载、课程 provenance。
+  - 2026-11-19 20:41 五臂 `mod4/mod3/mod2/mod1/mod0` 各 1-it 1536-env，全部 `rc=0`；
+  - 运行根：
+    `/data/yhx/underwater-robotics/runs/auv-local/goal186/20261119-goal186-a6e3b59/smoke/`；
+  - 五臂均指向 v2 env（`w_action_feasible_gap_pc=5.0`、
+    `w_path_vertical=2.5`、`w_sat_pc=0.0`），课程 `enabled=true`、初始 C0、
+    逐 episode provenance 1536 行、route gate `enforce` 且阈值已加载；
+  - MOD4 `critic_path_dim=30`、MOD3/1/0 `0`、MOD0 `dade_enabled=false`，
+    BC 均为 `86cab3fe...`；
+  - 发现并修复 `048fca6` 遗留问题：`learning_rate_max`/
+    `learning_rate_warmup_iterations` 被透传给 rsl_rl `PPO.__init__`
+    （Goal185 的 smoke 跑在加入 LR guard 之前的配置，正式队列从未启动过）；
+    `a6e3b59` 在 `rsl_train_cfg()` 中过滤 runner-only 键，并补回归测试。
 - [ ] Step 3：正式训练队列，2630 it，seed86201，MOD4 → MOD3 → MOD2 → MOD1 → MOD0。
 - [ ] Step 4：完整 `2.0 m` 半径评价矩阵；审计产物。
 - [ ] Step 5：写 result md、LEDGER、commit。
