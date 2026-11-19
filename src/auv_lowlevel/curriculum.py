@@ -1304,6 +1304,29 @@ class RouteGateWindow:
             "mode": self.mode,
         }
 
+    def state_dict(self) -> dict[str, Any]:
+        """Return the rolling window so a resumed run keeps gate progress."""
+
+        return {
+            "stage": self.stage,
+            "samples": [dict(sample) for sample in self._samples],
+            "consecutive_passes": int(self._consecutive_passes),
+            "last_status": json.loads(json.dumps(self.last_status)),
+        }
+
+    def load_state_dict(self, payload: Mapping[str, Any]) -> None:
+        """Restore a state produced by :meth:`state_dict`."""
+
+        self.stage = payload.get("stage")
+        self._samples = [
+            {str(key): float(value) for key, value in dict(sample).items()}
+            for sample in payload.get("samples", [])
+        ]
+        self._consecutive_passes = int(payload.get("consecutive_passes", 0))
+        last_status = payload.get("last_status")
+        if last_status is not None:
+            self.last_status = dict(last_status)
+
     def observe(
         self,
         *,

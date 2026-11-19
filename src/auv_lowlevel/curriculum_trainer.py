@@ -198,6 +198,9 @@ class CurriculumTrainerHook:
             "route_gate": (
                 None if self.routine_gate is None else dict(self.routine_gate.last_status)
             ),
+            "route_gate_window": (
+                None if self.routine_gate is None else self.routine_gate.state_dict()
+            ),
             "last_decision": None if decision is None else decision.value,
             "rollbacks_used": self.controller.rollbacks_used,
             "force_current_encoder_alpha_zero": self.force_current_encoder_alpha_zero,
@@ -282,6 +285,9 @@ class CurriculumTrainerHook:
         self._mix_ramp = (
             None if mix_ramp is None else CurriculumMixRamp.from_dict(mix_ramp)
         )
+        route_gate_state = payload.get("route_gate_window")
+        if self.routine_gate is not None and route_gate_state is not None:
+            self.routine_gate.load_state_dict(route_gate_state)
         restored = dict(payload)
         restored["stage"] = self.controller.stage
         restored["stage_mix"] = [

@@ -155,7 +155,14 @@ def _latest_checkpoint(output: Path) -> Path:
     ]
     if not candidates:
         raise FileNotFoundError(f"no resume checkpoint found under {output}")
-    return max(candidates, key=lambda path: path.stat().st_mtime)
+    for path in sorted(candidates, key=lambda item: item.stat().st_mtime, reverse=True):
+        try:
+            payload = torch.load(path, map_location="cpu", weights_only=False)
+        except Exception:
+            continue
+        if isinstance(payload, dict) and "model_state_dict" in payload:
+            return path
+    raise FileNotFoundError(f"no readable resume checkpoint found under {output}")
 
 
 def _load_iteration_records(path: Path) -> list[dict[str, Any]]:
@@ -369,6 +376,12 @@ def _parse_args() -> argparse.Namespace:
         "--resume-latest",
         action="store_true",
         help="resume from the newest checkpoint found under --output",
+    )
+    parser.add_argument(
+        "--save-interval",
+        type=int,
+        default=None,
+        help="override the runner checkpoint interval in iterations",
     )
     parser.add_argument(
         "--curriculum-eval-default-config",
@@ -857,7 +870,13 @@ def main() -> int:
 
     rsl_cfg = training.rsl_train_cfg()
     rsl_cfg["num_steps_per_env"] = num_steps
-    rsl_cfg["save_interval"] = training.runner["save_interval"]
+    rsl_cfg["save_interval"] = (
+        int(training.runner["save_interval"])
+        if args.save_interval is None
+        else int(args.save_interval)
+    )
+    if rsl_cfg["save_interval"] <= 0:
+        raise ValueError("--save-interval must be a positive integer")
     rsl_cfg["empirical_normalization"] = training.runner["empirical_normalization"]
     rsl_cfg["logger"] = training.runner["logger"]
     rsl_cfg["algorithm"]["num_mini_batches"] = num_mini_batches
@@ -1127,6 +1146,14 @@ def main() -> int:
             merged = dict(self._checkpoint_infos)
             if infos is not None:
                 merged.update(infos)
+            env_steps = int(self.env.total_env_steps)
+            merged["total_env_steps"] = env_steps
+            merged["completed_iterations"] = (
+                int(self.current_learning_iteration) + 1 if env_steps > 0 else 0
+            )
+            merged["adaptive_learning_rate"] = float(self.alg.learning_rate)
+            merged["num_envs"] = int(self.env.num_envs)
+            merged["num_steps_per_env"] = int(self.num_steps_per_env)
             pc_env = _unwrap_pc_vec_env(self.env)
             if pc_env is not None:
                 merged.update(pc_env.empirical_normalization_payload())
@@ -1900,6 +1927,33 @@ def main() -> int:
                     f"{resume_info.get('training_config_sha256')!r} != "
                     f"{training_config_sha256!r}"
                 )
+            for key, current_value in (
+                ("num_envs", int(num_envs)),
+                ("num_steps_per_env", int(num_steps)),
+            ):
+                recorded = resume_info.get(key)
+                if recorded is not None and int(recorded) != current_value:
+                    raise ValueError(
+                        f"resume checkpoint {key} does not match: "
+                        f"{int(recorded)} != {current_value}"
+                    )
+            # rsl_rl stores the last completed iteration index, so resume at +1.
+            checkpoint_env_steps = resume_info.get("total_env_steps")
+            checkpoint_completed = resume_info.get("completed_iterations")
+            if checkpoint_completed is None:
+                current_iteration = int(runner.current_learning_iteration)
+                if checkpoint_env_steps is None:
+                    checkpoint_completed = (
+                        current_iteration + 1 if current_iteration > 0 else 0
+                    )
+                else:
+                    checkpoint_completed = (
+                        current_iteration + 1 if int(checkpoint_env_steps) > 0 else 0
+                    )
+            resume_start_iteration = int(checkpoint_completed)
+            runner.current_learning_iteration = resume_start_iteration
+            if resume_info.get("adaptive_learning_rate") is not None:
+                runner.alg.learning_rate = float(resume_info["adaptive_learning_rate"])
             pc_env = _unwrap_pc_vec_env(env)
             if pc_env is not None and resume_info.get("normalization_state") is not None:
                 pc_env.load_empirical_normalization_state(
@@ -1929,19 +1983,57 @@ def main() -> int:
                 completed_transitions = int(
                     curriculum_state.get("completed_transitions", 0) or 0
                 )
+                if checkpoint_env_steps is not None:
+                    completed_transitions = max(
+                        completed_transitions, int(checkpoint_env_steps)
+                    )
                 if pc_env is not None:
                     pc_env.restore_total_env_steps(completed_transitions)
                 if curriculum_hook is not None:
                     alpha = curriculum_hook.current_encoder_alpha(completed_transitions)
                     runner._current_encoder_alpha = alpha
                     runner.alg.policy.set_actor_current_encoder_alpha(alpha)
+            elif pc_env is not None:
+                env_steps = (
+                    int(checkpoint_env_steps)
+                    if checkpoint_env_steps is not None
+                    else resume_start_iteration * int(num_envs) * int(num_steps)
+                )
+                pc_env.restore_total_env_steps(env_steps)
+            if resume_info.get("adaptive_learning_rate") is None and runner.records:
+                completed_records = [
+                    record
+                    for record in runner.records
+                    if int(record.get("iteration", 0)) <= resume_start_iteration
+                ]
+                last_learning_rate = (
+                    completed_records[-1].get("learning_rate")
+                    if completed_records
+                    else None
+                )
+                if last_learning_rate is not None:
+                    runner.alg.learning_rate = float(last_learning_rate)
+            # Drop records produced after the checkpoint so replayed iterations
+            # replace them instead of appearing twice in the learning curve.
+            kept_records = [
+                record
+                for record in runner.records
+                if int(record.get("iteration", 0)) <= resume_start_iteration
+            ]
+            if len(kept_records) != len(runner.records):
+                runner.records = kept_records
+                _write_json(records_path, {"records": kept_records})
+                records_jsonl_path.write_text(
+                    "".join(
+                        json.dumps(record, ensure_ascii=False) + "\n"
+                        for record in kept_records
+                    ),
+                    encoding="utf-8",
+                )
             if training.pc is not None and training.pc.path_dim:
                 env.set_path_blocks(
-                    _path_blocks_for_iteration(
-                        training.pc, int(runner.current_learning_iteration)
-                    )
+                    _path_blocks_for_iteration(training.pc, resume_start_iteration)
                 )
-            resume_start_iteration = int(runner.current_learning_iteration)
         if is_pc:
             policy_parameter_counts = runner.alg.policy.parameter_counts()
             checkpoint_infos[CHECKPOINT_METADATA_KEY].update(policy_parameter_counts)

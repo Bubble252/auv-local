@@ -144,6 +144,50 @@ def test_hook_state_roundtrip_restores_promotion_and_schedule(tmp_path: Path) ->
     assert restored.controller.stage_consumed_transitions == hook.controller.stage_consumed_transitions
 
 
+def test_hook_state_roundtrip_restores_route_gate_window(tmp_path: Path) -> None:
+    metrics = {
+        "/episode/cross_track_rmse_mean": 0.20,
+        "/episode/vertical_rmse_mean": 0.20,
+        "/episode/path_completion_mean": 0.95,
+        "/episode/safety_termination_rate": 0.0,
+    }
+    hook = CurriculumTrainerHook(
+        controller=CurriculumPromotionController(start_stage="C0"),
+        sampler=CurriculumStageSampler(stage_mix=(("C0", 1.0),)),
+        output_dir=tmp_path,
+        eval_interval_transitions=10_000,
+        evaluate=lambda _stage, _steps: _stage_eval(),
+        promotion_enabled=False,
+        routine_gate=RouteGateWindow(
+            window_size=5, consecutive_required=3, mode="shadow"
+        ),
+    )
+    for iteration in range(1, 4):
+        hook.maybe_update(
+            100 * iteration,
+            completed_iterations=iteration,
+            training_metrics=metrics,
+        )
+    state = hook.state_dict()
+    assert state["route_gate_window"]["stage"] == "C0"
+    assert len(state["route_gate_window"]["samples"]) == 3
+
+    restored = CurriculumTrainerHook(
+        controller=CurriculumPromotionController(start_stage="C0"),
+        sampler=CurriculumStageSampler(stage_mix=(("C0", 1.0),)),
+        output_dir=tmp_path / "restored",
+        eval_interval_transitions=10_000,
+        evaluate=lambda _stage, _steps: _stage_eval(),
+        promotion_enabled=False,
+        routine_gate=RouteGateWindow(
+            window_size=5, consecutive_required=3, mode="shadow"
+        ),
+    )
+    restored.load_state(state)
+    assert restored.routine_gate is not None
+    assert restored.routine_gate.state_dict() == hook.routine_gate.state_dict()
+
+
 def test_hook_fails_closed_at_stage_hard_cap_without_eval(tmp_path: Path) -> None:
     sampler = CurriculumStageSampler(stage_mix=(("C0", 1.0),))
     controller = CurriculumPromotionController(start_stage="C0")
