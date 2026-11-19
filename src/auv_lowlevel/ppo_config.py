@@ -679,6 +679,8 @@ class PPOTrainingConfig:
                 "learning_rate_actor",
                 "learning_rate_critic",
                 "learning_rate_dade_head",
+                "learning_rate_max",
+                "learning_rate_warmup_iterations",
                 "critic_warmup_iterations",
             }
         }

@@ -541,6 +541,8 @@ def test_ppo_config_supports_optional_separate_actor_critic_learning_rates() -> 
     raw["algorithm"]["learning_rate_actor"] = 1e-5
     raw["algorithm"]["learning_rate_critic"] = 3e-4
     raw["algorithm"]["critic_warmup_iterations"] = 2
+    raw["algorithm"]["learning_rate_max"] = 2e-3
+    raw["algorithm"]["learning_rate_warmup_iterations"] = 3
     config = parse_training_config(raw)
 
     assert config.algorithm["learning_rate"] == pytest.approx(
@@ -549,10 +551,17 @@ def test_ppo_config_supports_optional_separate_actor_critic_learning_rates() -> 
     assert config.algorithm["learning_rate_actor"] == pytest.approx(1e-5)
     assert config.algorithm["learning_rate_critic"] == pytest.approx(3e-4)
     assert config.algorithm["critic_warmup_iterations"] == 2
+    assert config.algorithm["learning_rate_max"] == pytest.approx(2e-3)
+    assert config.algorithm["learning_rate_warmup_iterations"] == 3
     train_cfg = config.rsl_train_cfg()
-    assert "learning_rate_actor" not in train_cfg["algorithm"]
-    assert "learning_rate_critic" not in train_cfg["algorithm"]
-    assert "critic_warmup_iterations" not in train_cfg["algorithm"]
+    for runner_only in (
+        "learning_rate_actor",
+        "learning_rate_critic",
+        "critic_warmup_iterations",
+        "learning_rate_max",
+        "learning_rate_warmup_iterations",
+    ):
+        assert runner_only not in train_cfg["algorithm"]
 
     raw["algorithm"]["schedule"] = "adaptive"
     with pytest.raises(ValueError, match="schedule='fixed'"):
