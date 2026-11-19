@@ -130,8 +130,8 @@ def test_hook_fails_closed_at_stage_hard_cap_without_eval(tmp_path: Path) -> Non
         evaluate=evaluate,
     )
 
-    assert hook.check_stage_budget(1_000, 119) is None
-    status = hook.check_stage_budget(2_000, 120)
+    assert hook.check_stage_budget(1_000, 149) is None
+    status = hook.check_stage_budget(2_000, 150)
     assert status is not None and status.exhausted is True
     assert evaluations == []
     rows = [
@@ -140,7 +140,7 @@ def test_hook_fails_closed_at_stage_hard_cap_without_eval(tmp_path: Path) -> Non
     ]
     assert rows[-1]["decision"] == "STAGE_BUDGET_EXHAUSTED"
     assert rows[-1]["stage"] == "C0"
-    assert rows[-1]["consumed_iterations"] == 120
+    assert rows[-1]["consumed_iterations"] == 150
     state = json.loads((tmp_path / "curriculum_state.json").read_text())
     assert state["last_decision"] == "STAGE_BUDGET_EXHAUSTED"
 
@@ -367,3 +367,36 @@ def test_enforce_route_gate_requires_frozen_thresholds(tmp_path: Path) -> None:
             evaluate=lambda _stage, _steps: _stage_eval(completion=0.0, success=0.0),
             routine_gate=RouteGateWindow(mode="enforce"),
         )
+
+
+def test_route_gate_uses_stage_local_iterations(tmp_path: Path) -> None:
+    """A late-entered stage must not inherit the global iteration counter."""
+
+    controller = CurriculumPromotionController(start_stage="C0")
+    assert controller.check_stage_budget(112).exhausted is False
+    controller.stage = "C1"
+    controller._stage_entry_iteration = 112
+
+    gate = RouteGateWindow(window_size=2, consecutive_required=2, mode="enforce")
+    hook = CurriculumTrainerHook(
+        controller=controller,
+        sampler=CurriculumStageSampler(stage_mix=(("C1", 1.0),)),
+        output_dir=tmp_path,
+        eval_interval_transitions=10_000_000,
+        evaluate=lambda _stage, _steps: _stage_eval(),
+        routine_gate=gate,
+        route_gate_thresholds=_route_thresholds(),
+    )
+
+    for completed in range(113, 121):
+        hook.maybe_update(
+            1_000_000 + completed,
+            completed_iterations=completed,
+            training_metrics=_training_route_metrics(),
+        )
+
+    assert hook.stage == "C1"
+    assert gate.last_status["eligible"] is False
+    assert gate.last_status["reason"] == "SOFT_ITERATION_CAP_NOT_REACHED"
+    assert gate.last_status["min_iterations"] == 108
+    assert controller.stage_consumed_iterations == 8

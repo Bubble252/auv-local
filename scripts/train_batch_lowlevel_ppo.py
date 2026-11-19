@@ -234,6 +234,30 @@ def _apply_learning_rate_for_iteration(runner: Any, iteration: int) -> None:
             group["lr"] = 0.0 if iteration < warmup else float(dade_head_target)
 
 
+def _apply_adaptive_learning_rate_guard(
+    alg: Any,
+    *,
+    warming_up: bool,
+    before_update: bool,
+    base_learning_rate: float,
+    learning_rate_max: float,
+    original_schedule: str,
+) -> None:
+    """Lock LR during warmup and clamp the adaptive scheduler afterwards."""
+    if before_update:
+        if not warming_up:
+            return
+        alg.schedule = "fixed"
+        alg.learning_rate = float(base_learning_rate)
+    elif warming_up:
+        alg.schedule = original_schedule
+        alg.learning_rate = float(base_learning_rate)
+    else:
+        alg.learning_rate = min(float(alg.learning_rate), float(learning_rate_max))
+    for group in alg.optimizer.param_groups:
+        group["lr"] = alg.learning_rate
+
+
 def _frozen_bc_parameter_audit(
     initial_checkpoint_path: Path,
     final_checkpoint: dict[str, Any],
@@ -820,6 +844,9 @@ def main() -> int:
             write_records: bool,
             policy_metrics_sample_size: int,
             clip_param: float,
+            learning_rate_max: float,
+            learning_rate_warmup_iterations: int,
+            base_learning_rate: float,
             checkpoint_infos: dict[str, Any],
             current_encoder_alpha_schedule: LinearAlphaSchedule | None,
             curriculum_hook: CurriculumTrainerHook | None = None,
@@ -833,6 +860,12 @@ def main() -> int:
             self._write_records = write_records
             self._policy_metrics_sample_size = policy_metrics_sample_size
             self._clip_param = clip_param
+            self._learning_rate_max = float(learning_rate_max)
+            self._learning_rate_warmup_iterations = int(
+                learning_rate_warmup_iterations
+            )
+            self._base_learning_rate = float(base_learning_rate)
+            self._original_schedule = str(self.alg.schedule)
             self._checkpoint_infos = checkpoint_infos
             self._current_encoder_alpha_schedule = current_encoder_alpha_schedule
             self._curriculum_hook = curriculum_hook
@@ -853,8 +886,28 @@ def main() -> int:
             original_update = self.alg.update
 
             def update_with_metrics() -> dict[str, float]:
+                warming_up = (
+                    int(self.current_learning_iteration)
+                    < self._learning_rate_warmup_iterations
+                )
+                _apply_adaptive_learning_rate_guard(
+                    self.alg,
+                    warming_up=warming_up,
+                    before_update=True,
+                    base_learning_rate=self._base_learning_rate,
+                    learning_rate_max=self._learning_rate_max,
+                    original_schedule=self._original_schedule,
+                )
                 storage = self.alg.storage
                 result = original_update()
+                _apply_adaptive_learning_rate_guard(
+                    self.alg,
+                    warming_up=warming_up,
+                    before_update=False,
+                    base_learning_rate=self._base_learning_rate,
+                    learning_rate_max=self._learning_rate_max,
+                    original_schedule=self._original_schedule,
+                )
                 if aux_current_enabled:
                     flat_observations = storage.observations.flatten(0, -2)
                     aux_loss_sum = 0.0
@@ -1620,6 +1673,12 @@ def main() -> int:
                 ppo_rpm_gain=training.pc.ppo_rpm_gain,
                 base_residual_bias=training.pc.base_residual_bias,
             )
+        # Building the env consumes global RNG differently across arms whose
+        # observation widths differ. Reset immediately before model creation so
+        # module ablations start from identical weights.
+        torch.manual_seed(seed)
+        if device.type == "cuda":
+            torch.cuda.manual_seed_all(seed)
         runner = RecordingRunner(
             env,
             copy.deepcopy(rsl_cfg),
@@ -1630,6 +1689,13 @@ def main() -> int:
             write_records=training.write_iteration_records,
             policy_metrics_sample_size=training.policy_metrics_sample_size,
             clip_param=float(training.algorithm["clip_param"]),
+            learning_rate_max=float(
+                training.algorithm.get("learning_rate_max", 1e-2)
+            ),
+            learning_rate_warmup_iterations=int(
+                training.algorithm.get("learning_rate_warmup_iterations", 0)
+            ),
+            base_learning_rate=float(training.algorithm["learning_rate"]),
             checkpoint_infos=checkpoint_infos,
             current_encoder_alpha_schedule=(
                 None
@@ -2028,6 +2094,18 @@ def main() -> int:
             else type(error).__name__
         )
         failure_fields: dict[str, Any] = {"failure_code": failure_code}
+        interrupted_path = output / "interrupted.pt"
+        if runner is not None:
+            try:
+                runner.save(str(interrupted_path))
+                failure_fields["interrupted_checkpoint"] = str(
+                    interrupted_path.resolve()
+                )
+                failure_fields["interrupted_checkpoint_sha256"] = sha256_file(
+                    interrupted_path
+                )
+            except Exception as save_error:  # never mask the original failure
+                failure_fields["interrupted_checkpoint_error"] = repr(save_error)
         if isinstance(error, StageBudgetExhausted):
             failure_fields.update(
                 {

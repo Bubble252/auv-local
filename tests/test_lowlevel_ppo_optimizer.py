@@ -108,3 +108,80 @@ def test_frozen_residual_shared_adaptive_lr_keeps_native_optimizer() -> None:
 
     assert runner.alg.optimizer is None
     assert runner.alg.learning_rate is None
+
+
+def _adaptive_alg(*, learning_rate: float, schedule: str = "adaptive") -> SimpleNamespace:
+    return SimpleNamespace(
+        schedule=schedule,
+        learning_rate=learning_rate,
+        optimizer=SimpleNamespace(
+            param_groups=[{"lr": learning_rate}, {"lr": learning_rate}]
+        ),
+    )
+
+
+def test_adaptive_lr_warmup_locks_base_before_update() -> None:
+    alg = _adaptive_alg(learning_rate=5e-3)
+
+    MODULE._apply_adaptive_learning_rate_guard(
+        alg,
+        warming_up=True,
+        before_update=True,
+        base_learning_rate=3e-4,
+        learning_rate_max=3e-3,
+        original_schedule="adaptive",
+    )
+
+    assert alg.schedule == "fixed"
+    assert alg.learning_rate == 3e-4
+    assert [group["lr"] for group in alg.optimizer.param_groups] == [3e-4, 3e-4]
+
+
+def test_adaptive_lr_warmup_restores_schedule_after_update() -> None:
+    alg = _adaptive_alg(learning_rate=5e-3)
+
+    MODULE._apply_adaptive_learning_rate_guard(
+        alg,
+        warming_up=True,
+        before_update=False,
+        base_learning_rate=3e-4,
+        learning_rate_max=3e-3,
+        original_schedule="adaptive",
+    )
+
+    assert alg.schedule == "adaptive"
+    assert alg.learning_rate == 3e-4
+    assert [group["lr"] for group in alg.optimizer.param_groups] == [3e-4, 3e-4]
+
+
+def test_adaptive_lr_post_warmup_clamps_and_syncs_groups() -> None:
+    alg = _adaptive_alg(learning_rate=9e-3)
+
+    MODULE._apply_adaptive_learning_rate_guard(
+        alg,
+        warming_up=False,
+        before_update=False,
+        base_learning_rate=3e-4,
+        learning_rate_max=3e-3,
+        original_schedule="adaptive",
+    )
+
+    assert alg.schedule == "adaptive"
+    assert alg.learning_rate == 3e-3
+    assert [group["lr"] for group in alg.optimizer.param_groups] == [3e-3, 3e-3]
+
+
+def test_adaptive_lr_post_warmup_keeps_lr_below_cap() -> None:
+    alg = _adaptive_alg(learning_rate=5e-4)
+
+    MODULE._apply_adaptive_learning_rate_guard(
+        alg,
+        warming_up=False,
+        before_update=False,
+        base_learning_rate=3e-4,
+        learning_rate_max=3e-3,
+        original_schedule="adaptive",
+    )
+
+    assert alg.learning_rate == 5e-4
+    assert [group["lr"] for group in alg.optimizer.param_groups] == [5e-4, 5e-4]

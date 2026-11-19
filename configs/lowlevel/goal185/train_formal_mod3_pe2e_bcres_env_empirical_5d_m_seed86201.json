@@ -14,6 +14,8 @@
     "learning_rate": 0.0003,
     "learning_rate_actor": 0.0003,
     "learning_rate_critic": 0.0003,
+    "learning_rate_max": 0.003,
+    "learning_rate_warmup_iterations": 5,
     "max_grad_norm": 1.0,
     "normalize_advantage_per_mini_batch": true,
     "num_learning_epochs": 5,
@@ -144,7 +146,7 @@
   "training": {
     "initial_residual_output_std": 0.0,
     "initial_residual_zero": false,
-    "iterations": 2600,
+    "iterations": 2630,
     "privileged_current_critic": false
   },
   "training_profile": "PPO-FLAT-4096x48-E5-MB4",

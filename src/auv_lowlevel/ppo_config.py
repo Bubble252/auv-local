@@ -1032,6 +1032,8 @@ def parse_training_config(
             "learning_rate_critic",
             "learning_rate_dade_head",
             "critic_warmup_iterations",
+            "learning_rate_max",
+            "learning_rate_warmup_iterations",
         },
     )
     instrumentation = _mapping(
@@ -1643,6 +1645,18 @@ def parse_training_config(
     )
     if critic_warmup_iterations < 0:
         raise ValueError("algorithm.critic_warmup_iterations must be non-negative")
+    learning_rate_max = _positive_number(
+        algorithm.get("learning_rate_max", 1e-2),
+        "algorithm.learning_rate_max",
+    )
+    learning_rate_warmup_iterations = _integer(
+        algorithm.get("learning_rate_warmup_iterations", 0),
+        "algorithm.learning_rate_warmup_iterations",
+    )
+    if learning_rate_warmup_iterations < 0:
+        raise ValueError(
+            "algorithm.learning_rate_warmup_iterations must be non-negative"
+        )
 
     result = PPOTrainingConfig(
         schema_version=SCHEMA_VERSION,
@@ -1735,6 +1749,8 @@ def parse_training_config(
             "learning_rate_critic": critic_learning_rate,
             "learning_rate_dade_head": dade_head_learning_rate,
             "critic_warmup_iterations": critic_warmup_iterations,
+            "learning_rate_max": learning_rate_max,
+            "learning_rate_warmup_iterations": learning_rate_warmup_iterations,
             "max_grad_norm": _positive_number(
                 algorithm["max_grad_norm"], "algorithm.max_grad_norm"
             ),

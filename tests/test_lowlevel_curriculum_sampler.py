@@ -384,27 +384,27 @@ def test_stalled_metric_triggers_stalled_decision() -> None:
 
 def test_iteration_budget_guard() -> None:
     controller = CurriculumPromotionController()
-    budget = controller.observe(_passing_evaluation(), completed_iterations=120)
+    budget = controller.observe(_passing_evaluation(), completed_iterations=150)
     assert budget is CurriculumDecision.STAGE_BUDGET_EXHAUSTED
 
 
 def test_per_iteration_stage_budget_check_is_idempotent() -> None:
     controller = CurriculumPromotionController(start_stage="C0")
 
-    assert controller.check_stage_budget(119).exhausted is False
-    status = controller.check_stage_budget(120)
+    assert controller.check_stage_budget(149).exhausted is False
+    status = controller.check_stage_budget(150)
     assert status.exhausted is True
     assert status.stage == "C0"
-    assert status.consumed_iterations == 120
-    assert status.hard_cap_iterations == 120
+    assert status.consumed_iterations == 150
+    assert status.hard_cap_iterations == 150
     # Re-observing the same completed iteration must not double-count.
-    assert controller.check_stage_budget(120).consumed_iterations == 120
+    assert controller.check_stage_budget(150).consumed_iterations == 150
 
 
 def test_goal182_iteration_caps_replace_transition_budget_unit() -> None:
     stages = default_curriculum_stages()
     expected = {
-        "C0": (72, 120),
+        "C0": (72, 150),
         "C1": (108, 180),
         "C2": (156, 260),
         "C3": (216, 360),
@@ -416,7 +416,7 @@ def test_goal182_iteration_caps_replace_transition_budget_unit() -> None:
         name: (stage.soft_budget_iterations, stage.hard_cap_iterations)
         for name, stage in stages.items()
     } == expected
-    assert sum(stage.hard_cap_iterations for stage in stages.values()) == 2600
+    assert sum(stage.hard_cap_iterations for stage in stages.values()) == 2630
 
     controller = CurriculumPromotionController(start_stage="C0")
     assert (
@@ -425,10 +425,10 @@ def test_goal182_iteration_caps_replace_transition_budget_unit() -> None:
     )
     assert controller.stage_consumed_iterations == 60
     assert (
-        controller.observe(_passing_evaluation(), completed_iterations=120)
+        controller.observe(_passing_evaluation(), completed_iterations=150)
         is CurriculumDecision.STAGE_BUDGET_EXHAUSTED
     )
-    assert controller.stage_consumed_iterations == 120
+    assert controller.stage_consumed_iterations == 150
 
 
 def test_goal182_iteration_budget_ignores_global_transition_clock() -> None:

@@ -614,7 +614,7 @@ def default_curriculum_stages() -> dict[str, CurriculumStageSpec]:
             soft_budget_transitions=250_000,
             hard_cap_transitions=400_000,
             soft_budget_iterations=72,
-            hard_cap_iterations=120,
+            hard_cap_iterations=150,
             gate=gates["C0"],
         ),
         CurriculumStageSpec(
@@ -1531,6 +1531,16 @@ class CurriculumPromotionController:
     @property
     def stage_consumed_iterations(self) -> int:
         return int(self._stage_consumed_iterations.get(self.stage, 0))
+
+    def consume_iterations(self, completed_iterations: int | None) -> None:
+        """Accumulate the stage-local iteration clock.
+
+        Idempotent for a repeated ``completed_iterations`` value, so callers may
+        invoke it both from the per-iteration budget check and from
+        ``maybe_update`` without double-counting.
+        """
+
+        self._consume_iterations(completed_iterations)
 
     def check_stage_budget(self, completed_iterations: int) -> StageBudgetStatus:
         """Consume the iteration clock and report whether the hard cap is hit.

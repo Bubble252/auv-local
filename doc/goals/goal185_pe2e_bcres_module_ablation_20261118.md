@@ -1,7 +1,7 @@
 # Goal185：PE2E × BCRES 模块集消融（MOD3 → MOD0）
 
 **日期**：2026-11-18<br>
-**状态**：`BLOCKED_PENDING_USER_DECISION / EXECUTED_2026-11-19_INVALID`<br>
+**状态**：`DECISIONS_FROZEN_2026-11-19 / READY_TO_IMPLEMENT`<br>
 **上游**：Goal184 Wave 1（MOD4）、Goal182 模块集轴注册表
 
 ## Research Contract
@@ -398,19 +398,100 @@ C0 晋升阈值 `0.621 m`，MOD0 是擦线失败。
 
 | ID | 项目 | 建议 | 状态 |
 |---|---|---|---|
-| FIX-1 | `min_iterations` 改 stage-local | 必须；否则消融仍被预算错配扭曲 | `[ ]` 待定夺 |
-| FIX-2 | adaptive LR 上限 `1e-2 → 3e-3` | 必须；同时限制每 iteration 放大次数或加 warmup | `[ ]` 待定夺 |
-| FIX-3 | 队列 `stop-on-failure` / `need_mb` / state | 必须 | `[ ]` 待定夺 |
-| FIX-4 | C0 hard cap `120 → 160` | 建议；当前只剩 8 it 余量 | `[ ]` 待定夺 |
-| FIX-5 | MOD3/MOD4 actor 初始化 RNG 配对 | 建议；否则不是严格同初始化 | `[ ]` 待定夺 |
-| FIX-6 | `StageBudgetExhausted` 优雅保存 checkpoint | 建议；避免没有 `final.pt` | `[ ]` 待定夺 |
-| FIX-7 | 重跑 MOD4 干净基线 | 依赖 FIX-1 | `[ ]` 待定夺 |
+| FIX-1 | `min_iterations` 改 stage-local | 必须；否则消融仍被预算错配扭曲 | `[x]` 已定夺：改 stage-local |
+| FIX-2 | adaptive LR 上限 `1e-2 → 3e-3` + 前 5 it warmup | 必须；抑制早期低 KL 连续放大 | `[x]` 已定夺：A+D |
+| FIX-3 | 队列 `stop-on-failure` / `other-growth` / `need_mb` / state | 必须 | `[x]` 已定夺：3a+3b+3c+3d |
+| FIX-4 | C0 hard cap `120 → 150` | 建议；当前只剩 8 it 余量 | `[x]` 已定夺：改 150 |
+| FIX-5 | MOD3/MOD4 actor 初始化 RNG 配对 | 建议；否则不是严格同初始化 | `[x]` 已定夺：A |
+| FIX-6 | `StageBudgetExhausted` 优雅保存 checkpoint | 建议；避免没有 `final.pt` | `[x]` 已定夺：A |
+| FIX-7 | 重跑 MOD4 干净基线 | 依赖 FIX-1 | `[x]` 已定夺：A，5 条全跑 |
 | FIX-8 | blocker / LEDGER / 文档 | 已记录 blocker，LEDGER 待定夺后写 | `[x]` 已记录 |
+
+#### 已定夺细节（2026-11-19）
+
+**FIX-1：gate 计时改为 stage-local**
+
+- 判据改为 `stage_iterations = completed_iterations - stage_entry_iteration`，
+  `min_iterations` 解释为“本 stage 内已完成的 it 数”。
+- 跨 stage 继续保留 optimizer 和模型状态，不照搬参考代码的 fresh optimizer；
+  参考代码每 stage 新进程是因为它跨不同 task，我们跨的是同任务难度。
+- 修改点：`src/auv_lowlevel/curriculum.py` 的 route gate 判据与
+  `curriculum_trainer.py` 的调用参数，保持 `_stage_boundary_target` 语义一致。
+
+**FIX-2：adaptive LR 上限 3e-3 + 前 5 it warmup**
+
+- 上限从硬编码 `1e-2` 降到 `3e-3`；实测 `≤3e-3` 时 KL 最大 `0.061`、
+  clip 最大 `0.44`，`5e-3–1e-2` 时 KL 最大 `0.264`、clip 最大 `0.76`。
+- 前 5 个 iteration 固定初始 LR `3e-4`，既不放也不缩，避开早期低 KL 误判。
+- 不改 `rsl_rl` 库：在 `RecordingRunner.update_with_metrics` 返回后
+  clamp `alg.learning_rate` 并同步 `optimizer.param_groups["lr"]`。
+- 新增配置项（默认值保持历史行为）：`learning_rate_max=1e-2`、
+  `learning_rate_warmup_iterations=0`；本 goal 显式设为 `3e-3` 和 `5`。
+- `desired_kl=0.01`、初始 `3e-4` 保持不变。
+
+**FIX-3：队列容错与显存判据**
+
+- 3a：`--stop-on-failure` 默认关闭。单臂失败只标 `failed` 并记录 rc，
+  其他臂继续调度；需要整队中止时再显式传入该 flag。
+- 3b：`other-growth` 判据改为 `free_mb < need_mb` 或
+  `other_mb > other_max_mb`（绝对 `4096`），不再用“相对启动 baseline
+  增长超过 margin”判。MOD2 启动时 `other=19MiB`、`free=24545MiB`，
+  2.5 分钟后因别人增长约 2GB 被误杀，卡上仍余约 22GB。
+- 3c：`need_mb` 保持 `22000`。Goal184 MOD4 实测
+  `peak_reserved≈21.2GB`、`peak_allocated≈19.1GB`，24GB 卡；
+  降到 21.5GB 只剩约 350MiB 余量，OOM 风险不可接受。
+- 3d：state 写入放 `try/finally`；失败臂写 `failed`、`stop_rc`，
+  避免 daemon 退出后仍显示 `running`。
+
+**FIX-4：C0 hard cap 120 → 150**
+
+- 只改 C0 的 `hard_cap_iterations`，`soft_budget_iterations=72` 不动，
+  评估节奏不变。
+- 依据：MOD4 的 C0 在 iteration 112 通过，原 hard cap 120 只剩 8 it 余量；
+  FIX-2 压低 LR 上限后 C0 可能更慢。150 提供 38 it 缓冲。
+- C1–C6 的 hard cap 余量已在 46–100+ it，本次不改。
+
+**FIX-5：建 runner 前重置种子（方案 A）**
+
+- 现象：MOD3 与 MOD4 的 `model_initial.pt` 中 `actor` 权重最大差 `0.17`，
+  尽管 config 只差 `critic_path_dim`（30 vs 0），BC checkpoint 路径与 SHA
+  完全相同（`86cab3fe...`）。
+- 根因：seed 在构建 env 之前设置；两个臂的观察维度不同，构建 env 时消耗的
+  全局 RNG 数量不同，导致 policy 初始化起点不同。
+- 参考代码：`Wheel-Legged-Lab` 每个 stage 独立进程，进程启动统一设种子，
+  天然规避了该问题；我们单进程连续课程需要在建模型前手动重置。
+- 修法：`scripts/train_batch_lowlevel_ppo.py` 在
+  `runner = RecordingRunner(...)` 之前再次执行 `torch.manual_seed(seed)`
+  （CUDA 时同时 `torch.cuda.manual_seed_all(seed)`）。
+- MOD4 需要用新代码重跑才能与 MOD3 严格配对，计入 FIX-7。
+
+**FIX-6：异常退出保存 `interrupted.pt`（方案 A）**
+
+- 现状：训练每 `save_interval=100` it 自动存档；MOD3 在 120 it 失败，
+  最新只有 `model_100.pt`，最后 20 it 丢失。异常分支只写 `manifest`
+  的 `status=failed`，不保存当前权重。
+- 修法：在 `scripts/train_batch_lowlevel_ppo.py` 的 `except BaseException`
+  中，若 `runner is not None`，尝试 `runner.save(output/"interrupted.pt")`，
+  并在 manifest 记录路径与 SHA；保存失败不覆盖原始异常。
+- 目的：保住预算耗尽/中断前最后一刻的权重，便于诊断与续训，不是为救
+  `INVALID` 结果。
+
+**FIX-7：5 条全量重跑（方案 A）**
+
+- 重跑范围：MOD4 + MOD3/MOD2/MOD1/MOD0，全部使用 FIX-1–FIX-6 修复后的代码。
+- 原因：旧 MOD4 的 C1–C6 只训了 22/24/60/36/84 it；修复后为
+  108/156/216/252/336 it，训练量不可比。
+- 成本：旧 MOD4 实测平均 `32.7 s/it`，655 it 约 6 h；修复后每条约
+  `1840 it`，约 `16.7 h`。5 条约 42 h（2 卡并行）或 33 h（4 卡并行），
+  不含排队与评估。
+- 执行顺序：队列按空闲显存调度；MOD3/MOD4 优先，MOD2/MOD1/MOD0 随后补足。
 
 ### 10.6 未决问题
 
-1. LR 上限选 `3e-3` 还是 `1e-3`？是否加每 iteration 放大次数限制或 warmup？
-2. 是否修 `min_iterations` 并重跑 MOD4？修后 4 条约 25 小时。
+1. ~~LR 上限选 `3e-3` 还是 `1e-3`？是否加每 iteration 放大次数限制或 warmup？~~
+   已定：上限 `3e-3`，前 5 it warmup。
+2. ~~修 `min_iterations` 后是否重跑 MOD4 干净基线（FIX-7）？~~
+   已定：5 条全量重跑。
 3. MOD2/1/0 复用无 current BC 的质量混杂是否接受？
 4. C0 阈值 `0.621` 是否继续沿用（不重标定）？
 5. 队列资源策略是否调整（单臂失败继续、`need_mb` 降低）？

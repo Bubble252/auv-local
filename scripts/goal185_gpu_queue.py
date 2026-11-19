@@ -19,7 +19,7 @@ Queue file (JSON list):
     "config": "configs/lowlevel/goal185/train_formal_mod3_...json",
     "output": "/data/.../full_wave/mod3/pe2e_bcres_seed86201",
     "seed": 86201,
-    "iterations": 2600,
+    "iterations": 2630,
     "need_mb": 22000,
     "deadline": "2026-11-19T12:00:00",
     "gpus": [0, 1],
@@ -223,7 +223,7 @@ def main() -> int:
     jobs = json.loads(args.queue.read_text(encoding="utf-8"))
     for job in jobs:
         job.setdefault("need_mb", 22000)
-        job.setdefault("iterations", 2600)
+        job.setdefault("iterations", 2630)
         job.setdefault("extra_args", [])
         job.setdefault("gpus", allowed)
         job.setdefault("status", "pending")
@@ -234,6 +234,9 @@ def main() -> int:
         if not args.dry_run:
             with args.log.open("a", encoding="utf-8") as handle:
                 handle.write(line + "\n")
+
+    def flush_state() -> None:
+        args.state.write_text(json.dumps(jobs, indent=2, ensure_ascii=False))
 
     pending = [j for j in jobs if j["status"] == "pending"]
     running: list[dict[str, Any]] = []
@@ -265,6 +268,7 @@ def main() -> int:
                         f"need={job['need_mb']} free={state['free_mb']} "
                         f"other={state['other_mb']}"
                     )
+            flush_state()
             return 0
 
         now = datetime.now()
@@ -273,15 +277,17 @@ def main() -> int:
             code = proc.poll()
             if code is not None:
                 log(f"job {entry['job']['name']} exited rc={code}")
-                if args.stop_on_failure and code != 0:
-                    log("stop-on-failure: abort queue")
-                    return 1
                 if entry.get("status") == "running" and code == 0:
                     entry["job"]["status"] = "completed"
                 elif entry.get("status") == "running":
                     entry["job"]["status"] = "failed"
+                    entry["job"]["exit_rc"] = code
                 release_lock(entry["gpu"])
                 running.remove(entry)
+                flush_state()
+                if args.stop_on_failure and code != 0:
+                    log("stop-on-failure: abort queue")
+                    return 1
                 continue
 
             job = entry["job"]
@@ -294,7 +300,10 @@ def main() -> int:
             if gpu_state is not None:
                 if gpu_state["free_mb"] < args.preempt_floor_mb:
                     reason = "free-floor"
-                elif gpu_state["other_mb"] > entry["other_baseline_mb"] + args.margin_mb:
+                elif (
+                    gpu_state["free_mb"] < int(job["need_mb"])
+                    or gpu_state["other_mb"] > args.other_max_mb
+                ):
                     reason = "other-growth"
             if reason:
                 log(f"job {job['name']} preempt reason={reason}")
@@ -380,12 +389,12 @@ def main() -> int:
             )
             pending.remove(job)
 
-        args.state.write_text(json.dumps(jobs, indent=2, ensure_ascii=False))
+        flush_state()
         if pending or running:
             time.sleep(args.poll_seconds)
 
     log("queue done")
-    args.state.write_text(json.dumps(jobs, indent=2, ensure_ascii=False))
+    flush_state()
     return 0
 
 

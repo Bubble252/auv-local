@@ -233,10 +233,15 @@ class CurriculumTrainerHook:
         self._apply_mix_ramp(completed_transitions)
         route_status: dict[str, Any] | None = None
         if self.routine_gate is not None and training_metrics is not None:
+            self.controller.consume_iterations(completed_iterations)
             spec = self.controller.stages[self.controller.stage]
             route_status = self.routine_gate.observe(
                 stage=self.controller.stage,
-                iteration=0 if completed_iterations is None else completed_iterations,
+                iteration=(
+                    0
+                    if completed_iterations is None
+                    else self.controller.stage_consumed_iterations
+                ),
                 metrics=training_metrics,
                 min_iterations=int(spec.soft_budget_iterations or 0),
                 thresholds=self.route_gate_thresholds,
