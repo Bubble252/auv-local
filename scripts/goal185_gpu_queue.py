@@ -172,6 +172,25 @@ def release_lock(gpu: int) -> None:
     lock_path(gpu).unlink(missing_ok=True)
 
 
+def checkpoint_exists(output: str | Path) -> bool:
+    root = Path(output)
+    if not root.is_dir():
+        return False
+    return any(
+        path.is_file() and path.suffix == ".pt" and path.name != "model_initial.pt"
+        for path in root.rglob("*.pt")
+    )
+
+
+def manifest_completed(output: str | Path) -> bool:
+    path = Path(output) / "training_manifest.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return False
+    return payload.get("status") == "completed"
+
+
 def stop_job(proc: subprocess.Popen[Any], grace_s: int, log) -> int:
     pgid = proc.pid
     log(f"stop: SIGINT pgid={pgid}")
@@ -217,6 +236,18 @@ def main() -> int:
     parser.add_argument("--log", type=Path, default=Path("goal185_queue.log"))
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--stop-on-failure", action="store_true")
+    parser.add_argument(
+        "--no-preempt",
+        action="store_true",
+        help="never stop our own job because another user grew into the margin",
+    )
+    parser.add_argument(
+        "--max-restarts",
+        type=int,
+        default=0,
+        help="requeue a failed job from its latest checkpoint this many times",
+    )
+    parser.add_argument("--restart-delay-seconds", type=int, default=120)
     args = parser.parse_args()
 
     allowed = parse_gpus(args.gpus)
@@ -227,6 +258,8 @@ def main() -> int:
         job.setdefault("extra_args", [])
         job.setdefault("gpus", allowed)
         job.setdefault("status", "pending")
+        job.setdefault("attempts", 0)
+        job.setdefault("resume_latest", True)
 
     def log(message: str) -> None:
         line = f"{datetime.now().isoformat(timespec='seconds')} {message}"
@@ -238,6 +271,9 @@ def main() -> int:
     def flush_state() -> None:
         args.state.write_text(json.dumps(jobs, indent=2, ensure_ascii=False))
 
+    for job in jobs:
+        if job["status"] == "pending" and manifest_completed(job["output"]):
+            job["status"] = "completed"
     pending = [j for j in jobs if j["status"] == "pending"]
     running: list[dict[str, Any]] = []
     log(f"queue start: jobs={len(pending)} gpus={allowed} dry_run={args.dry_run}")
@@ -260,7 +296,10 @@ def main() -> int:
                     state = snapshot[gpu]
                     available = state["free_mb"]
                     eligible = (
-                        state["other_mb"] <= args.other_max_mb
+                        (
+                            args.other_max_mb <= 0
+                            or state["other_mb"] <= args.other_max_mb
+                        )
                         and available >= job["need_mb"] + args.margin_mb
                     )
                     log(
@@ -276,18 +315,30 @@ def main() -> int:
             proc = entry["proc"]
             code = proc.poll()
             if code is not None:
-                log(f"job {entry['job']['name']} exited rc={code}")
+                job = entry["job"]
+                log(f"job {job['name']} exited rc={code}")
                 if entry.get("status") == "running" and code == 0:
-                    entry["job"]["status"] = "completed"
+                    job["status"] = "completed"
                 elif entry.get("status") == "running":
-                    entry["job"]["status"] = "failed"
-                    entry["job"]["exit_rc"] = code
+                    job["exit_rc"] = code
+                    job["attempts"] = int(job.get("attempts", 0)) + 1
+                    if args.max_restarts > 0 and job["attempts"] <= args.max_restarts:
+                        job["status"] = "pending"
+                        pending.append(job)
+                        log(
+                            f"job {job['name']} requeued attempt={job['attempts']}/"
+                            f"{args.max_restarts} rc={code}"
+                        )
+                    else:
+                        job["status"] = "failed"
                 release_lock(entry["gpu"])
                 running.remove(entry)
                 flush_state()
-                if args.stop_on_failure and code != 0:
+                if args.stop_on_failure and code != 0 and job.get("status") == "failed":
                     log("stop-on-failure: abort queue")
                     return 1
+                if job.get("status") == "pending":
+                    time.sleep(args.restart_delay_seconds)
                 continue
 
             job = entry["job"]
@@ -297,13 +348,16 @@ def main() -> int:
                 deadline = datetime.fromisoformat(job["deadline"])
                 if now >= deadline:
                     reason = "deadline"
-            if gpu_state is not None:
+            if gpu_state is not None and not args.no_preempt:
                 if gpu_state["free_mb"] < args.preempt_floor_mb:
                     reason = "free-floor"
                 elif (
                     gpu_state["total_mb"] - gpu_state["other_mb"]
                     < int(job["need_mb"])
-                    or gpu_state["other_mb"] > args.other_max_mb
+                    or (
+                        args.other_max_mb > 0
+                        and gpu_state["other_mb"] > args.other_max_mb
+                    )
                 ):
                     reason = "other-growth"
             if reason:
@@ -325,7 +379,7 @@ def main() -> int:
                 state = snapshot[gpu]
                 if read_lock(gpu) is not None:
                     continue
-                if state["other_mb"] > args.other_max_mb:
+                if args.other_max_mb > 0 and state["other_mb"] > args.other_max_mb:
                     continue
                 available = state["free_mb"] - active_ramp_mb(running, gpu, state)
                 if available < job["need_mb"] + args.margin_mb:
@@ -343,6 +397,15 @@ def main() -> int:
             if cap_mb < job["need_mb"]:
                 continue
             wrapper = Path(__file__).with_name("_gpu_mem_cap.py")
+            extra_args = list(job["extra_args"])
+            if (
+                job.get("resume_latest")
+                and checkpoint_exists(job["output"])
+                and "--resume-latest" not in extra_args
+                and "--resume-from" not in extra_args
+            ):
+                extra_args.append("--resume-latest")
+                log(f"resume {job['name']} from latest checkpoint under {job['output']}")
             command = [
                 args.python,
                 str(wrapper),
@@ -355,7 +418,7 @@ def main() -> int:
                 job["output"],
                 "--seed",
                 str(job["seed"]),
-                *job["extra_args"],
+                *extra_args,
             ]
             env = os.environ.copy()
             env["CUDA_VISIBLE_DEVICES"] = str(chosen)

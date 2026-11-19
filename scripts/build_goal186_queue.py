@@ -32,11 +32,23 @@ def main() -> int:
     parser.add_argument("--iterations", type=int, default=2630)
     parser.add_argument("--need-mb", type=int, default=22000)
     parser.add_argument("--gpus", default="0-7")
+    parser.add_argument("--modules", default="mod4,mod3,mod2,mod1,mod0")
+    parser.add_argument("--save-interval", type=int, default=None)
     args = parser.parse_args()
 
     gpus = parse_gpus(args.gpus)
     jobs = []
-    for module in ("mod4", "mod3", "mod2", "mod1", "mod0"):
+    modules = [item.strip() for item in args.modules.split(",") if item.strip()]
+    for module in modules:
+        extra_args = [
+            "--curriculum-eval-stage-boundaries",
+            "--curriculum-route-gate-mode",
+            "enforce",
+            "--curriculum-route-thresholds",
+            str(args.thresholds),
+        ]
+        if args.save_interval is not None:
+            extra_args.extend(["--save-interval", str(args.save_interval)])
         jobs.append(
             {
                 "name": f"{module}_pe2e_bcres_reward_v2_seed{args.seed}",
@@ -52,13 +64,8 @@ def main() -> int:
                 "iterations": args.iterations,
                 "need_mb": args.need_mb,
                 "gpus": gpus,
-                "extra_args": [
-                    "--curriculum-eval-stage-boundaries",
-                    "--curriculum-route-gate-mode",
-                    "enforce",
-                    "--curriculum-route-thresholds",
-                    str(args.thresholds),
-                ],
+                "resume_latest": True,
+                "extra_args": extra_args,
             }
         )
     args.output.parent.mkdir(parents=True, exist_ok=True)
