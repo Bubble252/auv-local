@@ -146,7 +146,7 @@ r_gap      = -5.0 * g
     `learning_rate_warmup_iterations` 被透传给 rsl_rl `PPO.__init__`
     （Goal185 的 smoke 跑在加入 LR guard 之前的配置，正式队列从未启动过）；
     `a6e3b59` 在 `rsl_train_cfg()` 中过滤 runner-only 键，并补回归测试。
-- [x] Step 3：正式训练队列，2630 it，seed86201，MOD4 → MOD3 → MOD2 → MOD1 → MOD0。
+- [ ] Step 3：正式训练队列，2630 it，seed86201，MOD4 → MOD3 → MOD2 → MOD1 → MOD0（运行中）。
   - 2026-11-19 20:43 已挂起：PID `3769887`，run root
     `/data/yhx/underwater-robotics/runs/auv-local/goal186/20261119-goal186-10360ff`；
   - 队列 `queue.json` 5 条，`need_mb=22000`，`margin=1536`，
