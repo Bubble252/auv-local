@@ -1,7 +1,7 @@
 # Goal186：PE2E BCRES reward v2（请求-可执行 gap + 垂向权重）
 
 **日期**：2026-11-19<br>
-**状态**：`SMOKE_VERIFIED / QUEUE_ARMED`
+**状态**：`TRAINING_RUNNING`
 
 ## Research Contract
 
@@ -146,7 +146,16 @@ r_gap      = -5.0 * g
     `learning_rate_warmup_iterations` 被透传给 rsl_rl `PPO.__init__`
     （Goal185 的 smoke 跑在加入 LR guard 之前的配置，正式队列从未启动过）；
     `a6e3b59` 在 `rsl_train_cfg()` 中过滤 runner-only 键，并补回归测试。
-- [ ] Step 3：正式训练队列，2630 it，seed86201，MOD4 → MOD3 → MOD2 → MOD1 → MOD0。
+- [x] Step 3：正式训练队列，2630 it，seed86201，MOD4 → MOD3 → MOD2 → MOD1 → MOD0。
+  - 2026-11-19 20:43 已挂起：PID `3769887`，run root
+    `/data/yhx/underwater-robotics/runs/auv-local/goal186/20261119-goal186-10360ff`；
+  - 队列 `queue.json` 5 条，`need_mb=22000`，`margin=1536`，
+    `other_max=4096`；按 GPU 空闲情况动态取卡；
+  - 20:43:48 MOD4 上 GPU1、MOD3 上 GPU2，各约 `19.7 GB`，
+    显存上限 `23009 MiB`，其他用户进程未受影响；
+  - 修复队列自身容量判定：运行中改为
+    `total_mb - other_mb >= need_mb`，不再把自身占用算成“其他增长”
+    （旧逻辑会在任务启动后误杀自己）。
 - [ ] Step 4：完整 `2.0 m` 半径评价矩阵；审计产物。
 - [ ] Step 5：写 result md、LEDGER、commit。
 
