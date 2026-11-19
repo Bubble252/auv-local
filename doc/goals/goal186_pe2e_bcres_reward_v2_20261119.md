@@ -208,6 +208,10 @@ CUDA_VISIBLE_DEVICES=<gpu> PYTHONPATH=$W/src:$CORE AUV_GOVERNANCE_ROOT=$GOV $PY 
 - 200 it 任务跑到第 30 it 被 `kill -9` → `--resume-latest` 从
   `model_28.pt` 续到 40 it：记录 `1..40` 严格单调、无重复；
   最终 `total_env_steps=491520=40×512×24`；
+- 队列级 kill 测试：`--no-preempt --max-restarts 2` 下跑到第 18 it
+  被 `kill -9`，队列记录 `exited rc=-9` → `requeued attempt=1/2` →
+  `resume ... from latest checkpoint`，恢复后记录 `1..26` 严格单调、
+  无重复；
 - 定向单测 `68 passed`。
 
 剩余 MOD（MOD2/MOD1/MOD0，默认不自动启动）：
