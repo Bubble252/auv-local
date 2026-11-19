@@ -212,6 +212,8 @@ CUDA_VISIBLE_DEVICES=<gpu> PYTHONPATH=$W/src:$CORE AUV_GOVERNANCE_ROOT=$GOV $PY 
   被 `kill -9`，队列记录 `exited rc=-9` → `requeued attempt=1/2` →
   `resume ... from latest checkpoint`，恢复后记录 `1..26` 严格单调、
   无重复；
+- empirical normalization 统计量连续：4 it 后从 `model_2.pt` 续到 6 it，
+  actor count `604233 → 622665`，差值 `18432 = 3×256×24`，没有从零重置；
 - 定向单测 `68 passed`。
 
 剩余 MOD（MOD2/MOD1/MOD0，默认不自动启动）：
