@@ -1916,6 +1916,26 @@ def main() -> int:
             initial_alpha = curriculum_hook.current_encoder_alpha(0)
             runner._current_encoder_alpha = initial_alpha
             runner.alg.policy.set_actor_current_encoder_alpha(initial_alpha)
+        frozen_bc_metadata: dict[str, Any] | None = None
+        if resume_path is not None and frozen_bc_residual:
+            # The frozen BC base is not part of the trainable checkpoint. Load it
+            # before runner.load so the resumed actor/optimizer state wins.
+            assert training.pc is not None
+            assert checkpoint_path is not None
+            frozen_bc_metadata = load_pc_bc_frozen_actor_prior(
+                runner.alg.policy,
+                checkpoint_path,
+                expected_d_z_total=training.pc.d_z_total,
+                expected_n_in_reserved=training.pc.n_in_reserved,
+                expected_n_z_reserved=training.pc.n_z_reserved,
+                expected_actor_hidden_dims=tuple(training.policy["actor_hidden_dims"]),
+                expected_state_encoder_hidden_dims=training.pc.state_encoder_hidden_dims,
+                expected_normalization=env.normalization,
+                expected_normalization_mode=normalization_mode,
+                expected_normalization_schema_hash=empirical_actor_schema_hash,
+                expected_activation=str(training.policy["activation"]),
+                residual_output_init_std=residual_output_init_std,
+            )
         _configure_optimizer_learning_rates(runner, training, is_pc=is_pc)
         resume_start_iteration = 0
         resume_info: dict[str, Any] | None = None
@@ -2068,7 +2088,6 @@ def main() -> int:
         initial_residual_l2_mean = 0.0
         initial_residual_to_base_l2 = 0.0
         warmstart_metadata = None
-        frozen_bc_metadata = None
         residual_warmstart_metadata = None
         if resume_path is None and warmstart_path is not None:
             if is_pc:
