@@ -11,6 +11,9 @@ Safety rules:
   floor, this queue stops its own job first. It never signals another user's
   process.
 - deadlines stop this queue's own job with SIGINT, then SIGTERM, then SIGKILL.
+- --no-preempt means the queue never stops a job it has already launched: it
+  ignores both other-user growth and job deadlines. Only process exit or an
+  explicit operator command ends the job.
 
 Queue file (JSON list):
 [
@@ -239,7 +242,7 @@ def main() -> int:
     parser.add_argument(
         "--no-preempt",
         action="store_true",
-        help="never stop our own job because another user grew into the margin",
+        help="never stop our own job after launch (ignores other-user growth and deadlines)",
     )
     parser.add_argument(
         "--max-restarts",
@@ -344,7 +347,7 @@ def main() -> int:
             job = entry["job"]
             gpu_state = snapshot.get(entry["gpu"])
             reason = None
-            if job.get("deadline"):
+            if job.get("deadline") and not args.no_preempt:
                 deadline = datetime.fromisoformat(job["deadline"])
                 if now >= deadline:
                     reason = "deadline"

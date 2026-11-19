@@ -22,6 +22,7 @@ import numpy as np
 import torch
 
 from auv_lowlevel.base_controller import sha256_file
+from auv_lowlevel.checkpoint_retention import prune_checkpoints
 from auv_lowlevel.batch.checkpoint import (
     CHECKPOINT_METADATA_KEY,
     build_checkpoint_infos,
@@ -382,6 +383,18 @@ def _parse_args() -> argparse.Namespace:
         type=int,
         default=None,
         help="override the runner checkpoint interval in iterations",
+    )
+    parser.add_argument(
+        "--checkpoint-keep-last",
+        type=int,
+        default=20,
+        help="keep the newest N model_<iteration>.pt checkpoints; 0 disables",
+    )
+    parser.add_argument(
+        "--checkpoint-keep-every",
+        type=int,
+        default=100,
+        help="keep model_<iteration>.pt milestones divisible by N; 0 disables",
     )
     parser.add_argument(
         "--curriculum-eval-default-config",
@@ -921,6 +934,8 @@ def main() -> int:
             current_encoder_alpha_schedule: LinearAlphaSchedule | None,
             initial_records: list[dict[str, Any]] | None = None,
             curriculum_hook: CurriculumTrainerHook | None = None,
+            checkpoint_keep_last: int = 20,
+            checkpoint_keep_every: int = 100,
             **runner_kwargs: Any,
         ) -> None:
             super().__init__(*runner_args, **runner_kwargs)
@@ -940,6 +955,8 @@ def main() -> int:
             self._checkpoint_infos = checkpoint_infos
             self._current_encoder_alpha_schedule = current_encoder_alpha_schedule
             self._curriculum_hook = curriculum_hook
+            self._checkpoint_keep_last = int(checkpoint_keep_last)
+            self._checkpoint_keep_every = int(checkpoint_keep_every)
             self._current_encoder_alpha = (
                 None
                 if current_encoder_alpha_schedule is None
@@ -1160,6 +1177,12 @@ def main() -> int:
             if getattr(self, "_curriculum_hook", None) is not None:
                 merged["curriculum_state"] = self._curriculum_hook.state_dict()
             super().save(path, infos=merged)
+            prune_checkpoints(
+                Path(path).parent,
+                keep_last=self._checkpoint_keep_last,
+                keep_every=self._checkpoint_keep_every,
+                protect=(path, Path(path).parent / "model_initial.pt"),
+            )
 
     rsl_module_file = getattr(sys.modules["rsl_rl"], "__file__", None)
     training_config_sha256 = sha256_file(training_path)
@@ -1787,6 +1810,8 @@ def main() -> int:
                 )
             ),
             initial_records=initial_records,
+            checkpoint_keep_last=int(args.checkpoint_keep_last),
+            checkpoint_keep_every=int(args.checkpoint_keep_every),
         )
         if isinstance(env, BatchTorchPCFrozenBCResidualVecEnv):
             env.set_base_action_fn(runner.alg.policy.base_action)

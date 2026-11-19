@@ -34,6 +34,8 @@ def main() -> int:
     parser.add_argument("--gpus", default="0-7")
     parser.add_argument("--modules", default="mod4,mod3,mod2,mod1,mod0")
     parser.add_argument("--save-interval", type=int, default=None)
+    parser.add_argument("--checkpoint-keep-last", type=int, default=20)
+    parser.add_argument("--checkpoint-keep-every", type=int, default=100)
     args = parser.parse_args()
 
     gpus = parse_gpus(args.gpus)
@@ -49,6 +51,14 @@ def main() -> int:
         ]
         if args.save_interval is not None:
             extra_args.extend(["--save-interval", str(args.save_interval)])
+        extra_args.extend(
+            [
+                "--checkpoint-keep-last",
+                str(args.checkpoint_keep_last),
+                "--checkpoint-keep-every",
+                str(args.checkpoint_keep_every),
+            ]
+        )
         jobs.append(
             {
                 "name": f"{module}_pe2e_bcres_reward_v2_seed{args.seed}",
