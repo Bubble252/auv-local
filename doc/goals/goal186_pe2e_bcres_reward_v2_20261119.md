@@ -245,6 +245,16 @@ PYTHONPATH=$W/src:/data/yhx/underwater-robotics/worktrees/auv-core/g04-sync/2026
 - 启动前先加 `--dry-run` 检查；当前没有 22 GB 空闲卡，队列会等待，
   不会挤占 MOD4/MOD3。
 
+2026-11-19 21:27 已启动非抢占队列（PID `3822673`）：
+`/data/yhx/underwater-robotics/runs/auv-local/goal186/20261119-goal186-resume-e44e799/queue.json`；
+dry-run 显示 8 张卡均 `eligible=False`，队列只轮询、不启动、不 kill 任何人。
+
+停止队列（只停队列，不碰正在训练的子进程）：
+
+```bash
+pkill -f "goal185_gpu_queue.py --queue /data/yhx/underwater-robotics/runs/auv-local/goal186/20261119-goal186-resume-e44e799/queue.json"
+```
+
 手动续训模板（必须沿用同一 output/config/seed/env 数）：
 
 ```bash
