@@ -259,6 +259,13 @@ PYTHONPATH=$W/src:/data/yhx/underwater-robotics/worktrees/auv-core/g04-sync/2026
 时被安全替换；替换前确认没有任何子任务占卡，MOD4/MOD3 未受影响。
 新队列改用包含 `6d74701` 的 worktree，重启上限 100。
 
+2026-11-19 21:44 新队列已启动（PID `3843353`）：
+`/data/yhx/underwater-robotics/runs/auv-local/goal186/20261119-goal186-resume-6d74701/queue.json`；
+worktree 为 `20261119-goal186-6d74701`（HEAD `657bc22`）。当前 8 张卡都
+没有 `free >= 22000 + 1536 MiB`，所以 MOD2/MOD1/MOD0 保持 `pending`；
+一旦某张卡满足条件，任务启动后会一直跑，队列不会因他人显存增长或
+`deadline` 主动停止它。MOD4/MOD3 原进程未重启、未受影响。
+
 停止队列（只停队列，不碰正在训练的子进程）：
 
 ```bash
