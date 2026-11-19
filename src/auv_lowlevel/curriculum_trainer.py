@@ -165,6 +165,7 @@ class CurriculumTrainerHook:
         self.budget_path = self.output_dir / "curriculum_stage_budget.jsonl"
         self.route_gate_path = self.output_dir / "curriculum_route_gate.jsonl"
         self.state_path = self.output_dir / "curriculum_state.json"
+        self._last_state_payload: dict[str, Any] | None = None
         self._write_state(0, None)
 
     def _stage_boundary_target(self, entry_iteration: int) -> int:
@@ -205,9 +206,90 @@ class CurriculumTrainerHook:
                 None if self.stage_boundary_evals else self._next_eval_transition
             ),
             "next_eval_iteration": self._next_stage_eval_iteration,
+            "stage_entered_at": int(self._stage_entered_at),
+            "controller_state": self.controller.state_dict(),
+            "mix_ramp": (
+                None if self._mix_ramp is None else self._mix_ramp.as_dict()
+            ),
             "finalized": bool(finalized),
         }
+        self._last_state_payload = payload
         self.state_path.write_text(json.dumps(payload, indent=1) + "\n")
+
+    def state_dict(self) -> dict[str, Any]:
+        """Return the latest complete state for checkpoint embedding."""
+
+        if self._last_state_payload is None:
+            raise RuntimeError("curriculum state has not been initialized")
+        return json.loads(json.dumps(self._last_state_payload))
+
+    def load_state(self, payload: Mapping[str, Any]) -> None:
+        """Restore a state written by :meth:`_write_state` or :meth:`state_dict`."""
+
+        stage = str(payload.get("stage", self.controller.stage))
+        stage_mix = payload.get("stage_mix")
+        if stage_mix is not None:
+            self.sampler.set_stage_mix(
+                [(str(key), float(weight)) for key, weight in stage_mix]
+            )
+        controller_state = payload.get("controller_state")
+        if controller_state is not None:
+            self.controller.load_state_dict(controller_state)
+        else:
+            completed_transitions = int(payload.get("completed_transitions", 0) or 0)
+            completed_iterations = payload.get("completed_iterations")
+            self.controller.load_state_dict(
+                {
+                    "stage": stage,
+                    "stage_consumed": {stage: completed_transitions},
+                    "stage_consumed_iterations": {
+                        stage: int(completed_iterations or 0)
+                    },
+                    "stage_entry_transition": 0,
+                    "stage_entry_iteration": 0,
+                }
+            )
+        if self.promotion_enabled and self.controller.stage != stage:
+            raise ValueError(
+                f"curriculum state stage mismatch: {self.controller.stage!r} != {stage!r}"
+            )
+        self._stage_entered_at = int(
+            payload.get(
+                "stage_entered_at",
+                self.controller._stage_entry_transition or 0,
+            )
+        )
+        if self.stage_boundary_evals:
+            self._next_eval_transition = int(self.eval_interval_transitions)
+            next_iteration = payload.get("next_eval_iteration")
+            self._next_stage_eval_iteration = (
+                None if next_iteration is None else int(next_iteration)
+            )
+            if self._next_stage_eval_iteration is None:
+                completed_iterations = int(payload.get("completed_iterations", 0) or 0)
+                self._next_stage_eval_iteration = self._stage_boundary_target(
+                    completed_iterations
+                )
+        else:
+            next_transition = payload.get("next_eval_transition")
+            self._next_eval_transition = int(
+                self.eval_interval_transitions
+                if next_transition is None
+                else next_transition
+            )
+            self._next_stage_eval_iteration = None
+        mix_ramp = payload.get("mix_ramp")
+        self._mix_ramp = (
+            None if mix_ramp is None else CurriculumMixRamp.from_dict(mix_ramp)
+        )
+        restored = dict(payload)
+        restored["stage"] = self.controller.stage
+        restored["stage_mix"] = [
+            [key, float(weight)] for key, weight in self.sampler.stage_mix
+        ]
+        restored["controller_state"] = self.controller.state_dict()
+        self._last_state_payload = restored
+        self.state_path.write_text(json.dumps(restored, indent=1) + "\n")
 
     def _apply_mix_ramp(self, completed_transitions: int) -> None:
         if self._mix_ramp is None:

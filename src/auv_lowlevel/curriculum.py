@@ -247,6 +247,27 @@ class CurriculumMixRamp:
             if start.get(key, 0.0) + fraction * (target.get(key, 0.0) - start.get(key, 0.0)) > 0.0
         )
 
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "start_mix": [[key, float(weight)] for key, weight in self.start_mix],
+            "target_mix": [[key, float(weight)] for key, weight in self.target_mix],
+            "start_transition": int(self.start_transition),
+            "transitions": int(self.transitions),
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, Any]) -> "CurriculumMixRamp":
+        return cls(
+            start_mix=tuple(
+                (str(key), float(weight)) for key, weight in payload["start_mix"]
+            ),
+            target_mix=tuple(
+                (str(key), float(weight)) for key, weight in payload["target_mix"]
+            ),
+            start_transition=int(payload["start_transition"]),
+            transitions=int(payload["transitions"]),
+        )
+
 
 @dataclass(frozen=True)
 class StageGate:
@@ -1799,6 +1820,59 @@ class CurriculumPromotionController:
             self.stage,
             completed_iterations=completed_iterations,
             route_gate=route_gate,
+        )
+
+    def state_dict(self) -> dict[str, Any]:
+        """Return the promotion-controller state needed for exact resume."""
+
+        return {
+            "stage": self.stage,
+            "consecutive_passes": int(self._consecutive_passes),
+            "consecutive_unsafe": int(self._consecutive_unsafe),
+            "consecutive_stalls": int(self._consecutive_stalls),
+            "rollback_counts": dict(self._rollback_counts),
+            "last_completion_ratio": self._last_completion_ratio,
+            "stage_consumed": dict(self._stage_consumed),
+            "stage_consumed_iterations": dict(self._stage_consumed_iterations),
+            "stage_entry_transition": self._stage_entry_transition,
+            "stage_entry_iteration": self._stage_entry_iteration,
+        }
+
+    def load_state_dict(self, payload: Mapping[str, Any]) -> None:
+        """Restore a state produced by :meth:`state_dict`."""
+
+        stage = str(payload["stage"])
+        if stage not in self.stages:
+            raise ValueError(f"unknown curriculum stage in state: {stage!r}")
+        self.stage = stage
+        self._consecutive_passes = int(payload.get("consecutive_passes", 0))
+        self._consecutive_unsafe = int(payload.get("consecutive_unsafe", 0))
+        self._consecutive_stalls = int(payload.get("consecutive_stalls", 0))
+        self._rollback_counts = {
+            str(key): int(value)
+            for key, value in dict(payload.get("rollback_counts", {})).items()
+        }
+        last_completion = payload.get("last_completion_ratio")
+        self._last_completion_ratio = (
+            None if last_completion is None else float(last_completion)
+        )
+        self._stage_consumed = {
+            stage_name: int(dict(payload.get("stage_consumed", {})).get(stage_name, 0))
+            for stage_name in self.stages
+        }
+        self._stage_consumed_iterations = {
+            stage_name: int(
+                dict(payload.get("stage_consumed_iterations", {})).get(stage_name, 0)
+            )
+            for stage_name in self.stages
+        }
+        entry_transition = payload.get("stage_entry_transition")
+        entry_iteration = payload.get("stage_entry_iteration")
+        self._stage_entry_transition = (
+            None if entry_transition is None else int(entry_transition)
+        )
+        self._stage_entry_iteration = (
+            None if entry_iteration is None else int(entry_iteration)
         )
 
     def _rollback(

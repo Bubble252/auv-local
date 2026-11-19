@@ -113,6 +113,37 @@ def test_hook_promotes_after_two_passes(tmp_path: Path) -> None:
     assert [row["decision"] for row in records] == ["CONTINUE", "PROMOTE"]
 
 
+def test_hook_state_roundtrip_restores_promotion_and_schedule(tmp_path: Path) -> None:
+    sampler = CurriculumStageSampler(stage_mix=(("C0", 1.0),))
+    controller = CurriculumPromotionController(start_stage="C0")
+    evaluations = [_stage_eval(), _stage_eval()]
+    hook = CurriculumTrainerHook(
+        controller=controller,
+        sampler=sampler,
+        output_dir=tmp_path,
+        eval_interval_transitions=100,
+        evaluate=lambda _stage, _steps: evaluations.pop(0),
+    )
+    assert hook.maybe_update(100) == CurriculumDecision.CONTINUE
+    assert hook.maybe_update(200) == CurriculumDecision.PROMOTE
+    state = hook.state_dict()
+
+    restored_sampler = CurriculumStageSampler(stage_mix=(("C0", 1.0),))
+    restored = CurriculumTrainerHook(
+        controller=CurriculumPromotionController(start_stage="C0"),
+        sampler=restored_sampler,
+        output_dir=tmp_path / "restored",
+        eval_interval_transitions=100,
+        evaluate=lambda _stage, _steps: _stage_eval(),
+    )
+    restored.load_state(state)
+
+    assert restored.stage == "C1"
+    assert restored.stage_mix == curriculum_stage_mix_target("C1", preview_enabled=True)
+    assert restored._next_eval_transition == 300
+    assert restored.controller.stage_consumed_transitions == hook.controller.stage_consumed_transitions
+
+
 def test_hook_fails_closed_at_stage_hard_cap_without_eval(tmp_path: Path) -> None:
     sampler = CurriculumStageSampler(stage_mix=(("C0", 1.0),))
     controller = CurriculumPromotionController(start_stage="C0")

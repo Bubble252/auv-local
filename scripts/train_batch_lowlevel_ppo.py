@@ -145,6 +145,29 @@ def _unwrap_pc_vec_env(env: Any) -> BatchTorchPCVecEnv | None:
     return None
 
 
+def _latest_checkpoint(output: Path) -> Path:
+    """Return the newest checkpoint under an output directory."""
+
+    candidates = [
+        path
+        for path in output.rglob("*.pt")
+        if path.is_file() and path.name != "model_initial.pt"
+    ]
+    if not candidates:
+        raise FileNotFoundError(f"no resume checkpoint found under {output}")
+    return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
+def _load_iteration_records(path: Path) -> list[dict[str, Any]]:
+    if not path.is_file():
+        return []
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    records = payload.get("records", [])
+    if not isinstance(records, list):
+        raise ValueError(f"invalid iteration records in {path}")
+    return records
+
+
 def _configure_optimizer_learning_rates(
     runner: Any,
     training: Any,
@@ -336,6 +359,17 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default=None)
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument(
+        "--resume-from",
+        type=Path,
+        default=None,
+        help="resume PPO/optimizer/curriculum state from a checkpoint",
+    )
+    parser.add_argument(
+        "--resume-latest",
+        action="store_true",
+        help="resume from the newest checkpoint found under --output",
+    )
     parser.add_argument(
         "--curriculum-eval-default-config",
         type=Path,
@@ -628,6 +662,15 @@ def main() -> int:
         )
     device = torch.device(training.training_device if args.device is None else args.device)
     output = _resolve(training.output if args.output is None else args.output)
+    if args.resume_from is not None and args.resume_latest:
+        raise ValueError("--resume-from and --resume-latest are mutually exclusive")
+    resume_path: Path | None = None
+    if args.resume_from is not None:
+        resume_path = _resolve(args.resume_from)
+        if not resume_path.is_file():
+            raise FileNotFoundError(f"resume checkpoint not found: {resume_path}")
+    elif args.resume_latest:
+        resume_path = _latest_checkpoint(output)
     warmstart_source = "cli" if args.warmstart_actor else "config"
     warmstart_path = (
         _resolve(args.warmstart_actor)
@@ -649,7 +692,12 @@ def main() -> int:
         raise ValueError("num_mini_batches exceeds rollout sample count")
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError(f"CUDA device {device} requested but torch.cuda is unavailable")
-    if output.exists() and any(output.iterdir()) and not args.overwrite:
+    if (
+        output.exists()
+        and any(output.iterdir())
+        and not args.overwrite
+        and resume_path is None
+    ):
         raise FileExistsError(f"output directory is not empty: {output}")
     pc_path_prior_warmstart = bool(
         is_pc and training.pc is not None and training.pc.bc_path_dim is not None
@@ -829,9 +877,12 @@ def main() -> int:
 
     records_path = output / "iteration_records.json"
     records_jsonl_path = output / "iteration_records.jsonl"
-    if args.overwrite:
+    if args.overwrite and resume_path is None:
         records_path.unlink(missing_ok=True)
         records_jsonl_path.unlink(missing_ok=True)
+    initial_records = (
+        _load_iteration_records(records_path) if resume_path is not None else []
+    )
 
     class RecordingRunner(OnPolicyRunner):
         """Record iteration-level diagnostics without modifying rsl_rl."""
@@ -849,12 +900,13 @@ def main() -> int:
             base_learning_rate: float,
             checkpoint_infos: dict[str, Any],
             current_encoder_alpha_schedule: LinearAlphaSchedule | None,
+            initial_records: list[dict[str, Any]] | None = None,
             curriculum_hook: CurriculumTrainerHook | None = None,
             **runner_kwargs: Any,
         ) -> None:
             super().__init__(*runner_args, **runner_kwargs)
             self.logger_type = str(self.cfg.get("logger", "tensorboard")).lower()
-            self.records: list[dict[str, Any]] = []
+            self.records: list[dict[str, Any]] = list(initial_records or [])
             self._records_path = records_path
             self._records_jsonl_path = records_jsonl_path
             self._write_records = write_records
@@ -1078,6 +1130,8 @@ def main() -> int:
             pc_env = _unwrap_pc_vec_env(self.env)
             if pc_env is not None:
                 merged.update(pc_env.empirical_normalization_payload())
+            if getattr(self, "_curriculum_hook", None) is not None:
+                merged["curriculum_state"] = self._curriculum_hook.state_dict()
             super().save(path, infos=merged)
 
     rsl_module_file = getattr(sys.modules["rsl_rl"], "__file__", None)
@@ -1705,6 +1759,7 @@ def main() -> int:
                     name="pc.actor_current_encoder_alpha",
                 )
             ),
+            initial_records=initial_records,
         )
         if isinstance(env, BatchTorchPCFrozenBCResidualVecEnv):
             env.set_base_action_fn(runner.alg.policy.base_action)
@@ -1835,6 +1890,58 @@ def main() -> int:
             runner._current_encoder_alpha = initial_alpha
             runner.alg.policy.set_actor_current_encoder_alpha(initial_alpha)
         _configure_optimizer_learning_rates(runner, training, is_pc=is_pc)
+        resume_start_iteration = 0
+        resume_info: dict[str, Any] | None = None
+        if resume_path is not None:
+            resume_info = runner.load(str(resume_path))
+            if resume_info.get("training_config_sha256") != training_config_sha256:
+                raise ValueError(
+                    "resume checkpoint training config SHA does not match: "
+                    f"{resume_info.get('training_config_sha256')!r} != "
+                    f"{training_config_sha256!r}"
+                )
+            pc_env = _unwrap_pc_vec_env(env)
+            if pc_env is not None and resume_info.get("normalization_state") is not None:
+                pc_env.load_empirical_normalization_state(
+                    {
+                        key: resume_info[key]
+                        for key in (
+                            "normalization_mode",
+                            "normalization_position",
+                            "actor_normalization_schema",
+                            "actor_normalization_schema_hash",
+                            "critic_normalization_schema",
+                            "critic_normalization_schema_hash",
+                            "normalization_state",
+                        )
+                        if key in resume_info
+                    }
+                )
+            curriculum_state = resume_info.get("curriculum_state")
+            if curriculum_state is None:
+                state_path = output / "curriculum_state.json"
+                if state_path.is_file():
+                    curriculum_state = json.loads(state_path.read_text(encoding="utf-8"))
+            if curriculum_state is not None:
+                curriculum_hook = getattr(runner, "_curriculum_hook", None)
+                if curriculum_hook is not None:
+                    curriculum_hook.load_state(curriculum_state)
+                completed_transitions = int(
+                    curriculum_state.get("completed_transitions", 0) or 0
+                )
+                if pc_env is not None:
+                    pc_env.restore_total_env_steps(completed_transitions)
+                if curriculum_hook is not None:
+                    alpha = curriculum_hook.current_encoder_alpha(completed_transitions)
+                    runner._current_encoder_alpha = alpha
+                    runner.alg.policy.set_actor_current_encoder_alpha(alpha)
+            if training.pc is not None and training.pc.path_dim:
+                env.set_path_blocks(
+                    _path_blocks_for_iteration(
+                        training.pc, int(runner.current_learning_iteration)
+                    )
+                )
+            resume_start_iteration = int(runner.current_learning_iteration)
         if is_pc:
             policy_parameter_counts = runner.alg.policy.parameter_counts()
             checkpoint_infos[CHECKPOINT_METADATA_KEY].update(policy_parameter_counts)
@@ -1871,7 +1978,7 @@ def main() -> int:
         warmstart_metadata = None
         frozen_bc_metadata = None
         residual_warmstart_metadata = None
-        if warmstart_path is not None:
+        if resume_path is None and warmstart_path is not None:
             if is_pc:
                 assert training.pc is not None
                 warmstart_metadata = load_pc_bc_actor_prior(
@@ -1913,7 +2020,7 @@ def main() -> int:
             with torch.inference_mode():
                 initial_actions = runner.alg.policy.act_inference(observations)
             initial_residual_abs_max = float(torch.max(torch.abs(initial_actions)).item())
-        if frozen_bc_residual:
+        if resume_path is None and frozen_bc_residual:
             assert training.pc is not None
             assert checkpoint_path is not None
             frozen_bc_metadata = load_pc_bc_frozen_actor_prior(
@@ -2003,7 +2110,7 @@ def main() -> int:
                 "residual_warmstart_metadata": residual_warmstart_metadata,
             }
         )
-        if is_pc:
+        if is_pc and resume_path is None:
             initial_checkpoint_path = output / "model_initial.pt"
             runner.save(str(initial_checkpoint_path))
             manifest.update(
@@ -2012,9 +2119,20 @@ def main() -> int:
                     "initial_checkpoint_sha256": sha256_file(initial_checkpoint_path),
                 }
             )
+        remaining_iterations = max(0, int(iterations) - int(resume_start_iteration))
+        manifest.update(
+            {
+                "resume_from": None if resume_path is None else str(resume_path.resolve()),
+                "resume_from_sha256": (
+                    None if resume_path is None else sha256_file(resume_path)
+                ),
+                "resume_start_iteration": int(resume_start_iteration),
+                "remaining_iterations": int(remaining_iterations),
+            }
+        )
         _write_json(manifest_path, manifest)
 
-        runner.learn(iterations, init_at_random_ep_len=False)
+        runner.learn(remaining_iterations, init_at_random_ep_len=False)
         if runner._curriculum_hook is not None:
             runner._curriculum_hook.finalize(int(env.total_env_steps))
         final_path = output / "final.pt"
@@ -2047,11 +2165,13 @@ def main() -> int:
         )
         frozen_bc_audit = None
         if frozen_bc_residual:
-            frozen_bc_audit = _frozen_bc_parameter_audit(
-                output / "model_initial.pt",
-                saved_checkpoint,
-                runner.alg.policy,
-            )
+            initial_audit_path = output / "model_initial.pt"
+            if initial_audit_path.is_file():
+                frozen_bc_audit = _frozen_bc_parameter_audit(
+                    initial_audit_path,
+                    saved_checkpoint,
+                    runner.alg.policy,
+                )
         wall_time_s = time.monotonic() - started
         manifest.update(
             {

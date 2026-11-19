@@ -787,6 +787,13 @@ class BatchTorchPCVecEnv:
     def total_env_steps(self) -> int:
         return self._total_env_steps
 
+    def restore_total_env_steps(self, value: int) -> None:
+        """Restore the cumulative step counter when resuming a checkpoint."""
+
+        if isinstance(value, bool) or int(value) < 0:
+            raise ValueError("total_env_steps must be a non-negative integer")
+        self._total_env_steps = int(value)
+
     @property
     def actor_observations(self) -> Tensor:
         """Return the actor observation that the next policy decision will see."""
