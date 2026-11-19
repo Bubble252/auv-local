@@ -188,6 +188,12 @@ CUDA_VISIBLE_DEVICES=<gpu> PYTHONPATH=$W/src:$CORE AUV_GOVERNANCE_ROOT=$GOV $PY 
   iteration；记录文件截断到断点，重放区间不会留下重复行；
 - `--resume-latest` 按 mtime 倒序试读，跳过写坏或半截的 `.pt`；
 - `--save-interval N` 覆盖 config 的 100 it；新队列用 10 it（约 5.5 min）。
+- checkpoint 保留策略（commit `6d74701`）：每 10 it 保存会占很多空间，
+  因此每次保存后自动清理 `model_<iteration>.pt`，默认
+  `--checkpoint-keep-last 20 --checkpoint-keep-every 100`，即保留最近
+  20 个 + 每 100 it 的里程碑；`model_initial.pt`、`final.pt`、
+  `curriculum_checkpoints/` 不受影响，正在写的当前 checkpoint 受保护。
+  需要完整历史时把两个参数设为 0（关闭清理）即可。
 
 限制：
 
@@ -219,8 +225,8 @@ CUDA_VISIBLE_DEVICES=<gpu> PYTHONPATH=$W/src:$CORE AUV_GOVERNANCE_ROOT=$GOV $PY 
 剩余 MOD（MOD2/MOD1/MOD0，默认不自动启动）：
 
 ```bash
-W=/data/yhx/underwater-robotics/worktrees/auv-local/goal186/20261119-goal186-78bfed7
-R=/data/yhx/underwater-robotics/runs/auv-local/goal186/20261119-goal186-resume-ce39ad9
+W=/data/yhx/underwater-robotics/worktrees/auv-local/goal186/20261119-goal186-6d74701
+R=/data/yhx/underwater-robotics/runs/auv-local/goal186/20261119-goal186-resume-6d74701
 T=/data/yhx/underwater-robotics/runs/auv-local/goal184/20261118-goal184-64d8225/route_gate_calibration_pe2e_stage_matched_v4_100it_fixedlr/thresholds
 PY=/data/yhx/underwater-robotics/envs/venvs/isaaclab/bin/python
 PYTHONPATH=$W/src:/data/yhx/underwater-robotics/worktrees/auv-core/g04-sync/20261114-g04-sync-0e0bfb1/src \
@@ -233,13 +239,14 @@ PYTHONPATH=$W/src:/data/yhx/underwater-robotics/worktrees/auv-core/g04-sync/2026
 PYTHONPATH=$W/src:/data/yhx/underwater-robotics/worktrees/auv-core/g04-sync/20261114-g04-sync-0e0bfb1/src \
   $PY $W/scripts/goal185_gpu_queue.py \
   --queue $R/queue.json --gpus 0-7 \
-  --no-preempt --max-restarts 5 --restart-delay-seconds 120 \
+  --no-preempt --max-restarts 100 --restart-delay-seconds 120 \
   --margin-mb 1536 --other-max-mb 0 \
   --state $R/queue_state.json --log $R/queue.log
 ```
 
-- `--no-preempt`：别人显存涨了也不主动杀自己的任务；
-- `--max-restarts 5`：只在进程真的退出（含 OOM/被 kill）后，
+- `--no-preempt`：任务一旦占卡，队列不再主动停它；既不看别人显存增长，
+  也忽略队列文件里的 `deadline`。只有进程自己退出或人工显式停止才结束；
+- `--max-restarts 100`：只在进程真的退出（含 OOM/被 kill）后，
   用 `--resume-latest` 从最新 checkpoint 重启；
 - `--other-max-mb 0`：关闭“其他用户占用超过 4 GB 就不许用卡”，
   改为只要求 `free >= need + margin`，并用 allocator cap 把自己锁在
@@ -247,9 +254,10 @@ PYTHONPATH=$W/src:/data/yhx/underwater-robotics/worktrees/auv-core/g04-sync/2026
 - 启动前先加 `--dry-run` 检查；当前没有 22 GB 空闲卡，队列会等待，
   不会挤占 MOD4/MOD3。
 
-2026-11-19 21:27 已启动非抢占队列（PID `3822673`）：
-`/data/yhx/underwater-robotics/runs/auv-local/goal186/20261119-goal186-resume-e44e799/queue.json`；
-dry-run 显示 8 张卡均 `eligible=False`，队列只轮询、不启动、不 kill 任何人。
+2026-11-19 21:27 启动的第一版非抢占队列（PID `3822673`，
+`20261119-goal186-resume-e44e799`）在 MOD2/MOD1/MOD0 全部仍为 `pending`
+时被安全替换；替换前确认没有任何子任务占卡，MOD4/MOD3 未受影响。
+新队列改用包含 `6d74701` 的 worktree，重启上限 100。
 
 停止队列（只停队列，不碰正在训练的子进程）：
 
