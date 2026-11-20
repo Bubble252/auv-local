@@ -12,6 +12,7 @@ import importlib.metadata
 import json
 import math
 import platform
+import re
 import subprocess
 import sys
 import time
@@ -148,12 +149,18 @@ def _unwrap_pc_vec_env(env: Any) -> BatchTorchPCVecEnv | None:
 
 
 def _latest_checkpoint(output: Path) -> Path:
-    """Return the newest checkpoint under an output directory."""
+    """Return the newest periodic ``model_<iteration>.pt`` checkpoint.
+
+    ``interrupted.pt`` and ``final.pt`` are intentionally excluded: an
+    interrupted checkpoint may embed the exact failed curriculum state that
+    caused the exit, and resuming from it would reproduce the failure.
+    Periodic checkpoints predate the failure and use the record-based rebuild.
+    """
 
     candidates = [
         path
         for path in output.rglob("*.pt")
-        if path.is_file() and path.name != "model_initial.pt"
+        if path.is_file() and re.fullmatch(r"model_\d+\.pt", path.name)
     ]
     if not candidates:
         raise FileNotFoundError(f"no resume checkpoint found under {output}")
