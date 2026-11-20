@@ -30,8 +30,8 @@ def test_reconstructs_current_stage_budget() -> None:
     controller = state["controller_state"]
     assert controller["stage_consumed_iterations"] == {"C1": 3}
     assert controller["stage_consumed"] == {"C1": 300}
-    assert controller["stage_entry_iteration"] == 2
-    assert controller["stage_entry_transition"] == 200
+    assert controller["stage_entry_iteration"] == 5
+    assert controller["stage_entry_transition"] == 500
 
 
 def test_ignores_records_after_checkpoint() -> None:

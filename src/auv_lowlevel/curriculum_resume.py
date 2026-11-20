@@ -63,8 +63,11 @@ def curriculum_state_from_records(
             "stage_consumed_iterations": {
                 stage: max(1, last_iteration - first_iteration + 1)
             },
-            "stage_entry_transition": entry_steps,
-            "stage_entry_iteration": first_iteration - 1,
+            # Consume counters already include everything up to the last
+            # completed iteration. The entry markers must point at that same
+            # iteration, otherwise the next check adds the stage history again.
+            "stage_entry_transition": last_steps,
+            "stage_entry_iteration": last_iteration,
         },
         "last_decision": None,
         "rollbacks_used": 0,
