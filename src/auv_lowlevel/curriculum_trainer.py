@@ -239,14 +239,16 @@ class CurriculumTrainerHook:
         if controller_state is not None:
             self.controller.load_state_dict(controller_state)
         else:
-            completed_transitions = int(payload.get("completed_transitions", 0) or 0)
-            completed_iterations = payload.get("completed_iterations")
+            consumed_transitions = dict(payload.get("stage_consumed", {}) or {})
+            consumed_iterations = dict(payload.get("stage_consumed_iterations", {}) or {})
             self.controller.load_state_dict(
                 {
                     "stage": stage,
-                    "stage_consumed": {stage: completed_transitions},
+                    "stage_consumed": {
+                        stage: int(consumed_transitions.get(stage, 0))
+                    },
                     "stage_consumed_iterations": {
-                        stage: int(completed_iterations or 0)
+                        stage: int(consumed_iterations.get(stage, 0))
                     },
                     "stage_entry_transition": 0,
                     "stage_entry_iteration": 0,

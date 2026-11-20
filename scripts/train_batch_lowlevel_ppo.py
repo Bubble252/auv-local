@@ -95,6 +95,7 @@ from auv_lowlevel.curriculum_trainer import (
     parse_eval_summary,
     run_eval_command,
 )
+from auv_lowlevel.curriculum_resume import curriculum_state_from_records
 from auv_lowlevel.experiment_contract import require_training_curriculum
 from auv_lowlevel.ppo_config import (
     TRRES_LEARNING_COMPOSITIONS,
@@ -2017,6 +2018,11 @@ def main() -> int:
                     }
                 )
             curriculum_state = resume_info.get("curriculum_state")
+            if curriculum_state is None:
+                curriculum_state = curriculum_state_from_records(
+                    initial_records,
+                    upto_iteration=resume_start_iteration,
+                )
             if curriculum_state is None:
                 state_path = output / "curriculum_state.json"
                 if state_path.is_file():
