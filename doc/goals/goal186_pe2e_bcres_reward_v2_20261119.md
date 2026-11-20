@@ -266,6 +266,40 @@ worktree 为 `20261119-goal186-6d74701`（HEAD `657bc22`）。当前 8 张卡都
 一旦某张卡满足条件，任务启动后会一直跑，队列不会因他人显存增长或
 `deadline` 主动停止它。MOD4/MOD3 原进程未重启、未受影响。
 
+2026-11-20 05:25/05:28 宿主机连续重启，所有训练进程被系统终止。重启后
+新队列又因为启动环境缺少 `AUV_GOVERNANCE_ROOT`，在
+`check_training_profile.py` 处反复 `rc=1`，没有产生任何 checkpoint。
+
+- MOD4 停在 it 914/C5，`model_900.pt` 可用；
+- MOD3 在 23:03 因 `C1` 的 180 it 硬上限抛出
+  `StageBudgetExhausted`，`model_200.pt` 可用；
+- MOD0 在 10:47 因 `C0` 的 150 it 硬上限退出，`model_150.pt` 可用；
+- MOD2/MOD1 从 10:35 起在 C0 正常训练。
+
+旧 checkpoint 续训兼容（commit `474e24f`、`4ca3171`、`abaa099`）：
+
+- 旧 checkpoint 没有 `curriculum_state`；现在从
+  `iteration_records.json` 重建 stage、stage mix、stage 内已消费 it/transitions，
+  并避免二次累加；
+- `--resume-latest` 只认 `model_<iteration>.pt`，不再自动选
+  `interrupted.pt` / `final.pt`；失败进程写下的 `interrupted.pt` 可能内嵌
+  触发失败的坏课程状态，自动续训不能信任它；
+- 实测 MOD4：`model_900` → 901..903 全部为 C5；MOD3：
+  `model_200` → 201..202 全部为 C1；
+- 仍然最多重放一个保存周期；MOD4/MOD3 旧 run 是 100 it 保存，迁移到新代码后
+  新 checkpoint 每 10 it 保存；route-gate 20-it 窗口重建后从空开始。
+
+当前主线状态：
+
+- MOD4 已由 `abaa099` 队列从 903 it/C5 恢复（PID `239165`，GPU0）；
+- MOD2/MOD1 继续在 C0 训练，但当前没有队列监管（原队列为替换 MOD4 已停止）；
+- MOD3/MOD0 暂停，等待“阶段硬上限”策略定夺。
+
+待定夺：`C0=150`、`C1=180` … 的 stage hard cap 到点后会抛
+`StageBudgetExhausted`，直接终止整个 arm。这与“route/completion 是软门，
+不直接停整个实验”的规则冲突。可选：到点强制推进并记
+`FORCED_ADVANCE`；冻结当前阶段继续跑完剩余 it；或维持 fail-closed。
+
 停止队列（只停队列，不碰正在训练的子进程）：
 
 ```bash
